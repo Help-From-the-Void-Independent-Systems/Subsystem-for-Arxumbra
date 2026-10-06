@@ -1,0 +1,15 @@
+[package]
+name = "subsystem-for-arxumbra"
+version = "0.0.0-s0"
+edition = "2024"
+
+[dependencies]
+bevy = { version = "0.20.0-rc.2", default-features = false, features = ["std"] }
+
+[profile.release]
+lto = "thin"
+panic = "abort"
+strip = true
+
+[package.metadata.cross.target.aarch64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main"
