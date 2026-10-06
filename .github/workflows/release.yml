@@ -1,0 +1,122 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: ${{ matrix.artifact }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        include:
+          - artifact: AArch64-Linux-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
+            os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            builder: cross
+            extension: ""
+          - artifact: x86_64-Linux-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            builder: cargo
+            extension: ""
+          - artifact: AArch64-macOS-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
+            os: macos-latest
+            target: aarch64-apple-darwin
+            builder: cargo
+            extension: ""
+          - artifact: x86_64-macOS-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
+            os: macos-latest
+            target: x86_64-apple-darwin
+            builder: cargo
+            extension: ""
+          - artifact: AArch64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
+            os: windows-latest
+            target: aarch64-pc-windows-msvc
+            builder: cargo
+            extension: ".exe"
+          - artifact: x86_64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            builder: cargo
+            extension: ".exe"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Restore build cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install cross
+        if: matrix.builder == 'cross'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Build
+        run: ${{ matrix.builder }} build --release --target ${{ matrix.target }}
+
+      - name: Rename executable
+        run: |
+          mkdir -p dist
+          mv "target/${{ matrix.target }}/release/subsystem-for-arxumbra${{ matrix.extension }}" "dist/${{ matrix.artifact }}${{ matrix.extension }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}${{ matrix.extension }}
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --generate-notes
+          for file in \
+            AArch64-Linux-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0 \
+            x86_64-Linux-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0 \
+            AArch64-macOS-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0 \
+            x86_64-macOS-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0 \
+            AArch64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0.exe \
+            x86_64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0.exe
+          do
+            gh release upload "$TAG" "dist/$file" --clobber
+          done
