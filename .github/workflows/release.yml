@@ -57,6 +57,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          lfs: true
+
+      - name: Verify textures
+        run: |
+          cd assets
+          for file in *.ktx2; do
+            magic="$(od -An -tx1 -N12 "$file" | tr -d ' \n' | tr 'A-F' 'a-f')"
+            if [ "$magic" != "ab4b5458203230bb0d0a1a0a" ]; then
+              echo "Not a KTX2 texture, Git LFS object missing: assets/$file" >&2
+              exit 1
+            fi
+          done
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
