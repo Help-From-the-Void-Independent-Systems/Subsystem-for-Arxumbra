@@ -1,72 +1,116 @@
 fn main() {
     bevy::app::App::new()
-        .add_plugins(
-            bevy::app::PluginGroup::set(
-                bevy::DefaultPlugins,
-                bevy::window::WindowPlugin {
-                    primary_window: Some(bevy::window::Window {
-                        present_mode: bevy::window::PresentMode::AutoVsync,
-                        mode: bevy::window::WindowMode::BorderlessFullscreen(
-                            bevy::window::MonitorSelection::Primary,
-                        ),
-                        position: bevy::window::WindowPosition::Automatic,
-                        resolution: bevy::window::WindowResolution::new(1280, 720),
-                        title: String::from("Subsystem for Arxumbra"),
-                        name: None,
-                        composite_alpha_mode: bevy::window::CompositeAlphaMode::Auto,
-                        resize_constraints: bevy::window::WindowResizeConstraints {
-                            min_width: 180.0,
-                            min_height: 120.0,
-                            max_width: f32::INFINITY,
-                            max_height: f32::INFINITY,
-                        },
-                        resizable: false,
-                        enabled_buttons: bevy::window::EnabledButtons {
-                            minimize: true,
-                            maximize: true,
-                            close: true,
-                        },
-                        decorations: false,
-                        transparent: false,
-                        focused: true,
-                        window_level: bevy::window::WindowLevel::Normal,
-                        canvas: None,
-                        fit_canvas_to_parent: false,
-                        prevent_default_event_handling: true,
-                        internal: bevy::window::InternalWindowState::default(),
-                        ime_enabled: false,
-                        ime_position: bevy::math::Vec2::ZERO,
-                        window_theme: None,
-                        visible: true,
-                        skip_taskbar: true,
-                        clip_children: true,
-                        desired_maximum_frame_latency: None,
-                        recognize_pinch_gesture: false,
-                        recognize_rotation_gesture: false,
-                        recognize_doubletap_gesture: false,
-                        recognize_pan_gesture: None,
-                        movable_by_window_background: false,
-                        fullsize_content_view: false,
-                        has_shadow: false,
-                        titlebar_shown: true,
-                        titlebar_transparent: false,
-                        titlebar_show_title: true,
-                        titlebar_show_buttons: true,
-                        borderless_game: true,
-                        prefers_home_indicator_hidden: false,
-                        prefers_status_bar_hidden: false,
-                        preferred_screen_edges_deferring_system_gestures: bevy::window::ScreenEdge::None,
-                    }),
-                    primary_cursor_options: Some(bevy::window::CursorOptions {
-                        visible: false,
-                        grab_mode: bevy::window::CursorGrabMode::None,
-                        hit_test: true,
-                    }),
-                    exit_condition: bevy::window::ExitCondition::OnAllClosed,
-                    close_when_requested: true,
+        .add_plugins((
+            bevy::app::TaskPoolPlugin {
+                task_pool_options: bevy::app::TaskPoolOptions {
+                    min_total_threads: 1,
+                    max_total_threads: usize::MAX,
+                    io: bevy::app::TaskPoolThreadAssignmentPolicy {
+                        min_threads: 1,
+                        max_threads: 4,
+                        percent: 0.25,
+                        on_thread_spawn: None,
+                        on_thread_destroy: None,
+                    },
+                    async_compute: bevy::app::TaskPoolThreadAssignmentPolicy {
+                        min_threads: 1,
+                        max_threads: 4,
+                        percent: 0.25,
+                        on_thread_spawn: None,
+                        on_thread_destroy: None,
+                    },
+                    compute: bevy::app::TaskPoolThreadAssignmentPolicy {
+                        min_threads: 1,
+                        max_threads: usize::MAX,
+                        percent: 1.0,
+                        on_thread_spawn: None,
+                        on_thread_destroy: None,
+                    },
                 },
-            )
-            .set(bevy::render::RenderPlugin {
+            },
+            bevy::diagnostic::FrameCountPlugin,
+            bevy::time::TimePlugin,
+            bevy::transform::TransformPlugin,
+            bevy::diagnostic::DiagnosticsPlugin,
+            bevy::input::InputPlugin,
+            bevy::window::WindowPlugin {
+                primary_window: Some(bevy::window::Window {
+                    present_mode: bevy::window::PresentMode::AutoVsync,
+                    mode: bevy::window::WindowMode::BorderlessFullscreen(
+                        bevy::window::MonitorSelection::Primary,
+                    ),
+                    position: bevy::window::WindowPosition::Automatic,
+                    resolution: bevy::window::WindowResolution::new(1920, 1080),
+                    title: String::from("Subsystem for Arxumbra"),
+                    name: None,
+                    composite_alpha_mode: bevy::window::CompositeAlphaMode::Auto,
+                    resize_constraints: bevy::window::WindowResizeConstraints {
+                        min_width: 180.0,
+                        min_height: 120.0,
+                        max_width: f32::INFINITY,
+                        max_height: f32::INFINITY,
+                    },
+                    resizable: false,
+                    enabled_buttons: bevy::window::EnabledButtons {
+                        minimize: false,
+                        maximize: false,
+                        close: false,
+                    },
+                    decorations: false,
+                    transparent: false,
+                    focused: true,
+                    window_level: bevy::window::WindowLevel::Normal,
+                    canvas: None,
+                    fit_canvas_to_parent: false,
+                    prevent_default_event_handling: true,
+                    internal: bevy::window::InternalWindowState::default(),
+                    ime_enabled: false,
+                    ime_position: bevy::math::Vec2::ZERO,
+                    window_theme: None,
+                    visible: true,
+                    skip_taskbar: true,
+                    clip_children: true,
+                    desired_maximum_frame_latency: Some(core::num::NonZero::<u32>::MIN),
+                    recognize_pinch_gesture: false,
+                    recognize_rotation_gesture: false,
+                    recognize_doubletap_gesture: false,
+                    recognize_pan_gesture: None,
+                    movable_by_window_background: false,
+                    fullsize_content_view: false,
+                    has_shadow: false,
+                    titlebar_shown: true,
+                    titlebar_transparent: false,
+                    titlebar_show_title: true,
+                    titlebar_show_buttons: true,
+                    borderless_game: true,
+                    prefers_home_indicator_hidden: false,
+                    prefers_status_bar_hidden: false,
+                    preferred_screen_edges_deferring_system_gestures: bevy::window::ScreenEdge::None,
+                }),
+                primary_cursor_options: Some(bevy::window::CursorOptions {
+                    visible: false,
+                    grab_mode: bevy::window::CursorGrabMode::None,
+                    hit_test: true,
+                }),
+                exit_condition: bevy::window::ExitCondition::DontExit,
+                close_when_requested: false,
+            },
+            bevy::a11y::AccessibilityPlugin,
+            bevy::asset::AssetPlugin {
+                file_path: String::from("assets"),
+                processed_file_path: String::from("imported_assets/Default"),
+                watch_for_changes_override: None,
+                use_asset_processor_override: None,
+                mode: bevy::asset::AssetMode::Unprocessed,
+                meta_check: bevy::asset::AssetMetaCheck::Never,
+                unapproved_path_mode: bevy::asset::UnapprovedPathMode::Forbid,
+            },
+            bevy::winit::WinitPlugin {
+                run_on_any_thread: false,
+            },
+        ))
+        .add_plugins((
+            bevy::render::RenderPlugin {
                 render_creation: bevy::render::settings::RenderCreation::Automatic(Box::new(
                     bevy::render::settings::WgpuSettings {
                         device_label: None,
@@ -143,18 +187,26 @@ fn main() {
                         gles3_minor_version: bevy::render::settings::Gles3MinorVersion::Automatic,
                         instance_flags: bevy::render::settings::InstanceFlags::VALIDATION_INDIRECT_CALL,
                         memory_hints: bevy::render::settings::MemoryHints::Performance,
-                        instance_memory_budget_thresholds: wgpu::MemoryBudgetThresholds {
-                            for_resource_creation: None,
-                            for_device_loss: None,
-                        },
+                        instance_memory_budget_thresholds:
+                            bevy::render::settings::WgpuSettings::default()
+                                .instance_memory_budget_thresholds,
                         force_fallback_adapter: false,
                         adapter_name: None,
                     },
                 )),
                 synchronous_pipeline_compilation: false,
                 debug_flags: bevy::render::RenderDebugFlags::empty(),
-            }),
-        )
+            },
+            bevy::image::ImagePlugin {
+                default_sampler: bevy::image::ImageSamplerDescriptor::linear(),
+            },
+            bevy::mesh::MeshPlugin,
+            bevy::camera::CameraPlugin,
+            bevy::render::pipelined_rendering::PipelinedRenderingPlugin,
+            bevy::core_pipeline::CorePipelinePlugin,
+            bevy::sprite::SpritePlugin,
+            bevy::sprite_render::SpriteRenderPlugin,
+        ))
         .add_systems(
             bevy::app::Startup,
             |world: &mut bevy::ecs::world::World| {
@@ -199,53 +251,61 @@ fn main() {
                         )
                         .unwrap();
                     world.spawn((
-                            bevy::sprite::Sprite {
-                                image: bevy::asset::Handle::Uuid(
-                                    bevy::asset::uuid::Uuid::from_u128(0),
-                                    core::marker::PhantomData,
-                                ),
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(
-                                    width.max(height * 16.0 / 9.0),
-                                    height.max(width * 9.0 / 16.0),
-                                )),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Opaque,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::ZERO,
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::ONE,
-                            },
-                        ));
-                    world.spawn((
-                            bevy::sprite::Sprite {
-                                image: bevy::asset::Handle::Uuid(
-                                    bevy::asset::uuid::Uuid::from_u128(1),
-                                    core::marker::PhantomData,
-                                ),
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(
-                                    (width / 3.0).max(height * 9.0 / 16.0),
-                                    height.max(width * 16.0 / 27.0),
-                                )),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Opaque,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(-width / 3.0, 0.0, 1.0),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::ONE,
-                            },
-                        ));
+                        bevy::sprite::Sprite {
+                            image: bevy::asset::Handle::Uuid(
+                                bevy::asset::uuid::Uuid::from_u128(0),
+                                core::marker::PhantomData,
+                            ),
+                            texture_atlas: None,
+                            color: bevy::color::Color::WHITE,
+                            flip_x: false,
+                            flip_y: false,
+                            custom_size: Some(bevy::math::Vec2::new(
+                                width.max(height * 16.0 / 9.0),
+                                height.max(width * 9.0 / 16.0),
+                            )),
+                            rect: None,
+                            image_mode: bevy::sprite::SpriteImageMode::Auto,
+                            alpha_mode: bevy::sprite::SpriteAlphaMode::Opaque,
+                        },
+                        bevy::transform::components::Transform {
+                            translation: bevy::math::Vec3::ZERO,
+                            rotation: bevy::math::Quat::IDENTITY,
+                            scale: bevy::math::Vec3::ONE,
+                        },
+                    ));
+                    world
+                        .spawn(bevy::transform::components::Transform {
+                            translation: bevy::math::Vec3::new(-width * 2.0 / 3.0, 0.0, 1.0),
+                            rotation: bevy::math::Quat::IDENTITY,
+                            scale: bevy::math::Vec3::ONE,
+                        })
+                        .with_children(|panel| {
+                            panel.spawn((
+                                bevy::sprite::Sprite {
+                                    image: bevy::asset::Handle::Uuid(
+                                        bevy::asset::uuid::Uuid::from_u128(1),
+                                        core::marker::PhantomData,
+                                    ),
+                                    texture_atlas: None,
+                                    color: bevy::color::Color::WHITE,
+                                    flip_x: false,
+                                    flip_y: false,
+                                    custom_size: Some(bevy::math::Vec2::new(
+                                        (width / 3.0).max(height * 9.0 / 16.0),
+                                        height.max(width * 16.0 / 27.0),
+                                    )),
+                                    rect: None,
+                                    image_mode: bevy::sprite::SpriteImageMode::Auto,
+                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Opaque,
+                                },
+                                bevy::transform::components::Transform {
+                                    translation: bevy::math::Vec3::ZERO,
+                                    rotation: bevy::math::Quat::IDENTITY,
+                                    scale: bevy::math::Vec3::ONE,
+                                },
+                            ));
+                        });
                 })(
                     world.resource::<bevy::image::CompressedImageFormatSupport>().0,
                     world
@@ -260,6 +320,92 @@ fn main() {
                         .next()
                         .unwrap()
                         .physical_height as f32,
+                    world,
+                );
+            },
+        )
+        .add_systems(
+            bevy::app::Update,
+            |world: &mut bevy::ecs::world::World| {
+                (|state: bevy::transform::components::Transform,
+                  panel: f32,
+                  dt: f32,
+                  escape: f32,
+                  toggle: f32,
+                  world: &mut bevy::ecs::world::World|
+                 {
+                    (|step: f32, dt: f32, held: f32, panel: f32, world: &mut bevy::ecs::world::World|
+                     {
+                        (|slide: f32, held: f32, panel: f32, world: &mut bevy::ecs::world::World| {
+                            *world
+                                .query_filtered::<
+                                    &mut bevy::transform::components::Transform,
+                                    bevy::ecs::query::With<bevy::ecs::hierarchy::Children>,
+                                >()
+                                .iter_mut(world)
+                                .next()
+                                .unwrap() = bevy::transform::components::Transform {
+                                    translation: bevy::math::Vec3::new(
+                                        -panel
+                                            * (1.5 + 0.5 * slide.signum()
+                                                - (2.0 * slide.abs() - 1.0).powi(3)
+                                                    * ((2.0 * slide.abs() - 1.0)
+                                                        * ((2.0 * slide.abs() - 1.0) * 6.0 - 15.0)
+                                                        + 10.0)
+                                                    * slide.signum()),
+                                        0.0,
+                                        1.0 + held,
+                                    ),
+                                    rotation: bevy::math::Quat::IDENTITY,
+                                    scale: bevy::math::Vec3::new(1.0, 1.0, slide + 2.0),
+                                };
+                            (held >= 7.0)
+                                .then(|| {
+                                    world.write_message(bevy::app::AppExit::Success);
+                                })
+                                .unwrap_or(());
+                        })(
+                            (step + dt * step.signum()).clamp(-1.0, 1.0),
+                            held,
+                            panel,
+                            world,
+                        );
+                    })(
+                        toggle
+                            * (-(state.scale.z - 2.0).signum()
+                                * (1.5 - (state.scale.z - 2.0).abs()))
+                            + (1.0 - toggle) * (state.scale.z - 2.0),
+                        dt,
+                        (state.translation.z - 1.0 + dt) * escape,
+                        panel,
+                        world,
+                    );
+                })(
+                    world
+                        .query_filtered::<
+                            &bevy::transform::components::Transform,
+                            bevy::ecs::query::With<bevy::ecs::hierarchy::Children>,
+                        >()
+                        .iter(world)
+                        .next()
+                        .unwrap()
+                        .clone(),
+                    world
+                        .query::<&bevy::window::Monitor>()
+                        .iter(world)
+                        .next()
+                        .unwrap()
+                        .physical_width as f32
+                        / 3.0,
+                    world.resource::<bevy::time::Time>().delta_secs(),
+                    world
+                        .resource::<bevy::input::ButtonInput<bevy::input::keyboard::KeyCode>>()
+                        .pressed(bevy::input::keyboard::KeyCode::Escape)
+                        as i32 as f32,
+                    world
+                        .resource::<bevy::input::ButtonInput<bevy::input::keyboard::KeyCode>>()
+                        .just_pressed(bevy::input::keyboard::KeyCode::F1)
+                        as i32 as f32,
                     world,
                 );
             },
