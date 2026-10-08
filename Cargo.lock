@@ -3819,7 +3819,6 @@ name = "subsystem-for-arxumbra"
 version = "0.0.0-s0"
 dependencies = [
  "bevy",
- "wgpu",
 ]
 
 [[package]]
