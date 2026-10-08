@@ -4,21 +4,16 @@ version = "0.0.0-s0"
 edition = "2024"
 
 [dependencies]
-bevy = { version = "=0.20.0-rc.2", default-features = false, features = [
+bevy = { git = "https://github.com/bevyengine/bevy", tag = "v0.20.0-rc.2", default-features = false, features = [
     "std",
     "multi_threaded",
     "async_executor",
     "bevy_asset",
-    "bevy_log",
-    "bevy_state",
-    "reflect_auto_register",
     "bevy_winit",
     "wayland",
     "bevy_window",
     "bevy_render",
     "bevy_core_pipeline",
-    "bevy_post_process",
-    "bevy_mesh",
     "bevy_camera",
     "bevy_image",
     "bevy_sprite",
@@ -27,6 +22,7 @@ bevy = { version = "=0.20.0-rc.2", default-features = false, features = [
     "basis-universal",
     "zstd_rust",
 ] }
+wgpu = { version = "30", default-features = false }
 
 [profile.release]
 opt-level = 3
