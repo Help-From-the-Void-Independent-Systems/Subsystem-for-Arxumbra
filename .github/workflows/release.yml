@@ -20,43 +20,36 @@ jobs:
       run:
         shell: bash
     strategy:
-      fail-fast: true
-      max-parallel: 1
+      fail-fast: false
       matrix:
         include:
-          - artifact: AArch64-Linux-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
-            os: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
-            builder: cross
-            extension: ""
           - artifact: x86_64-Linux-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            builder: cargo
             extension: ""
-          - artifact: AArch64-macOS-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
-            os: macos-latest
-            target: aarch64-apple-darwin
-            builder: cargo
+          - artifact: AArch64-Linux-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
             extension: ""
           - artifact: x86_64-macOS-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
             os: macos-latest
             target: x86_64-apple-darwin
-            builder: cargo
             extension: ""
-          - artifact: AArch64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
-            os: windows-latest
-            target: aarch64-pc-windows-msvc
-            builder: cargo
-            extension: ".exe"
+          - artifact: AArch64-macOS-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
+            os: macos-latest
+            target: aarch64-apple-darwin
+            extension: ""
           - artifact: x86_64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
             os: windows-latest
             target: x86_64-pc-windows-msvc
-            builder: cargo
+            extension: ".exe"
+          - artifact: AArch64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
+            os: windows-latest
+            target: aarch64-pc-windows-msvc
             extension: ".exe"
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
         with:
           lfs: true
 
@@ -71,6 +64,10 @@ jobs:
             fi
           done
 
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libwayland-dev libxkbcommon-dev
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -78,17 +75,9 @@ jobs:
 
       - name: Restore build cache
         uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.target }}
-
-      - name: Install cross
-        if: matrix.builder == 'cross'
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cross
 
       - name: Build
-        run: ${{ matrix.builder }} build --release --target ${{ matrix.target }}
+        run: cargo build --release --locked --target ${{ matrix.target }}
 
       - name: Rename executable
         run: |
@@ -96,7 +85,7 @@ jobs:
           mv "target/${{ matrix.target }}/release/subsystem-for-arxumbra${{ matrix.extension }}" "dist/${{ matrix.artifact }}${{ matrix.extension }}"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: dist/${{ matrix.artifact }}${{ matrix.extension }}
@@ -111,7 +100,7 @@ jobs:
       contents: write
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
@@ -124,12 +113,12 @@ jobs:
         run: |
           gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --generate-notes
           for file in \
-            AArch64-Linux-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0 \
             x86_64-Linux-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0 \
-            AArch64-macOS-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0 \
+            AArch64-Linux-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0 \
             x86_64-macOS-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0 \
-            AArch64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0.exe \
-            x86_64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0.exe
+            AArch64-macOS-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0 \
+            x86_64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0.exe \
+            AArch64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0.exe
           do
             gh release upload "$TAG" "dist/$file" --clobber
           done
