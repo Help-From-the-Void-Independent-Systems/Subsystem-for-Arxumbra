@@ -15,7 +15,7 @@ env:
 jobs:
   build:
     name: ${{ matrix.artifact }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     defaults:
       run:
         shell: bash
@@ -23,46 +23,46 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - artifact: x86_64-Linux-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
-            os: ubuntu-24.04
+          - artifact: subsystem-for-arxumbra-linux-x86_64
+            runner: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
             extension: ""
-          - artifact: AArch64-Linux-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
-            os: ubuntu-24.04-arm
+          - artifact: subsystem-for-arxumbra-linux-aarch64
+            runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             extension: ""
-          - artifact: x86_64-macOS-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
-            os: macos-latest
+          - artifact: subsystem-for-arxumbra-macos-x86_64
+            runner: macos-15-intel
             target: x86_64-apple-darwin
             extension: ""
-          - artifact: AArch64-macOS-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
-            os: macos-latest
+          - artifact: subsystem-for-arxumbra-macos-aarch64
+            runner: macos-15
             target: aarch64-apple-darwin
             extension: ""
-          - artifact: x86_64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
-            os: windows-latest
+          - artifact: subsystem-for-arxumbra-windows-x86_64
+            runner: windows-2025
             target: x86_64-pc-windows-msvc
-            extension: ".exe"
-          - artifact: AArch64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0
-            os: windows-latest
+            extension: .exe
+          - artifact: subsystem-for-arxumbra-windows-aarch64
+            runner: windows-11-arm
             target: aarch64-pc-windows-msvc
-            extension: ".exe"
+            extension: .exe
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           lfs: true
 
-      - name: Verify textures
+      - name: Verify background texture
         run: |
-          cd assets
-          for file in *.ktx2; do
-            magic="$(od -An -tx1 -N12 "$file" | tr -d ' \n' | tr 'A-F' 'a-f')"
-            if [ "$magic" != "ab4b5458203230bb0d0a1a0a" ]; then
-              echo "Not a KTX2 texture, Git LFS object missing: assets/$file" >&2
-              exit 1
-            fi
-          done
+          set -euo pipefail
+          file=assets/000.ktx2
+          test -s "$file"
+          magic="$(od -An -tx1 -N12 "$file" | tr -d ' \n' | tr 'A-F' 'a-f')"
+          if [ "$magic" != "ab4b5458203230bb0d0a1a0a" ]; then
+            echo "Invalid KTX2 payload: $file" >&2
+            exit 1
+          fi
 
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
@@ -72,9 +72,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-
-      - name: Restore build cache
-        uses: Swatinem/rust-cache@v2
 
       - name: Build
         run: cargo build --release --locked --target ${{ matrix.target }}
@@ -94,7 +91,7 @@ jobs:
   release:
     name: Publish release
     needs: build
-    if: github.ref_type == 'tag'
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -112,13 +109,5 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --generate-notes
-          for file in \
-            x86_64-Linux-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0 \
-            AArch64-Linux-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0 \
-            x86_64-macOS-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0 \
-            AArch64-macOS-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0 \
-            x86_64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0.exe \
-            AArch64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s0.exe
-          do
-            gh release upload "$TAG" "dist/$file" --clobber
-          done
+          shopt -s nullglob
+          gh release upload "$TAG" dist/* --clobber
