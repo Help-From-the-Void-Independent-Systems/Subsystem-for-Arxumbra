@@ -18,10 +18,14 @@ bevy = { git = "https://github.com/bevyengine/bevy", tag = "v0.20.0-rc.2", defau
     "bevy_image",
     "bevy_sprite",
     "bevy_sprite_render",
+    "bevy_ui",
+    "bevy_ui_render",
+    "default_font",
     "ktx2",
     "basis-universal",
     "zstd_rust",
 ] }
+wgpu = { version = "30", default-features = false }
 
 [profile.release]
 opt-level = 3
