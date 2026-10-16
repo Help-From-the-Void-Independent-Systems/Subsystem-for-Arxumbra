@@ -88,7 +88,11 @@
   against its target architecture, the archive layout and permission bits,
   extraction into a different working directory, and the recorded checksum;
   the publication job asserts set-equality of the twelve downloaded files
-  against the parsed matrix. Exact six-entry matrix, SHA-pinned actions (see
+  against the parsed matrix. Per the requester's 2026-10-16 decision, the
+  toolchain job also ends with a headless process smoke check (Xvfb +
+  software Vulkan, 12 s survival, no panic, no early exit) as black-box
+  compensation for the prohibited Rust test functions. Exact six-entry
+  matrix, SHA-pinned actions (see
   the version table below), least-privilege permissions, guarded publication
   kept. YAML parse-validated locally; every embedded Python block executed
   locally against the real tree and synthetic fixtures (commands table).
@@ -267,13 +271,20 @@ SHA↔version mapping lives here (verified via the GitHub refs API and
     policy via the fixtures); every workflow run block starts with
     `set -euo pipefail`, every Python block fails through assertions or
     non-zero exit, and no step uses `continue-on-error`.
-17. (spec v3, OPEN) Two decisions were escalated to the requester instead of
-    being taken silently: (a) approval of the nine `&mut` signature-position
-    spellings (docs/architecture.md §13.1 — narrowest possible relaxation,
-    precedent: the original spec's petition clause and the baseline's own
-    `|world: &mut World|`); (b) the fate of behavioral regression tests —
-    revision 3 prohibits `#[test]` functions by default while revision 1
-    mandated regression tests; the implemented default is "prohibited wins"
-    (tests deleted, boundary semantics preserved via Python simulation +
-    documentation), pending an explicit approval to restore a test module if
-    the requester prefers the revision-1 mandate.
+17. (spec v3, RESOLVED 2026-10-16) Two decisions were escalated to the
+    requester instead of being taken silently, and both were answered:
+    (a) the nine `&mut` signature-position spellings
+    (docs/architecture.md §13.1 — narrowest possible relaxation; precedent:
+    the original spec's petition clause and the baseline's own
+    `|world: &mut World|`; the CI policy job enforces the exact inventory) —
+    **approved as implemented**; (b) the fate of behavioral regression tests
+    (revision 3 prohibits `#[test]` functions by default while revision 1
+    mandated them) — **compensate with black-box checks**: no test module is
+    restored; the CI toolchain job gained a headless process smoke check
+    (Xvfb + software Vulkan: the release binary must survive 12 s of Startup
+    + Update frames with no panic and no early exit — exit status 124 from
+    `timeout` is the pass condition), which joins the static policy job and
+    the release pipeline's package-inspection steps. The smoke check cannot
+    be executed in this sandbox (no toolchain); its first real run is the
+    remote CI run, and a software-device failure there would fail loudly
+    rather than being concealed (no `continue-on-error` anywhere).

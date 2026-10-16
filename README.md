@@ -68,6 +68,10 @@ and the asset tree. The release workflow additionally verifies binary
 headers against each target architecture, archive layout, executable-bit
 preservation, extraction from a different working directory, and checksums,
 and its publication job checks the downloaded file set against the matrix.
+As black-box compensation for the absent Rust tests, the CI toolchain job
+ends with a **headless process smoke check**: the release binary must run
+Startup plus 12 seconds of Update frames under Xvfb with software Vulkan
+(lavapipe) — no physical display — without panicking or exiting early.
 Behavioral boundaries (F1/click same-frame semantics, Escape-hold exit) are
 documented with truth tables in `docs/architecture.md` §5.2.
 

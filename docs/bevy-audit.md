@@ -91,12 +91,14 @@ project code reaches into those layers.
    rather than resolved unilaterally.
 4. Fate of the behavioral regression tests: revision 3 prohibits `#[test]`
    functions by default (exactly one `fn` item), while revision 1 mandated
-   regression tests for the behavioral baseline. The implemented default is
-   "prohibition wins" — the 13 tests were deleted, their boundary semantics
-   are preserved as documented truth tables + Python simulation, and the
-   static-check scope moved to the CI policy job. Restoring a test module
-   requires explicit approval; the question is escalated, not decided
-   silently.
+   regression tests for the behavioral baseline. **Decided by the requester
+   on 2026-10-16**: the prohibition stands (no test module is restored) and
+   the gap is compensated with black-box checks — the CI toolchain job now
+   ends with a headless process smoke check (Xvfb + software Vulkan; the
+   release binary must survive 12 s of Startup + Update frames without
+   panic or early exit), alongside the already-existing static policy job
+   and the release pipeline's package-inspection steps (binary headers,
+   archive layout, permission bits, extraction, checksums).
 
 ## Revision-3 approval request: the nine `&mut` signature spellings
 
@@ -118,7 +120,7 @@ exact inventory: any tenth occurrence, any other spelling, or any drift in
 the six/three counts fails the build. Compiler diagnostics demonstrating the
 absence of alternatives are unavailable here (no toolchain — the substituted
 evidence is the pinned-source signature reading above). **Approval for this
-narrow relaxation is requested.**
+narrow relaxation was GRANTED by the requester on 2026-10-16.**
 
 ## Revision-3 feasibility gate status: BLOCKED
 
@@ -154,7 +156,8 @@ runtime test; a parse-level simulation is never counted as a GitHub run.
 | Required runtime phase ordering; no inferred tuple ordering | docs/architecture.md §5.1 phase table | ordering claims cite verified engine behavior, not chain position | PASS (documentation) · runtime: NOT RUN | — |
 | Input & state-transition invariants; same-frame toggle+click boundary defined | inlined expressions in the Update chain; truth table in docs/architecture.md §5.2 | all 7 boundary assertions re-simulated in Python against the inlined expression | simulation: PASS · runtime: NOT RUN | blocker: no toolchain; test fns prohibited (open question #4) |
 | Invalidation protocol; settled animations stop updating; hidden UI never stale | guarded write pass (equality comparison before `Mut::into_inner`); inline gate | engine facts verified from source (`into_inner` sets CHANGED; `Changed<Visibility>`/`Changed<Sprite>` gates); guard algebra reviewed | engine facts: PASS · runtime: NOT RUN | — |
-| Nine `&mut` signature spellings (rev 3 relaxation) | docs/architecture.md §13.1; CI policy job enforces the exact inventory (6 × `&mut World`, 1 each `&mut Visibility`/`&mut Transform`/`&mut Sprite`) | pinned-source signature reading (typed alternatives require forbidden `mut` bindings); inventory asserted locally | inventory: PASS · **approval: REQUESTED (pending requester decision)** | compiler diagnostics unavailable (no toolchain) |
+| Nine `&mut` signature spellings (rev 3 relaxation) | docs/architecture.md §13.1; CI policy job enforces the exact inventory (6 × `&mut World`, 1 each `&mut Visibility`/`&mut Transform`/`&mut Sprite`) | pinned-source signature reading (typed alternatives require forbidden `mut` bindings); inventory asserted locally | inventory: PASS · **approval: GRANTED (requester, 2026-10-16)** | compiler diagnostics unavailable (no toolchain) |
+| Black-box compensation for prohibited test fns (requester decision, 2026-10-16) | CI toolchain job: headless process smoke check (Xvfb + lavapipe, 12 s survival, no panic, no early exit); release build jobs: package inspection (headers/layout/permissions/extraction/checksums) | package-inspection blocks executed locally on synthetic fixtures (PASS); smoke check step authored — cannot be executed here (no toolchain) | smoke check: NOT RUN (remote CI) · package inspection: PASS (local fixtures) | first GitHub run will exercise the smoke check; a software-device failure would fail loudly, not silently |
 | Combined feasibility gate before transformation (rev 3) | experiment confined to `/tmp` (outside the maintained tree); no second Rust entry point committed | — | **BLOCKED** | no installable Rust toolchain; substituted verification recorded in the feasibility section above |
 | No per-frame entity-list clone; no texture regeneration; no per-frame formatting/lookups (§22 properties) | Update/Startup structure | static inspection (no such code path exists); keyboard reads consolidated into one snapshot | PASS (static) · measurement: BLOCKED | no toolchain/GPU for dynamic confirmation |
 | Asset lifetime & package path behavior | Startup handles stored in components; `release.yml` `dist/<artifact>/` staging | PNG magic-byte check executed; workflow YAML parsed; staging/extraction steps executed locally on synthetic archives | PASS (static/parse/local) · packaged run: NOT RUN | blocker: cannot build |

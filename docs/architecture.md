@@ -572,6 +572,8 @@ in the pinned revision):
    *binding* — prohibited by the contract, while `&mut` in a signature
    position is exactly the relaxation the original spec's petition clause
    contemplated. The baseline `main` itself uses `|world: &mut World|`.
+   **Approval for this exact nine-occurrence inventory was granted by the
+   requester on 2026-10-16** (docs/rewrite-log.md, decision 17).
 2. **Mutable query data types — three occurrences:
    `&mut bevy::camera::visibility::Visibility`,
    `&mut bevy::transform::components::Transform`,
