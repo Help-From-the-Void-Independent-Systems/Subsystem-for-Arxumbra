@@ -51,20 +51,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Verify the binary has no external asset dependency
+      - name: "Verify the assets/ resource folder (Task 11 icons)"
         run: |
           set -euo pipefail
-          test ! -e assets
+          test -d assets
+          for f in assets/app-icon.png assets/icons/*.png; do
+            test -f "$f"
+            head -c 8 "$f" | od -An -tx1 | tr -d ' \n' | grep -q '89504e470d0a1a0a'
+          done
           ! grep -q 'include_bytes!' src/main.rs
+          grep -q 'AssetPlugin' src/main.rs
+          grep -q 'AssetServer' src/main.rs
+          grep -q '"png",' Cargo.toml
 
-      - name: Install Linux build dependencies
+      - name: "Install Linux build chain (LLVM: clang + lld)"
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libwayland-dev libxkbcommon-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libwayland-dev libxkbcommon-dev clang lld llvm
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust toolchain (pre-release/nightly, with sources for build-std)
+        uses: dtolnay/rust-toolchain@nightly
         with:
           targets: ${{ matrix.target }}
+          components: rust-src
 
       - name: Build
         run: cargo build --release --locked --target ${{ matrix.target }}
@@ -74,11 +84,19 @@ jobs:
           mkdir -p dist
           mv "target/${{ matrix.target }}/release/subsystem-for-arxumbra${{ matrix.extension }}" "dist/${{ matrix.artifact }}${{ matrix.extension }}"
 
+      - name: "Stage the assets/ resource folder"
+        run: |
+          set -euo pipefail
+          mkdir -p "dist/${{ matrix.artifact }}-assets"
+          cp -r assets/. "dist/${{ matrix.artifact }}-assets/"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
-          path: dist/${{ matrix.artifact }}${{ matrix.extension }}
+          path: |
+            dist/${{ matrix.artifact }}${{ matrix.extension }}
+            dist/${{ matrix.artifact }}-assets/
           if-no-files-found: error
 
   release:
