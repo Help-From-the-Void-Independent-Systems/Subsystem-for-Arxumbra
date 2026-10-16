@@ -1,4 +1,4 @@
-name: Release
+name: Release (6-target matrix)
 
 on:
   push:
@@ -9,8 +9,6 @@ on:
 permissions:
   contents: read
 
-# A release run is never cancelled mid-flight; concurrent runs for the same
-# ref queue instead.
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -19,13 +17,17 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  checks:
+    name: Policy, format, lint, compile, and test gates
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
   build:
     name: ${{ matrix.artifact }}
+    needs: checks
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 240
-    defaults:
-      run:
-        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -49,30 +51,37 @@ jobs:
           - artifact: AArch64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s1
             runner: windows-11-arm
             target: aarch64-pc-windows-msvc
-            extension: .exe
+            extension: ".exe"
           - artifact: x86_64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s1
             runner: windows-2025
             target: x86_64-pc-windows-msvc
-            extension: .exe
+            extension: ".exe"
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Install Linux system libraries (winit wayland backend)
-        if: runner.os == 'Linux'
+        if: contains(matrix.target, 'linux')
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y pkg-config libwayland-dev libxkbcommon-dev
 
-      - name: Install the pinned toolchain and matrix target
+      - name: Activate the pinned toolchain
         run: |
           set -euo pipefail
           rustup show active-toolchain
+
+      - name: Add the pinned Rust target
+        run: |
+          set -euo pipefail
           rustup target add "${{ matrix.target }}"
 
       - name: Cache Cargo registry, Git checkouts, and target directory
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: |
             ~/.cargo/registry
@@ -87,89 +96,217 @@ jobs:
           set -euo pipefail
           test -f Cargo.lock || cargo generate-lockfile
 
-      - name: Validate the external assets (real files, real PNG signatures)
+      - name: Verify the release matrix and executable names from the workflow file
         run: |
           set -euo pipefail
-          test -d assets
-          for f in assets/app-icon.png assets/icons/flask.png assets/icons/house.png assets/icons/registry.png assets/icons/rocket-pill.png assets/icons/rocket.png; do
-            test -f "$f"
-            head -c 8 "$f" | od -An -tx1 | tr -d ' \n' | grep -q '89504e470d0a1a0a'
-          done
-
-      - name: Verify dependency policy and binary target from Cargo metadata
-        run: |
-          set -euo pipefail
-          cargo metadata --locked --format-version 1 > metadata.json
           python3 - <<'PY'
-          import json, pathlib
-          metadata = json.loads(pathlib.Path("metadata.json").read_text())
-          package = next(p for p in metadata["packages"] if p["name"] == "subsystem-for-arxumbra")
-          direct = [d["name"] for d in package["dependencies"] if d.get("kind") in (None, "normal")]
-          assert "wgpu" not in direct, f"direct wgpu dependency: {direct}"
-          assert "wgpu-types" not in direct, f"direct wgpu-types dependency: {direct}"
-          bevy = next(d for d in package["dependencies"] if d["name"] == "bevy")
-          assert (bevy.get("source") or "").startswith("git+https://github.com/bevyengine/bevy?tag=v0.20.0"), bevy.get("source")
-          binary_names = [t["name"] for t in package["targets"] if "bin" in t["kind"]]
-          assert binary_names == ["subsystem-for-arxumbra"], binary_names
-          print("dependency policy and binary target verified; direct deps:", sorted(direct))
+          import pathlib
+          import re
+
+          text = pathlib.Path(".github/workflows/release.yml").read_text()
+          entries = []
+          mode = 0
+          current = None
+          for raw in text.split("\n"):
+              stripped = raw.strip()
+              indent = len(raw) - len(raw.lstrip(" "))
+              if mode == 0 and stripped == "matrix:":
+                  mode = 1
+                  continue
+              if mode == 1 and stripped == "include:":
+                  mode = 2
+                  continue
+              if mode == 2:
+                  if stripped.startswith("- artifact:"):
+                      if current is not None:
+                          entries.append(current)
+                      current = {"artifact": stripped.split(":", 1)[1].strip().strip('"')}
+                      continue
+                  if current is not None and any(
+                      stripped.startswith(k + ":") for k in ("runner", "target", "extension")
+                  ):
+                      key, value = stripped.split(":", 1)
+                      current[key.strip()] = value.strip().strip('"')
+                      continue
+                  if stripped and indent <= 8:
+                      if current is not None:
+                          entries.append(current)
+                          current = None
+                      mode = 0
+          if current is not None:
+              entries.append(current)
+          expected = [
+              {"artifact": "AArch64-Linux-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s1", "runner": "ubuntu-24.04-arm", "target": "aarch64-unknown-linux-gnu", "extension": ""},
+              {"artifact": "x86_64-Linux-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s1", "runner": "ubuntu-24.04", "target": "x86_64-unknown-linux-gnu", "extension": ""},
+              {"artifact": "AArch64-macOS-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s1", "runner": "macos-15", "target": "aarch64-apple-darwin", "extension": ""},
+              {"artifact": "x86_64-macOS-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s1", "runner": "macos-15-intel", "target": "x86_64-apple-darwin", "extension": ""},
+              {"artifact": "AArch64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s1", "runner": "windows-11-arm", "target": "aarch64-pc-windows-msvc", "extension": ".exe"},
+              {"artifact": "x86_64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s1", "runner": "windows-2025", "target": "x86_64-pc-windows-msvc", "extension": ".exe"},
+          ]
+          assert entries == expected, entries
+          names = [e["artifact"] + e["extension"] for e in entries]
+          assert len(names) == len(set(names)) == 6, names
+          double_extension = ".exe" + ".exe"
+          assert double_extension not in text
+          print("matrix self-check: PASS")
           PY
-          rm metadata.json
 
-      - name: Build the release binary
-        run: cargo build --release --locked --target "${{ matrix.target }}"
-
-      - name: Stage the deterministic package layout
+      - name: Build the pinned release binary
         run: |
           set -euo pipefail
-          mkdir -p "dist/${{ matrix.artifact }}/assets"
-          cp "target/${{ matrix.target }}/release/subsystem-for-arxumbra${{ matrix.extension }}" "dist/${{ matrix.artifact }}/${{ matrix.artifact }}${{ matrix.extension }}"
-          cp -r assets/. "dist/${{ matrix.artifact }}/assets/"
-          chmod +x "dist/${{ matrix.artifact }}/${{ matrix.artifact }}${{ matrix.extension }}"
+          cargo build --locked --release --target "${{ matrix.target }}"
 
-      - name: Validate the staged package (files, names, permissions)
+      - name: Stage the executable and asset tree
         run: |
           set -euo pipefail
-          cd "dist/${{ matrix.artifact }}"
-          test -f "${{ matrix.artifact }}${{ matrix.extension }}"
-          test "$(find . -maxdepth 1 -type f | wc -l | tr -d ' ')" = "1"
-          test ! -e subsystem-for-arxumbra
-          test ! -e subsystem-for-arxumbra.exe
-          for f in assets/app-icon.png assets/icons/flask.png assets/icons/house.png assets/icons/registry.png assets/icons/rocket-pill.png assets/icons/rocket.png; do
-            test -f "$f"
-          done
-          if [ "${{ runner.os }}" != "Windows" ]; then
-            test -x "${{ matrix.artifact }}${{ matrix.extension }}"
-          fi
-          if command -v file >/dev/null 2>&1; then
-            file "${{ matrix.artifact }}${{ matrix.extension }}"
-          fi
+          ART="${{ matrix.artifact }}"
+          EXE="${{ matrix.artifact }}${{ matrix.extension }}"
+          rm -rf "dist/${ART}"
+          mkdir -p "dist/${ART}"
+          cp "target/${{ matrix.target }}/release/${EXE}" "dist/${ART}/${EXE}"
+          cp -R assets "dist/${ART}/assets"
 
-      - name: Archive the package (executable bit preserved inside tar.gz)
+      - name: Inspect the binary header against the target architecture
+        run: |
+          set -euo pipefail
+          EXE="${{ matrix.artifact }}${{ matrix.extension }}"
+          ARCH="${{ matrix.target }}"
+          ARCH="${ARCH%%-*}"
+          python3 - "$ARCH" "dist/${{ matrix.artifact }}/${EXE}" <<'PY'
+          import struct
+          import sys
+
+          expected, path = sys.argv[1], sys.argv[2]
+          with open(path, "rb") as handle:
+              head = handle.read(65536)
+          if head[:4] == b"\x7fELF":
+              machine = struct.unpack_from("<H", head, 18)[0]
+              found = {0xB7: "aarch64", 0x3E: "x86_64"}.get(machine, hex(machine))
+          elif head[:4] == b"\xcf\xfa\xed\xfe":
+              cputype = struct.unpack_from("<I", head, 4)[0] & 0x00FFFFFF
+              found = {0x0C: "aarch64", 0x07: "x86_64"}.get(cputype, hex(cputype))
+          elif head[:2] == b"MZ":
+              pe = struct.unpack_from("<I", head, 0x3C)[0]
+              machine = struct.unpack_from("<H", head, pe + 4)[0]
+              found = {0xAA64: "aarch64", 0x8664: "x86_64"}.get(machine, hex(machine))
+          else:
+              raise SystemExit("unrecognized binary format")
+          assert found == expected, (found, expected)
+          print("binary header matches", expected)
+          PY
+
+      - name: Verify the staged executable name, extension, and file permissions
+        run: |
+          set -euo pipefail
+          EXE="${{ matrix.artifact }}${{ matrix.extension }}"
+          case "${{ matrix.target }}" in
+            *-windows-msvc)
+              test -f "dist/${{ matrix.artifact }}/${EXE}"
+              echo "Windows artifact present: ${EXE}"
+              ;;
+            *)
+              test -x "dist/${{ matrix.artifact }}/${EXE}"
+              echo "Unix artifact present and executable: ${EXE}"
+              ;;
+          esac
+
+      - name: Verify no stale executable names exist in the staging tree
+        run: |
+          set -euo pipefail
+          EXE="${{ matrix.artifact }}${{ matrix.extension }}"
+          find dist -type f ! -name "${EXE}" ! -name "*.png" -print | {
+            if read -r stale; then
+              echo "unexpected staged file: ${stale}" >&2
+              exit 1
+            fi
+          }
+
+      - name: Create the distribution archive with a root-relative layout
         run: |
           set -euo pipefail
           tar -czf "dist/${{ matrix.artifact }}.tar.gz" -C "dist/${{ matrix.artifact }}" .
 
-      - name: Checksum the archive
+      - name: Verify archive contents, extraction layout, and permission preservation
         run: |
           set -euo pipefail
-          cd dist
-          if command -v sha256sum >/dev/null 2>&1; then
-            sha256sum "${{ matrix.artifact }}.tar.gz" > "${{ matrix.artifact }}.tar.gz.sha256"
-          else
-            shasum -a 256 "${{ matrix.artifact }}.tar.gz" > "${{ matrix.artifact }}.tar.gz.sha256"
-          fi
+          EXE="${{ matrix.artifact }}${{ matrix.extension }}"
+          python3 - "${{ matrix.artifact }}" "$EXE" <<'PY'
+          import stat
+          import sys
+          import tarfile
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+          artifact, exe = sys.argv[1], sys.argv[2]
+          with tarfile.open("dist/" + artifact + ".tar.gz") as archive:
+              names = archive.getnames()
+              assert "./" + exe in names, names
+              member = archive.getmember("./" + exe)
+              if "Windows" not in artifact:
+                  assert stat.S_IMODE(member.mode) & 0o111, oct(member.mode)
+              entries = [n for n in names if n not in (".", "./")]
+              roots = {(n[2:] if n.startswith("./") else n).split("/", 1)[0] for n in entries}
+              assert roots == {exe, "assets"}, roots
+              pngs = [n for n in entries if n.endswith(".png")]
+              assert len(pngs) == 6, pngs
+              stray = [n for n in entries if not (n == "./" + exe or n.startswith("./assets"))]
+              assert not stray, stray
+          print("archive layout and permissions verified:", artifact)
+          PY
+
+      - name: Record the archive checksum through Python (cross-platform)
+        run: |
+          set -euo pipefail
+          python3 - "${{ matrix.artifact }}" <<'PY'
+          import hashlib
+          import pathlib
+          import sys
+
+          artifact = sys.argv[1]
+          data = pathlib.Path("dist/" + artifact + ".tar.gz").read_bytes()
+          digest = hashlib.sha256(data).hexdigest()
+          pathlib.Path("dist/" + artifact + ".tar.gz.sha256").write_text(
+              digest + "  " + artifact + ".tar.gz\n"
+          )
+          print("sha256:", digest, artifact + ".tar.gz")
+          PY
+
+      - name: Verify the recorded checksum and extraction from a different working directory
+        run: |
+          set -euo pipefail
+          EXE="${{ matrix.artifact }}${{ matrix.extension }}"
+          python3 - "${{ matrix.artifact }}" <<'PY'
+          import hashlib
+          import pathlib
+          import sys
+
+          artifact = sys.argv[1]
+          data = pathlib.Path("dist/" + artifact + ".tar.gz").read_bytes()
+          digest = hashlib.sha256(data).hexdigest()
+          recorded = pathlib.Path("dist/" + artifact + ".tar.gz.sha256").read_text().split()[0]
+          assert digest == recorded, (digest, recorded)
+          print("checksum verified:", artifact)
+          PY
+          TMPD="$(mktemp -d)"
+          tar -xzf "dist/${{ matrix.artifact }}.tar.gz" -C "$TMPD"
+          test -f "$TMPD/$EXE"
+          test -d "$TMPD/assets"
+          PNG_COUNT="$(find "$TMPD/assets" -name '*.png' | wc -l | tr -d ' ')"
+          test "$PNG_COUNT" = "6"
+          case "${{ matrix.target }}" in
+            *-windows-msvc) echo "extracted on Windows: layout verified (permission bits not applicable)" ;;
+            *) test -x "$TMPD/$EXE"; echo "extracted layout and executable bit verified" ;;
+          esac
+          rm -rf "$TMPD"
+
+      - name: Upload the verified archive
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: ${{ matrix.artifact }}
+          name: ${{ matrix.artifact }}.tar.gz
           path: |
             dist/${{ matrix.artifact }}.tar.gz
             dist/${{ matrix.artifact }}.tar.gz.sha256
-          if-no-files-found: error
 
   release:
-    name: Publish release
+    name: Publish GitHub Release
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
@@ -181,63 +318,97 @@ jobs:
         shell: bash
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
-      - name: Download artifacts
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      - name: Download all target artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           path: dist
           merge-multiple: true
 
-      # Validates the staged outputs against the *parsed* matrix (PyYAML is
-      # preinstalled on ubuntu runners); a missing platform blocks publication
-      # because `needs: build` plus `fail-fast: false` already skipped this
-      # job on any build failure.
-      - name: Validate the six expected archives and checksums
+      - name: Verify the downloaded set matches the release matrix exactly
         run: |
           set -euo pipefail
-          python3 - .github/workflows/release.yml <<'PY'
-          import pathlib, sys, yaml
-          workflow = yaml.safe_load(pathlib.Path(sys.argv[1]).read_text())
-          entries = workflow["jobs"]["build"]["strategy"]["matrix"]["include"]
-          assert len(entries) == 6, entries
-          for entry in entries:
-              archive = pathlib.Path("dist") / (entry["artifact"] + ".tar.gz")
-              checksum = pathlib.Path("dist") / (entry["artifact"] + ".tar.gz.sha256")
-              assert archive.is_file(), archive
-              assert checksum.is_file(), checksum
-              recorded = checksum.read_text().split()[0]
-              assert len(recorded) == 64, checksum
-          print("all six platform archives and checksums are present")
+          python3 - <<'PY'
+          import pathlib
+          import sys
+
+          import yaml
+
+          release = yaml.safe_load(pathlib.Path(".github/workflows/release.yml").read_text())
+          matrix = release["jobs"]["build"]["strategy"]["matrix"]["include"]
+          assert len(matrix) == 6, matrix
+          expected = set()
+          for entry in matrix:
+              artifact = entry["artifact"]
+              expected.add(artifact + ".tar.gz")
+              expected.add(artifact + ".tar.gz.sha256")
+          found = {p.name for p in pathlib.Path("dist").iterdir() if p.is_file()}
+          missing = sorted(expected - found)
+          extra = sorted(found - expected)
+          assert not missing and not extra, {"missing": missing, "extra": extra}
+          print("downloaded file set matches the matrix exactly:", len(found), "files")
           PY
 
-      - name: Produce the combined checksum file
+      - name: Verify checksums and recompute digests
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import pathlib
+
+          for record in sorted(pathlib.Path("dist").glob("*.sha256")):
+              parts = record.read_text().split()
+              digest, name = parts[0], parts[1]
+              data = (record.parent / name).read_bytes()
+              actual = hashlib.sha256(data).hexdigest()
+              assert actual == digest, (name, digest, actual)
+              print("verified", name, actual)
+          PY
+
+      - name: Build the combined SHA256SUMS file
         run: |
           set -euo pipefail
           cd dist
-          sha256sum *.tar.gz > SHA256SUMS
+          python3 - <<'PY'
+          import hashlib
+          import pathlib
 
-      - name: Publish the release (authorized tag events only)
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
+          lines = []
+          for archive in sorted(pathlib.Path(".").glob("*.tar.gz")):
+              digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+              lines.append(digest + "  " + archive.name)
+          pathlib.Path("SHA256SUMS").write_text("\n".join(lines) + "\n")
+          print("\n".join(lines))
+          PY
+
+      - name: Resolve the release tag
         run: |
           set -euo pipefail
-          gh auth status
-          if gh release view "$TAG" > /dev/null 2>&1; then
-            echo "Release $TAG exists; re-uploading this pipeline's outputs (--clobber replaces only same-tag artifacts produced by this workflow)."
-          else
-            probe="$(gh release view "$TAG" 2>&1 >/dev/null || true)"
-            case "$probe" in
-              *"not found"*)
-                gh release create "$TAG" --title "$TAG" --generate-notes
-                ;;
-              *)
-                echo "gh release view failed for a reason other than a missing release; refusing to create or upload:" >&2
-                echo "$probe" >&2
-                exit 1
-                ;;
-            esac
+          if [ "${GITHUB_REF}" != refs/tags/* ]; then
+            echo "Not a tag push; skipping publication."
+            exit 0
           fi
-          gh release upload "$TAG" dist/*.tar.gz dist/*.tar.gz.sha256 dist/SHA256SUMS --clobber
+          TAG="${GITHUB_REF#refs/tags/}"
+          printf '%s' "$TAG" > /tmp/tag.txt
+          echo "Publishing release for tag: $TAG"
+
+      - name: Publish (idempotent; safe to re-run)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="$(cat /tmp/tag.txt)"
+          if [ -z "$TAG" ]; then
+            echo "Tag file missing; refusing to publish." >&2
+            exit 1
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG exists; re-uploading artifacts and updating the release body."
+            gh release upload "$TAG" dist/*.tar.gz dist/*.sha256 dist/SHA256SUMS --clobber
+            gh release edit "$TAG" --notes "Automated multi-platform release built from tag $TAG. See SHA256SUMS for archive digests. Re-running this workflow re-uploads artifacts idempotently."
+          else
+            gh release create "$TAG" dist/*.tar.gz dist/*.sha256 dist/SHA256SUMS \
+              --title "Subsystem for Arxumbra $TAG" \
+              --notes "Automated multi-platform release built from tag $TAG. Assets: six target archives with per-archive .sha256 files and a combined SHA256SUMS. Launching the executable opens a borderless fullscreen window titled 'Arxumbra' with the HUD rendered from procedural textures and bundled PNG assets; F1 toggles HUD visibility; holding Escape for seven seconds exits; clicking the launch pill toggles launch state and hides the HUD. The application loads external PNG assets from an assets directory beside the executable, so extract the archive and run it from the extraction directory (or adjust ASSET_SEARCH_PATHS per docs/architecture.md)."
+          fi

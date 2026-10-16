@@ -5,14 +5,6 @@ edition = "2024"
 rust-version = "1.97.1"
 
 [dependencies]
-# Bevy is pinned to the official Git repository at tag v0.20.0.
-# Tag commit (recorded for audit): b3bdd75becaffe9a16677cf5bae5bd6d198f052b.
-# Cargo.lock records the resolved commit; tag pinning keeps the manifest readable.
-#
-# There is deliberately no direct `wgpu` (or `wgpu-types`) dependency: all
-# renderer configuration is expressed through verified public re-exports in
-# `bevy::render::settings` plus `WgpuSettings::default()` struct-update for the
-# remainder. wgpu stays in the lockfile only as Bevy's transitive backend.
 bevy = { git = "https://github.com/bevyengine/bevy", tag = "v0.20.0", default-features = false, features = [
     "std",
     "multi_threaded",
@@ -32,15 +24,6 @@ bevy = { git = "https://github.com/bevyengine/bevy", tag = "v0.20.0", default-fe
     "default_font",
 ] }
 
-# Release profile: portable stable-toolchain build.
-# - `panic = "abort"` replaces the previous nightly-only abort variant and
-#   its unstable manifest feature gate; abort keeps unwinding tables out.
-# - fat LTO + one codegen unit + strip: smallest/fastest artifact at the cost
-#   of slower release builds. Trade-off documented in docs/architecture.md.
-# - `overflow-checks`/`debug-assertions` off matches Cargo's own release
-#   defaults; they are stated explicitly so the choice is visible.
-# - No `target-cpu=native`, no `-Z` flags, no `build-std`: distribution
-#   binaries must run on machines without this build host's ISA extensions.
 [profile.release]
 opt-level = 3
 lto = "fat"

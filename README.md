@@ -3,10 +3,12 @@
 A minimal 2D dashboard interface built on
 [Bevy](https://github.com/bevyengine/bevy) **v0.20.0** (official Git tag,
 commit `b3bdd75becaffe9a16677cf5bae5bd6d198f052b`), written under a strict
-source-syntax contract: one dominant, fully qualified application-construction
-chain in `fn main`, no `use`/`let`/`mut` bindings/author-defined
-`const`/`static`/`unsafe`, and no direct `wgpu` dependency (renderer settings
-go through verified `bevy::render::settings` re-exports).
+source-syntax contract: exactly one function — `fn main` — containing one
+dominant, fully qualified application-construction chain; no
+`use`/`let`/`mut` bindings/author-defined `const`/`static`/`unsafe`; no
+comments in any maintained Rust, manifest, or workflow file (explanation
+lives in `docs/`); and no direct `wgpu` dependency (renderer settings go
+through verified `bevy::render::settings` re-exports).
 
 ## Behavior
 
@@ -44,20 +46,30 @@ cargo build --release
 `assets/` is resolved relative to the current working directory, so packaged
 builds must be launched from the package root (executable next to `assets/`).
 
-## Tests & checks
+## Checks
 
 ```sh
 cargo fmt --all -- --check
 cargo clippy --locked --all-targets -- -D warnings
-cargo test --locked
+cargo test --locked    # honestly reports 0 tests — see below
 ```
 
-`cargo test` is headless and includes behavior regressions (hit test, Escape
-hold/exit boundary, HUD visibility truth table, slot tint, procedural-texture
-pixel invariants, asset PNG validation), the automated strict-syntax-contract
-scanner over every handwritten Rust file, the dependency policy (Git Bevy
-v0.20.0, no direct wgpu, no nightly manifest gates), and structural checks of
-the six-entry release matrix and executable filenames.
+The crate deliberately contains **no Rust test functions**: the governing
+specification admits exactly one `fn` item (`main`) and prohibits `#[test]`
+functions absent explicit approval, so `cargo test` reports zero tests and
+CI records that count honestly. All static enforcement lives in the CI
+**policy job** (`.github/workflows/ci.yml`): a syntax-aware Python scanner —
+validated against embedded positive/negative fixtures before every run —
+enforces the single-`fn` rule, the prohibited-keyword contract, the exact
+nine-spelling `&mut` inventory, zero comments in maintained
+Rust/TOML/YAML files, the dependency policy (Git Bevy v0.20.0, no direct or
+renamed wgpu), the six-entry release matrix and exact executable filenames,
+and the asset tree. The release workflow additionally verifies binary
+headers against each target architecture, archive layout, executable-bit
+preservation, extraction from a different working directory, and checksums,
+and its publication job checks the downloaded file set against the matrix.
+Behavioral boundaries (F1/click same-frame semantics, Escape-hold exit) are
+documented with truth tables in `docs/architecture.md` §5.2.
 
 ## Release packaging
 

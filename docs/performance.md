@@ -26,22 +26,56 @@ previous, networked build against `v0.20.0-rc.2`).
 
 ## Work removed or avoided (static, verifiable by inspection — not a runtime claim)
 
-| change | rationale | runtime claim status |
+| change | rationale | evidence class (see classification below) |
 | --- | --- | --- |
 | **Guarded component writes**: `Visibility`/`Transform.scale.z`/slot `Sprite.color` are written (and their `Mut` wrappers consumed) only when an explicit equality comparison against the derived next value differs | Verified v0.20.0 semantics: `Mut::into_inner` sets the CHANGED tick unconditionally (`change_detection/traits.rs#L516-L523`), and the engine consumers are change-gated — visibility propagation on `Or<(Changed<Visibility>, Changed<ChildOf>)>` (`bevy_camera`), sprite mesh preparation on `Or<(Changed<Sprite>, …)>` (`bevy_sprite_render`). The baseline flagged all ~26 entities' components on every gated frame (e.g. every frame of a 7 s Escape hold) even when values were equal; now hold-only frames flag only the genuinely progressing `scale.z`, and settled frames flag nothing | unverified hypothesis until measured (no toolchain here); final values and frame timing are identical to baseline by construction |
 | One coherent keyboard snapshot: F1 edge + Escape level from a single `ButtonInput<KeyCode>` borrow | spec §22: no redundant input/window lookup when a coherent snapshot suffices (baseline fetched the resource twice per frame) | unverified hypothesis; zero behavior change |
 | Monitor geometry read once per site (`(width, height)` fold) instead of two `world.query::<&Monitor>()` constructions per site | duplicate `QueryState` construction + iteration for one coherent value pair | unverified hypothesis until measured; zero behavior change |
 | Exit detection computed from the uniform hold value instead of a `&mut [bool;1]` cell re-checked per entity | removes mutable-cell plumbing and a per-entity OR from the write pass | unverified hypothesis; algebraically identical |
-| Update gate preserved (`hud_gate`): idle frames with no input and zero hold perform only the input reads + one read-only fold | baseline optimization kept and regression-tested | behavior encoded in tests |
-| Launch transition extracted to named `next_launched` with the identical boolean expression | testability of the same-frame toggle+click boundary (spec §18.2), not speed | behavior encoded in tests |
+| Update gate preserved (inline `f1 \|\| escape \|\| pressed \|\| hold != 0.0`): idle frames with no input and zero hold perform only the input reads + one read-only fold | baseline optimization kept; expression byte-identical | STRUCTURAL |
+| Launch transition: the identical boolean expression, inlined at its single call site (rev 3 dissolved the named helper) | same-frame toggle+click boundary defined in docs/architecture.md §5.2, not speed | STRUCTURAL |
 | Per-frame `Vec<Entity>::clone()` (recorded arena-branch issue) | does not exist in the chosen `main` baseline; nothing to remove | n/a |
 | Procedural textures generated exactly once in `Startup` | baseline behavior kept | n/a |
 
 No floating-point expression, branch structure, or iterator chain was
-replaced by a "supposedly faster" alternative; the pixel shaders are
-byte-for-byte the baseline formulas, now in named functions, and `next_hold`
-preserves the baseline's exact operation order (spec §19: no accidental
-floating-point changes through reordering).
+replaced by a "supposedly faster" alternative; the pixel formulas are
+byte-for-byte the baseline bodies (now inlined as immediately-applied
+closure expressions), and the hold accumulator preserves the baseline's
+exact operation order (spec §19: no accidental floating-point changes
+through reordering).
+
+## Evidence classification (third-revision rule)
+
+Every performance-relevant statement in this document is classified; no
+statement is labeled MEASURED, because nothing was measured anywhere (no
+toolchain, no GPU, no display — the workload definitions below exist so the
+first networked machine can produce MEASURED rows, not to substitute for
+them):
+
+| class | meaning | where it applies here |
+| --- | --- | --- |
+| STRUCTURAL | verifiable by source inspection alone; no runtime claim | all rows of "Work removed or avoided"; the acceptance-property table's PASS (static) rows |
+| HYPOTHESIS | expected runtime effect, unverified until measured | every "unverified hypothesis until measured" row above |
+| MEASURED | real measurement with recorded conditions | **none — nothing was measured** |
+| REGRESSION | before/after comparison under a fixed workload | **none possible here**; the rev-3 transformation was regression-controlled structurally instead (checklist below) |
+
+The third-revision transformation (helpers → inlined expressions, merged
+Startup IIFEs, flattened Update chain) was checked against the required
+regression dimensions before acceptance: correctness (byte-identical
+expression bodies; boundary truth tables re-simulated 7/7), visual
+equivalence (same formulas, same constants, same spawn order — nothing
+pixel-affecting changed), state freshness (write-pass guards and change
+detection untouched), allocations (Startup: one 15-parameter IIFE replaces
+two IIFEs — weakly fewer closure allocations; Update: unchanged), frame cost
+(no per-frame expression changed semantically; the monitor/snapshot folds
+are the same single folds), startup cost (weakly lower: one fewer closure
+construction and one fewer argument-tuple evaluation), portability
+(unchanged — no codegen/profile/flag change), package integrity (unchanged
+matrix, names, layout; new verification steps only *check* more). No change
+in this pass increases complexity for an unmeasurable benefit; the merged
+IIFE and the flattening both strictly reduce closure machinery, which the
+spec's elimination list names as a target (allocation/dynamic-dispatch/
+repeated-evaluation machinery).
 
 ## Acceptance properties of application-owned code (spec §22)
 

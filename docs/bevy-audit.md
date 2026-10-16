@@ -89,6 +89,52 @@ project code reaches into those layers.
    factor 1.0, skewed otherwise. Changing it would alter baseline behavior,
    so per the spec's conflict rule this is reported as an open decision
    rather than resolved unilaterally.
+4. Fate of the behavioral regression tests: revision 3 prohibits `#[test]`
+   functions by default (exactly one `fn` item), while revision 1 mandated
+   regression tests for the behavioral baseline. The implemented default is
+   "prohibition wins" — the 13 tests were deleted, their boundary semantics
+   are preserved as documented truth tables + Python simulation, and the
+   static-check scope moved to the CI policy job. Restoring a test module
+   requires explicit approval; the question is escalated, not decided
+   silently.
+
+## Revision-3 approval request: the nine `&mut` signature spellings
+
+The no-`mut` contract cannot be satisfied by any typed-system alternative in
+Bevy v0.20.0 (all signatures read in the pinned tree):
+`Commands::spawn(&mut self, …)`, `QueryState::iter_mut/single_mut/get_mut`
+(`&mut self` receivers), and `ResMut`'s methods likewise — a typed system
+would need a `mut` *binding*, which the contract forbids outright, whereas
+`&mut` in a *signature/type position* is the relaxation the original
+mandate's petition clause contemplated (and the baseline `main` itself uses
+`|world: &mut World|`). The implementation therefore uses exactly nine
+`&mut` occurrences, inventoried in docs/architecture.md §13.1: six
+`&mut bevy::ecs::world::World` (two exclusive-system closure parameters +
+four IIFE parameters that thread the world, the only `let`-free way to move
+it across a closure boundary) and three mutable `QueryData` spellings
+(`&mut Visibility`, `&mut Transform`, `Option<&mut Sprite>` — the only
+type-level spelling of mutable query access). The CI policy job enforces the
+exact inventory: any tenth occurrence, any other spelling, or any drift in
+the six/three counts fails the build. Compiler diagnostics demonstrating the
+absence of alternatives are unavailable here (no toolchain — the substituted
+evidence is the pinned-source signature reading above). **Approval for this
+narrow relaxation is requested.**
+
+## Revision-3 feasibility gate status: BLOCKED
+
+The combined feasibility gate (compile and run a minimal
+closure-conversion experiment before transforming the maintained source)
+could not be executed: no Rust toolchain is installable in this sandbox
+(`static.rust-lang.org` and crates.io are outside the network allowlist).
+Per the spec, the experiment was kept entirely outside the maintained tree
+(analysis scripts lived in `/tmp`; nothing experimental was committed, and
+no second Rust entry point exists in the repository). The substituted
+verification: (a) the transformation was assembled mechanically from the
+already-verified second-revision text with byte-identical expression bodies;
+(b) the final tree was re-scanned (structure, balance, counts, policy —
+all green); (c) every Python check embedded in the workflows was executed
+locally against the real tree and synthetic fixtures. First compilation
+remains the downstream gate (commands in docs/rewrite-log.md).
 
 ## Acceptance map (spec §24)
 
@@ -100,19 +146,22 @@ runtime test; a parse-level simulation is never counted as a GitHub run.
 
 | requirement | implementation location | verification method | executed status | evidence / blocker |
 | --- | --- | --- | --- | --- |
-| Bevy from official Git at exactly v0.20.0; no direct/renamed wgpu | `Cargo.toml`; test `manifest_pins_git_bevy_v0_20_0_without_direct_wgpu` | refs API + `git ls-remote` tag→commit; manifest greps (executed); Rust policy test (written) | greps/refs: PASS · cargo test: NOT RUN | `v0.20.0` → `b3bdd75b…`; blocker: no Rust toolchain/crates.io in sandbox |
-| Dominant linear chain in `main`; no wrappers/hidden config | `src/main.rs` `fn main` | structural review; contract scanner (no build_app-style indirection exists); bracket/literal balance | PASS (static) | — |
-| Strict syntax contract incl. §23 hardening | `mod tests`: `strip_comments_and_literals`, `contract_violations` (+`transmute`/`from_raw_parts`/`as_mut_ptr`), whole-tree scan test, fixtures test | Python mirror of the committed checker on final source: 0 violations; all 6 negative + 28 positive + block-comment fixtures simulated to expected results | mirror + fixtures: PASS (simulated) · cargo test: NOT RUN | blocker: no toolchain; macro-expansion boundary recorded in docs/architecture.md §13 |
+| Bevy from official Git at exactly v0.20.0; no direct/renamed wgpu | `Cargo.toml`; CI policy job manifest scan (tomllib; package identity across all dependency sections incl. renamed deps) | refs API + `git ls-remote` tag→commit; manifest greps (executed); policy scan executed locally against the final tree | greps/refs/policy scan: PASS · remote CI run: NOT RUN | `v0.20.0` → `b3bdd75b…`; blocker: no Rust toolchain/crates.io in sandbox |
+| Dominant linear chain in `main`; no wrappers/hidden config; exactly one `fn` item (rev 3) | `src/main.rs` `fn main` (line 1; 1516 lines, no other `fn`, no `impl`) | structural review; policy scanner (single-`fn` assertion + fixtures; bracket/literal balance) executed locally | PASS (static + local scan) | — |
+| Strict syntax contract incl. §23 hardening; comment policy per file type (rev 3) | CI policy job: tokenizer scanner (+`transmute`/`from_raw_parts`/`as_mut_ptr`), syntax-aware TOML/YAML comment scanners, whole-tree scan, fixtures | the committed checker itself executed locally on the final tree: 0 violations, 0 comments in any maintained file; all fixtures (keyword ±, comment/URL, block-comment, attribute, lifetime, fn-count, TOML, YAML) pass before the scan | checker + fixtures: PASS (executed locally) · remote CI run: NOT RUN | macro-expansion boundary recorded in docs/architecture.md §13.2 |
 | Plugin & lifecycle ownership; exit through supported lifecycle | chain (18 plugins); Update closure writes `AppExit::Success` | every plugin/field/enum verified against pinned source (table above) | PASS (static) · runtime: NOT RUN | — |
 | Construction order vs frame execution documented separately | docs/architecture.md §3 + §5 | documentation authored from verified schedule facts (Startup→Update, pipelined extraction) | PASS (documentation) | — |
 | Required runtime phase ordering; no inferred tuple ordering | docs/architecture.md §5.1 phase table | ordering claims cite verified engine behavior, not chain position | PASS (documentation) · runtime: NOT RUN | — |
-| Input & state-transition invariants; same-frame toggle+click boundary defined and tested | helpers `hud_gate`, `next_launched`, `next_hold`, `exit_reached`; tests incl. `same_frame_toggle_and_click_boundary_uses_post_toggle_visibility` | all boundary assertions re-simulated in Python (7/7 pass); cargo test written | simulation: PASS · cargo test: NOT RUN | blocker: no toolchain |
-| Invalidation protocol; settled animations stop updating; hidden UI never stale | guarded write pass (equality comparison before `Mut::into_inner`); `hud_gate` | engine facts verified from source (`into_inner` sets CHANGED; `Changed<Visibility>`/`Changed<Sprite>` gates); guard algebra reviewed | engine facts: PASS · runtime: NOT RUN | — |
+| Input & state-transition invariants; same-frame toggle+click boundary defined | inlined expressions in the Update chain; truth table in docs/architecture.md §5.2 | all 7 boundary assertions re-simulated in Python against the inlined expression | simulation: PASS · runtime: NOT RUN | blocker: no toolchain; test fns prohibited (open question #4) |
+| Invalidation protocol; settled animations stop updating; hidden UI never stale | guarded write pass (equality comparison before `Mut::into_inner`); inline gate | engine facts verified from source (`into_inner` sets CHANGED; `Changed<Visibility>`/`Changed<Sprite>` gates); guard algebra reviewed | engine facts: PASS · runtime: NOT RUN | — |
+| Nine `&mut` signature spellings (rev 3 relaxation) | docs/architecture.md §13.1; CI policy job enforces the exact inventory (6 × `&mut World`, 1 each `&mut Visibility`/`&mut Transform`/`&mut Sprite`) | pinned-source signature reading (typed alternatives require forbidden `mut` bindings); inventory asserted locally | inventory: PASS · **approval: REQUESTED (pending requester decision)** | compiler diagnostics unavailable (no toolchain) |
+| Combined feasibility gate before transformation (rev 3) | experiment confined to `/tmp` (outside the maintained tree); no second Rust entry point committed | — | **BLOCKED** | no installable Rust toolchain; substituted verification recorded in the feasibility section above |
 | No per-frame entity-list clone; no texture regeneration; no per-frame formatting/lookups (§22 properties) | Update/Startup structure | static inspection (no such code path exists); keyboard reads consolidated into one snapshot | PASS (static) · measurement: BLOCKED | no toolchain/GPU for dynamic confirmation |
-| Asset lifetime & package path behavior | Startup handles stored in components; `release.yml` `dist/<artifact>/` staging | PNG magic-byte check executed; workflow YAML parsed; staging steps simulated against the Rust matrix parser | PASS (static/parse) · packaged run: NOT RUN | blocker: cannot build |
-| Exact six matrix entries & executable filenames | `release.yml`; tests `release_workflow_matrix_matches…`, `staged_executable_names…` | PyYAML parse **and** independent Python re-implementation of the Rust line-scanner: both equal the mandated 6-entry contract in order; no `.exe.exe`; all `${{ matrix.* }}` expressions present | PASS (two independent methods) · GitHub run: NOT RUN | a locally linted workflow is not a successful GitHub run |
-| Action pins resolve to exact SHAs; least privilege | `release.yml`, `ci.yml` | `git ls-remote` on all four action repos (lightweight tags → pinned SHAs); permissions blocks reviewed | PASS | — |
-| Cargo version/label separation | `Cargo.toml` `0.0.0-s1`; label only in workflows | executed policy greps + semver validation of `0.0.0-s1`; label absent from manifest | PASS (static) | — |
-| Performance measurements | docs/performance.md | none executable here | BLOCKED | every metric honestly `not measured`; reproducible procedures recorded |
+| Asset lifetime & package path behavior | Startup handles stored in components; `release.yml` `dist/<artifact>/` staging | PNG magic-byte check executed; workflow YAML parsed; staging/extraction steps executed locally on synthetic archives | PASS (static/parse/local) · packaged run: NOT RUN | blocker: cannot build |
+| Exact six matrix entries & executable filenames | `release.yml`; CI policy job (PyYAML) **and** the release build job's independent line-scanner self-check | both methods executed locally: each equals the mandated 6-entry contract in order; no doubled extension; all `${{ matrix.* }}` expressions present | PASS (two independent methods, executed) · GitHub run: NOT RUN | a locally linted workflow is not a successful GitHub run |
+| Package integrity: binary headers, archive layout, permission bits, extraction from a different cwd, checksums (rev 3) | `release.yml` build-job verification steps | every embedded Python block executed locally against synthetic ELF/Mach-O/PE fixtures (correct arch accepted, mismatch rejected) and synthetic archives (unix + Windows shapes, missing/extra file rejected) | PASS (local execution on fixtures) · real-binary run: NOT RUN | requires a real build; runners execute the same blocks |
+| Action pins resolve to exact SHAs; least privilege; version mapping outside comments | `release.yml`, `ci.yml`; mapping table in docs/rewrite-log.md | `git ls-remote` on all four action repos (lightweight tags → pinned SHAs); permissions blocks reviewed and policy-asserted (top-level `contents: read`; write only in the publication job) | PASS | — |
+| Cargo version/label separation | `Cargo.toml` `0.0.0-s1`; label only in workflows | executed policy greps + semver validation of `0.0.0-s1`; label absent from manifest (policy-scanned on every CI run) | PASS (static + local scan) | — |
+| Performance measurements | docs/performance.md | none executable here | BLOCKED | every metric honestly `not measured`; claims classified STRUCTURAL/HYPOTHESIS per docs/performance.md; reproducible procedures recorded |
 | GPU/visual behavior | — | — | BLOCKED | no display/GPU in sandbox; scenario list in docs/performance.md |
-| Compile / fmt / clippy / test / build | whole crate | — | BLOCKED → NOT RUN downstream | no toolchain; first downstream step: `cargo generate-lockfile`, `cargo fmt --all`, then the full gate sequence in docs/rewrite-log.md |
+| Compile / fmt / clippy / test / build | whole crate (`cargo test` will honestly report 0 tests) | — | BLOCKED → NOT RUN downstream | no toolchain; first downstream step: `cargo generate-lockfile`, `cargo fmt --all`, then the full gate sequence in docs/rewrite-log.md |
