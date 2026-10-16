@@ -76,10 +76,16 @@ project code reaches into those layers.
 ## Unresolved questions
 
 1. Nothing in this sandbox can compile Rust (no toolchain, and crates.io is
-   outside the network allowlist), so every "verified fact" above is
-   source-level verification, not compiler confirmation. First compile must
-   happen on a networked machine (`cargo check --locked` after
-   `cargo generate-lockfile`).
+   outside the network allowlist), so every "verified fact" above started as
+   source-level verification. **Resolved remotely on 2026-10-16**: the first
+   GitHub Actions run (ubuntu-24.04, run 38969211084) compiled the full Bevy
+   v0.20.0 git dependency graph and type-checked + borrow-checked the
+   transformed single-`fn` crate successfully (under the clippy driver; the
+   run failed only on style lints, since fixed — docs/rewrite-log.md
+   decision 18). `cargo fmt --all -- --check` also passed on that run.
+   Remaining unexecuted at that point: `cargo check --all-targets`,
+   `cargo test` (0 tests), `cargo build --release`, and the headless smoke
+   check.
 2. Whether the baseline's hand-enumerated `WgpuLimits` ever produced a working
    device on real hardware (several zero-valued fields look below wgpu
    validation minimums). The rewrite uses engine defaults instead; see
@@ -135,8 +141,13 @@ verification: (a) the transformation was assembled mechanically from the
 already-verified second-revision text with byte-identical expression bodies;
 (b) the final tree was re-scanned (structure, balance, counts, policy —
 all green); (c) every Python check embedded in the workflows was executed
-locally against the real tree and synthetic fixtures. First compilation
-remains the downstream gate (commands in docs/rewrite-log.md).
+locally against the real tree and synthetic fixtures. **Subsequent remote
+confirmation**: the first GitHub Actions run (2026-10-16) compiled and
+type/borrow-checked the transformed crate, which retroactively fulfills the
+gate's purpose (the converted-closure architecture is compiler-proven),
+though the gate itself was not — and could not be — executed *before* the
+transformation. First full build/test/smoke sequence remains the downstream
+gate (commands in docs/rewrite-log.md).
 
 ## Acceptance map (spec §24)
 
@@ -148,9 +159,9 @@ runtime test; a parse-level simulation is never counted as a GitHub run.
 
 | requirement | implementation location | verification method | executed status | evidence / blocker |
 | --- | --- | --- | --- | --- |
-| Bevy from official Git at exactly v0.20.0; no direct/renamed wgpu | `Cargo.toml`; CI policy job manifest scan (tomllib; package identity across all dependency sections incl. renamed deps) | refs API + `git ls-remote` tag→commit; manifest greps (executed); policy scan executed locally against the final tree | greps/refs/policy scan: PASS · remote CI run: NOT RUN | `v0.20.0` → `b3bdd75b…`; blocker: no Rust toolchain/crates.io in sandbox |
+| Bevy from official Git at exactly v0.20.0; no direct/renamed wgpu | `Cargo.toml`; CI policy job manifest scan (tomllib; package identity across all dependency sections incl. renamed deps) | refs API + `git ls-remote` tag→commit; manifest greps (executed); policy scan executed locally and **on GitHub Actions (run 38969211084, PASS)** | greps/refs/policy scan: PASS (local + remote) | `v0.20.0` → `b3bdd75b…` (confirmed by the remote compile); sandbox toolchain blocker unchanged |
 | Dominant linear chain in `main`; no wrappers/hidden config; exactly one `fn` item (rev 3) | `src/main.rs` `fn main` (line 1; 1516 lines, no other `fn`, no `impl`) | structural review; policy scanner (single-`fn` assertion + fixtures; bracket/literal balance) executed locally | PASS (static + local scan) | — |
-| Strict syntax contract incl. §23 hardening; comment policy per file type (rev 3) | CI policy job: tokenizer scanner (+`transmute`/`from_raw_parts`/`as_mut_ptr`), syntax-aware TOML/YAML comment scanners, whole-tree scan, fixtures | the committed checker itself executed locally on the final tree: 0 violations, 0 comments in any maintained file; all fixtures (keyword ±, comment/URL, block-comment, attribute, lifetime, fn-count, TOML, YAML) pass before the scan | checker + fixtures: PASS (executed locally) · remote CI run: NOT RUN | macro-expansion boundary recorded in docs/architecture.md §13.2 |
+| Strict syntax contract incl. §23 hardening; comment policy per file type (rev 3) | CI policy job: tokenizer scanner (+`transmute`/`from_raw_parts`/`as_mut_ptr`), syntax-aware TOML/YAML comment scanners, whole-tree scan, fixtures | the committed checker itself executed locally on the final tree **and remotely on GitHub Actions (run 38969211084, policy job PASS)**: 0 violations, 0 comments in any maintained file; all fixtures pass before the scan | checker + fixtures: PASS (local + remote) | macro-expansion boundary recorded in docs/architecture.md §13.2 |
 | Plugin & lifecycle ownership; exit through supported lifecycle | chain (18 plugins); Update closure writes `AppExit::Success` | every plugin/field/enum verified against pinned source (table above) | PASS (static) · runtime: NOT RUN | — |
 | Construction order vs frame execution documented separately | docs/architecture.md §3 + §5 | documentation authored from verified schedule facts (Startup→Update, pipelined extraction) | PASS (documentation) | — |
 | Required runtime phase ordering; no inferred tuple ordering | docs/architecture.md §5.1 phase table | ordering claims cite verified engine behavior, not chain position | PASS (documentation) · runtime: NOT RUN | — |
@@ -167,4 +178,4 @@ runtime test; a parse-level simulation is never counted as a GitHub run.
 | Cargo version/label separation | `Cargo.toml` `0.0.0-s1`; label only in workflows | executed policy greps + semver validation of `0.0.0-s1`; label absent from manifest (policy-scanned on every CI run) | PASS (static + local scan) | — |
 | Performance measurements | docs/performance.md | none executable here | BLOCKED | every metric honestly `not measured`; claims classified STRUCTURAL/HYPOTHESIS per docs/performance.md; reproducible procedures recorded |
 | GPU/visual behavior | — | — | BLOCKED | no display/GPU in sandbox; scenario list in docs/performance.md |
-| Compile / fmt / clippy / test / build | whole crate (`cargo test` will honestly report 0 tests) | — | BLOCKED → NOT RUN downstream | no toolchain; first downstream step: `cargo generate-lockfile`, `cargo fmt --all`, then the full gate sequence in docs/rewrite-log.md |
+| Compile / fmt / clippy / test / build | whole crate (`cargo test` will honestly report 0 tests) | first remote run 2026-10-16 (run 38969211084, ubuntu-24.04): dependency graph + crate compiled and type/borrow-checked under the clippy driver | fmt --check: PASS (remote) · compile: PASS (remote) · clippy: FAIL→fixed (decision 18) · check/test/build/smoke: NOT RUN (re-run pending) | sandbox toolchain still BLOCKED; remote evidence recorded in docs/rewrite-log.md |

@@ -93,12 +93,20 @@ Structural rules this shape follows:
   next level consumes, and each IIFE's argument list is evaluated in the
   enclosing scope — which is how `world` threads through as the final
   argument without any `let`/`mut` binding.
-- **Pixel formulas are inlined, byte-identical.** The procedural-texture
-  generators (divider glow/core, header separator, pill, menu card, lab tile,
-  lab well, badge) appear as immediately-applied closure expressions
+- **Pixel formulas are inlined.** The procedural-texture generators (divider
+  glow/core, header separator, pill, menu card, lab tile, lab well, badge)
+  appear as immediately-applied closure expressions
   `(|x, y, …| { body })(args)` at their single call site inside the image
-  literals. The bodies are the baseline formulas character-for-character
-  (f32 constants re-verified), so no visual value changed; the second
+  literals. The bodies are the baseline formulas with f32 constants
+  re-verified, with one enforced normalization: twelve
+  `f32::min(f32::max(v, 0.0), 1.0)` patterns became `v.clamp(0.0, 1.0)`
+  (clippy `manual_clamp` under CI's `-D warnings`). The two forms are
+  bitwise identical for every value the formulas can produce: all clamped
+  arguments are finite (pixel coordinates from integer casts, finite
+  constants; the only variable divisor `height - 48.0` cannot be zero on a
+  monitor that hosts the 120-px-minimum window, and the fallback is 1080),
+  and for finite non-NaN `v` the results coincide (at `v == -0.0` the forms
+  differ only in sign of zero, and both cast to `0u8`). The second
   revision's named helpers were dissolved into these expressions because the
   third revision admits no second `fn` item.
 - **Badge composition.** The badge's two spawns live inside the merged
@@ -509,6 +517,19 @@ measurement (all text is static; no runtime measurement is needed).
   they made release binaries non-portable (native ISA) and required nightly.
   Diagnostic trade-off: `abort` loses unwinding but keeps the panic message;
   asset-load failures still surface through Bevy's asset error handling.
+- **Clippy resolution under `-D warnings`** (first remote CI run,
+  2026-10-16): two lint families fired on the strict-contract source.
+  `manual_clamp` (12×) was **fixed in code** (see §3; the lint's suggestion
+  is provably output-identical on the reachable domain).
+  `redundant_closure_call` (24×) flags the immediately-applied-closure
+  pattern *itself* — the contract-mandated machinery for binding values
+  without `let` — so it cannot be fixed without violating the syntax
+  contract, and source attributes are prohibited by the comment/attribute
+  policy. It is allowed through a **single targeted manifest entry**
+  (`[lints.clippy] redundant_closure_call = "allow"` in `Cargo.toml`), which
+  the CI policy job asserts to be the *entire* lints table: no blanket
+  `allow(warnings)`, no other suppressed lint, no clippy disabling, and any
+  future suppression attempt fails CI.
 
 ## 11. Naming identities (Section 11.4 separation)
 
@@ -632,16 +653,23 @@ prelude.
 - No Rust toolchain and no crates.io access existed in the rewrite sandbox
   (network allowlist: github.com/codeload/api.github/npm/pypi). Consequently
   `cargo fmt/check/clippy/test/build` and `cargo generate-lockfile` were
-  **not executed**; verification was source-level (pinned Bevy/wgpu trees,
-  drift diff, structural scans, parse-level simulations, and local execution
-  of every Python block embedded in the workflows). `Cargo.lock` was
-  removed rather than left stale — regenerate and commit it as the first step
-  on a networked machine (exact commands in docs/rewrite-log.md §Next steps).
+  **not executed in the sandbox**; verification was source-level (pinned
+  Bevy/wgpu trees, drift diff, structural scans, parse-level simulations,
+  and local execution of every Python block embedded in the workflows).
+  **Remotely, the first CI run (2026-10-16) executed** the lockfile
+  bootstrap, `cargo fmt --all -- --check` (PASS), metadata/tree (PASS), and
+  the full dependency + crate compile under clippy (type/borrow check PASS;
+  lint-only failure since fixed — docs/rewrite-log.md decision 18).
+  `Cargo.lock` is still not committed — regenerate and commit it as the
+  first step on a networked machine (exact commands in
+  docs/rewrite-log.md §Next steps).
 - The third revision's combined feasibility gate (compile + run a minimal
-  closure-conversion experiment before the transformation) is **BLOCKED** in
-  this sandbox for the same reason; the transformation was instead
-  mirror-verified structurally (balance, junctions, counts) and every
-  embedded CI check was executed locally against the real tree.
+  closure-conversion experiment before the transformation) was **BLOCKED**
+  in this sandbox when due; the transformation was instead mirror-verified
+  structurally (balance, junctions, counts) and every embedded CI check was
+  executed locally against the real tree. The first remote CI run
+  subsequently proved the transformed source compiles, retroactively
+  confirming the conversion (docs/bevy-audit.md, feasibility section).
 - GPU/visual checks were not executed (no display). Reproducible scenario
   list in docs/performance.md.
 - The scale-factor question (§9.1) is an open product decision, reported

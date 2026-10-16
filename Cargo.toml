@@ -24,6 +24,9 @@ bevy = { git = "https://github.com/bevyengine/bevy", tag = "v0.20.0", default-fe
     "default_font",
 ] }
 
+[lints.clippy]
+redundant_closure_call = "allow"
+
 [profile.release]
 opt-level = 3
 lto = "fat"

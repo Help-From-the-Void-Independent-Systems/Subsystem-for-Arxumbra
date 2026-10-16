@@ -387,6 +387,9 @@ jobs:
           assert release_profile["panic"] == "abort"
           assert release_profile["lto"] == "fat"
           assert release_profile["codegen-units"] == 1
+          assert manifest.get("lints", {}) == {
+              "clippy": {"redundant_closure_call": "allow"}
+          }, manifest.get("lints")
           toolchain = tomllib.loads(pathlib.Path("rust-toolchain.toml").read_text())
           channel = toolchain["toolchain"]["channel"]
           assert re.fullmatch(r"\d+\.\d+\.\d+", channel), channel

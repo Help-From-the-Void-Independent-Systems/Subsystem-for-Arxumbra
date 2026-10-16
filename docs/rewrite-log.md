@@ -145,7 +145,7 @@
 | (rev 3) transformation script on `src/main.rs` + structural re-scan | 1516 lines; 0 comments; 0 attributes; exactly 1 `fn` (line 1); 0 `impl`; 0 keyword violations; `&mut` inventory exactly the 9 approved spellings; brackets balanced; 27 spawns / 8 image adds / 6 loads / 2 `add_systems` / 2 `add_plugins` |
 | (rev 3) local execution of the CI policy job's embedded Python against the real tree | fixtures (keyword ±, comments, TOML, YAML, fn-count, attributes) PASS; rust source policy PASS; manifest policy PASS; workflow comment/pin policy PASS; release matrix + naming PASS; asset policy PASS — "ALL CHECKS PASSED", exit 0 |
 | (rev 3) local execution of the release workflow's embedded Python blocks against synthetic fixtures | matrix self-check PASS; binary-header inspection PASS for ELF x86_64/aarch64, Mach-O arm64, PE x86_64/arm64 and correctly REJECTS an architecture mismatch; archive layout + permission verification PASS (unix and Windows shapes); checksum record→verify round-trip PASS; downloaded-set equality PASS (12/12) and correctly REJECTS both a missing and an extra file |
-| `cargo fmt/check/clippy/test/build`, `cargo metadata`, `cargo tree` | **NOT EXECUTED — no toolchain, no crates.io access** (hard blocker of this sandbox, not a skipped convenience) |
+| `cargo fmt/check/clippy/test/build`, `cargo metadata`, `cargo tree` | **NOT EXECUTED in the sandbox** — no toolchain, no crates.io access (hard blocker, not a skipped convenience). **Executed remotely for the first time on 2026-10-16** (GitHub Actions, ubuntu-24.04, run 38969211084, workflow_dispatch): policy job PASS; `cargo generate-lockfile` PASS; `cargo fmt --all -- --check` PASS; `cargo metadata --locked` + `cargo tree --locked -d` PASS; the whole Bevy v0.20.0 dependency graph **and the transformed single-`fn` crate type-checked and borrow-checked successfully** under the clippy driver; the run failed only on 36 lint errors (24 × `redundant_closure_call` on the contract-mandated IIFE pattern, 12 × `manual_clamp`) — both resolved (decision 18); `cargo check --all-targets`, `cargo test` (0 tests), `cargo build --release`, and the headless smoke check had not been reached yet in that run |
 
 ## Next steps (exact commands, networked machine with a GPU for the visual step)
 
@@ -288,3 +288,29 @@ SHA↔version mapping lives here (verified via the GitHub refs API and
     be executed in this sandbox (no toolchain); its first real run is the
     remote CI run, and a software-device failure there would fail loudly
     rather than being concealed (no `continue-on-error` anywhere).
+18. (remote CI feedback, 2026-10-16) The first remote run failed only on
+    clippy lints (everything else — policy scan, lockfile bootstrap,
+    `cargo fmt --all -- --check`, metadata, tree, and the full type/borrow
+    check of the transformed crate — passed). Resolution of the two lint
+    families:
+    (a) `manual_clamp` (12 sites): fixed **in code** —
+    `f32::min(f32::max(v, 0.0), 1.0)` → `v.clamp(0.0, 1.0)`. Equivalence:
+    identical for all finite non-NaN `v` (verified over 250k sampled values
+    incl. ±inf and denormals; at `v == -0.0` the results differ only in the
+    sign of zero and both cast to `0u8`); the Rust-level NaN divergence
+    (`f32::max(NaN, 0.0) = 0.0` vs `NaN.clamp(..) = NaN`) is unreachable —
+    every clamped argument is built from finite pixel coordinates and
+    non-zero constant divisors, except `(height - 48.0)`, which cannot be
+    zero for a monitor hosting the 120-px-minimum fullscreen window
+    (fallback: 1080). Even in that impossible case the saturating `as u8`
+    cast keeps direct-channel pixels identical; no panic is possible.
+    (b) `redundant_closure_call` (24 sites): the lint targets the
+    immediately-applied-closure pattern itself — the only `let`-free value
+    binding under the syntax contract — so it is unfixable without violating
+    the contract, and source attributes are banned by the comment/attribute
+    policy. Allowed via **one targeted manifest entry**
+    (`[lints.clippy] redundant_closure_call = "allow"`), and the CI policy
+    job now asserts the manifest's entire `[lints]` table equals exactly
+    that entry — any additional or blanket suppression fails CI. This is
+    neither `allow(warnings)` nor clippy disabling: all other lints stay at
+    `-D warnings`.

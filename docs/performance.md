@@ -38,11 +38,13 @@ previous, networked build against `v0.20.0-rc.2`).
 | Procedural textures generated exactly once in `Startup` | baseline behavior kept | n/a |
 
 No floating-point expression, branch structure, or iterator chain was
-replaced by a "supposedly faster" alternative; the pixel formulas are
-byte-for-byte the baseline bodies (now inlined as immediately-applied
-closure expressions), and the hold accumulator preserves the baseline's
-exact operation order (spec §19: no accidental floating-point changes
-through reordering).
+replaced by a "supposedly faster" alternative; the pixel formulas are the
+baseline bodies inlined as immediately-applied closure expressions, with the
+twelve clippy-mandated `f32::min(f32::max(v, 0.0), 1.0)` →
+`v.clamp(0.0, 1.0)` normalizations proven output-identical on the reachable
+domain (docs/architecture.md §3/§10), and the hold accumulator preserves the
+baseline's exact operation order (spec §19: no accidental floating-point
+changes through reordering).
 
 ## Evidence classification (third-revision rule)
 
