@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  checks:
+    name: Format, lint, policy, and headless tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Linux system libraries (winit wayland backend)
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libwayland-dev libxkbcommon-dev
+
+      - name: Activate the pinned toolchain
+        run: rustup show active-toolchain
+
+      - name: Cache Cargo registry, Git checkouts, and target directory
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-ci-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.toml', 'Cargo.lock') }}
+          restore-keys: |
+            cargo-ci-${{ runner.os }}-
+
+      - name: Ensure Cargo.lock exists (regenerated through Cargo, never by hand)
+        run: |
+          set -euo pipefail
+          test -f Cargo.lock || cargo generate-lockfile
+
+      - name: Formatting
+        run: cargo fmt --all -- --check
+
+      - name: Dependency metadata and duplicate report
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --format-version 1 > /dev/null
+          cargo tree --locked --duplicates
+
+      - name: Lint
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Compile check of all targets
+        run: cargo check --locked --all-targets
+
+      # Includes the strict source-syntax contract scan, the dependency-policy
+      # checks, the release-matrix regression checks, behavior regression
+      # tests, and asset validation — all headless.
+      #
+      # GPU/GUI smoke tests are intentionally NOT run here: GitHub-hosted
+      # runners have no display server or GPU for this windowed application.
+      # Visual verification must happen on a real machine; see
+      # docs/performance.md for the reproducible scenario list.
+      - name: Headless regression, syntax-contract, and policy tests
+        run: cargo test --locked

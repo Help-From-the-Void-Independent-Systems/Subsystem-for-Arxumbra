@@ -1,0 +1,75 @@
+# Subsystem for Arxumbra
+
+A minimal 2D dashboard interface built on
+[Bevy](https://github.com/bevyengine/bevy) **v0.20.0** (official Git tag,
+commit `b3bdd75becaffe9a16677cf5bae5bd6d198f052b`), written under a strict
+source-syntax contract: one dominant, fully qualified application-construction
+chain in `fn main`, no `use`/`let`/`mut` bindings/author-defined
+`const`/`static`/`unsafe`, and no direct `wgpu` dependency (renderer settings
+go through verified `bevy::render::settings` re-exports).
+
+## Behavior
+
+- Borderless fullscreen window titled **Arxumbra** on the primary monitor,
+  hidden cursor, black background; layout derives from the monitor size
+  (1920×1080 fallback).
+- **F1** toggles the HUD (divider, tab pills, Home / Extension Registry
+  entries, badge, OS title, launch well).
+- Clicking the **Launch** pill (only while the HUD is visible) switches from
+  the Laboratory menu to the launched state (rocket slot).
+- Holding **Escape** for 7 accumulated seconds exits with success; releasing
+  resets the hold.
+- Idle frames perform no component writes (the update pass is gated on
+  relevant input or an active Escape hold).
+
+Icons and the app icon load from the external `assets/` folder; eight RGBA
+textures (divider glow/core, header separator, pill, menu card, lab tile,
+lab well, badge) are generated procedurally once at startup.
+
+## Build & run
+
+Requires the pinned stable toolchain (`rust-toolchain.toml` → 1.99.1; rustup
+installs it automatically) and, on Linux, `pkg-config libwayland-dev
+libxkbcommon-dev`.
+
+```sh
+cargo generate-lockfile   # only needed until Cargo.lock is committed
+cargo build --release
+./target/release/subsystem-for-arxumbra   # run from the repository root
+```
+
+`assets/` is resolved relative to the current working directory, so packaged
+builds must be launched from the package root (executable next to `assets/`).
+
+## Tests & checks
+
+```sh
+cargo fmt --all -- --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
+```
+
+`cargo test` is headless and includes behavior regressions (hit test, Escape
+hold/exit boundary, HUD visibility truth table, slot tint, procedural-texture
+pixel invariants, asset PNG validation), the automated strict-syntax-contract
+scanner over every handwritten Rust file, the dependency policy (Git Bevy
+v0.20.0, no direct wgpu, no nightly manifest gates), and structural checks of
+the six-entry release matrix and executable filenames.
+
+## Release packaging
+
+`.github/workflows/release.yml` builds six platform packages on tag pushes
+(`v*`). Each package is one archive named `<artifact>.tar.gz` containing
+exactly the executable `<artifact><extension>` and `assets/`, with a
+`.sha256` sibling; publication runs in a separate `contents: write` job only
+for tag events. The artifact/executable label `…-v0.0.0.0.0.0-s1` is a fixed
+external naming contract — it is intentionally **not** the Cargo package
+version (`0.0.0-s1`), see `docs/architecture.md` §6.
+
+## Documentation
+
+- `docs/bevy-audit.md` — commit-pinned Bevy v0.20.0 source audit.
+- `docs/architecture.md` — control map, baseline comparison, decisions.
+- `docs/performance.md` — measurement record (honest `not measured` where
+  nothing was measured) and reproducible procedures.
+- `docs/rewrite-log.md` — revisions, stage status, executed commands.

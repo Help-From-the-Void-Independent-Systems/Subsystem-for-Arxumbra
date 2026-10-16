@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# A release run is never cancelled mid-flight; concurrent runs for the same
+# ref queue instead.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -16,6 +22,7 @@ jobs:
   build:
     name: ${{ matrix.artifact }}
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
     defaults:
       run:
         shell: bash
@@ -23,80 +30,142 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - artifact: subsystem-for-arxumbra-linux-x86_64
-            runner: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
-            extension: ""
-          - artifact: subsystem-for-arxumbra-linux-aarch64
+          - artifact: AArch64-Linux-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s1
             runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             extension: ""
-          - artifact: subsystem-for-arxumbra-macos-x86_64
-            runner: macos-15-intel
-            target: x86_64-apple-darwin
+          - artifact: x86_64-Linux-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s1
+            runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
             extension: ""
-          - artifact: subsystem-for-arxumbra-macos-aarch64
+          - artifact: AArch64-macOS-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s1
             runner: macos-15
             target: aarch64-apple-darwin
             extension: ""
-          - artifact: subsystem-for-arxumbra-windows-x86_64
-            runner: windows-2025
-            target: x86_64-pc-windows-msvc
-            extension: .exe
-          - artifact: subsystem-for-arxumbra-windows-aarch64
+          - artifact: x86_64-macOS-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s1
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+            extension: ""
+          - artifact: AArch64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s1
             runner: windows-11-arm
             target: aarch64-pc-windows-msvc
             extension: .exe
+          - artifact: x86_64-Windows-Subsystem-for-Arxumbra-v0.0.0.0.0.0-s1
+            runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            extension: .exe
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: "Verify the assets/ resource folder (Task 11 icons)"
+      - name: Install Linux system libraries (winit wayland backend)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libwayland-dev libxkbcommon-dev
+
+      - name: Install the pinned toolchain and matrix target
+        run: |
+          set -euo pipefail
+          rustup show active-toolchain
+          rustup target add "${{ matrix.target }}"
+
+      - name: Cache Cargo registry, Git checkouts, and target directory
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.toml', 'Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ matrix.target }}-
+
+      - name: Ensure Cargo.lock exists (regenerated through Cargo, never by hand)
+        run: |
+          set -euo pipefail
+          test -f Cargo.lock || cargo generate-lockfile
+
+      - name: Validate the external assets (real files, real PNG signatures)
         run: |
           set -euo pipefail
           test -d assets
-          for f in assets/app-icon.png assets/icons/*.png; do
+          for f in assets/app-icon.png assets/icons/flask.png assets/icons/house.png assets/icons/registry.png assets/icons/rocket-pill.png assets/icons/rocket.png; do
             test -f "$f"
             head -c 8 "$f" | od -An -tx1 | tr -d ' \n' | grep -q '89504e470d0a1a0a'
           done
-          ! grep -q 'include_bytes!' src/main.rs
-          grep -q 'AssetPlugin' src/main.rs
-          grep -q 'AssetServer' src/main.rs
-          grep -q '"png",' Cargo.toml
 
-      - name: "Install Linux build chain (LLVM: clang + lld)"
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libwayland-dev libxkbcommon-dev clang lld llvm
-
-      - name: Install Rust toolchain (pre-release/nightly, with sources for build-std)
-        uses: dtolnay/rust-toolchain@nightly
-        with:
-          targets: ${{ matrix.target }}
-          components: rust-src
-
-      - name: Build
-        run: cargo build --release --locked --target ${{ matrix.target }}
-
-      - name: Rename executable
-        run: |
-          mkdir -p dist
-          mv "target/${{ matrix.target }}/release/subsystem-for-arxumbra${{ matrix.extension }}" "dist/${{ matrix.artifact }}${{ matrix.extension }}"
-
-      - name: "Stage the assets/ resource folder"
+      - name: Verify dependency policy and binary target from Cargo metadata
         run: |
           set -euo pipefail
-          mkdir -p "dist/${{ matrix.artifact }}-assets"
-          cp -r assets/. "dist/${{ matrix.artifact }}-assets/"
+          cargo metadata --locked --format-version 1 > metadata.json
+          python3 - <<'PY'
+          import json, pathlib
+          metadata = json.loads(pathlib.Path("metadata.json").read_text())
+          package = next(p for p in metadata["packages"] if p["name"] == "subsystem-for-arxumbra")
+          direct = [d["name"] for d in package["dependencies"] if d.get("kind") in (None, "normal")]
+          assert "wgpu" not in direct, f"direct wgpu dependency: {direct}"
+          assert "wgpu-types" not in direct, f"direct wgpu-types dependency: {direct}"
+          bevy = next(d for d in package["dependencies"] if d["name"] == "bevy")
+          assert (bevy.get("source") or "").startswith("git+https://github.com/bevyengine/bevy?tag=v0.20.0"), bevy.get("source")
+          binary_names = [t["name"] for t in package["targets"] if "bin" in t["kind"]]
+          assert binary_names == ["subsystem-for-arxumbra"], binary_names
+          print("dependency policy and binary target verified; direct deps:", sorted(direct))
+          PY
+          rm metadata.json
+
+      - name: Build the release binary
+        run: cargo build --release --locked --target "${{ matrix.target }}"
+
+      - name: Stage the deterministic package layout
+        run: |
+          set -euo pipefail
+          mkdir -p "dist/${{ matrix.artifact }}/assets"
+          cp "target/${{ matrix.target }}/release/subsystem-for-arxumbra${{ matrix.extension }}" "dist/${{ matrix.artifact }}/${{ matrix.artifact }}${{ matrix.extension }}"
+          cp -r assets/. "dist/${{ matrix.artifact }}/assets/"
+          chmod +x "dist/${{ matrix.artifact }}/${{ matrix.artifact }}${{ matrix.extension }}"
+
+      - name: Validate the staged package (files, names, permissions)
+        run: |
+          set -euo pipefail
+          cd "dist/${{ matrix.artifact }}"
+          test -f "${{ matrix.artifact }}${{ matrix.extension }}"
+          test "$(find . -maxdepth 1 -type f | wc -l | tr -d ' ')" = "1"
+          test ! -e subsystem-for-arxumbra
+          test ! -e subsystem-for-arxumbra.exe
+          for f in assets/app-icon.png assets/icons/flask.png assets/icons/house.png assets/icons/registry.png assets/icons/rocket-pill.png assets/icons/rocket.png; do
+            test -f "$f"
+          done
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            test -x "${{ matrix.artifact }}${{ matrix.extension }}"
+          fi
+          if command -v file >/dev/null 2>&1; then
+            file "${{ matrix.artifact }}${{ matrix.extension }}"
+          fi
+
+      - name: Archive the package (executable bit preserved inside tar.gz)
+        run: |
+          set -euo pipefail
+          tar -czf "dist/${{ matrix.artifact }}.tar.gz" -C "dist/${{ matrix.artifact }}" .
+
+      - name: Checksum the archive
+        run: |
+          set -euo pipefail
+          cd dist
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "${{ matrix.artifact }}.tar.gz" > "${{ matrix.artifact }}.tar.gz.sha256"
+          else
+            shasum -a 256 "${{ matrix.artifact }}.tar.gz" > "${{ matrix.artifact }}.tar.gz.sha256"
+          fi
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.artifact }}
           path: |
-            dist/${{ matrix.artifact }}${{ matrix.extension }}
-            dist/${{ matrix.artifact }}-assets/
+            dist/${{ matrix.artifact }}.tar.gz
+            dist/${{ matrix.artifact }}.tar.gz.sha256
           if-no-files-found: error
 
   release:
@@ -104,21 +173,71 @@ jobs:
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       contents: write
+    defaults:
+      run:
+        shell: bash
     steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - name: Download artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           merge-multiple: true
 
-      - name: Publish release
+      # Validates the staged outputs against the *parsed* matrix (PyYAML is
+      # preinstalled on ubuntu runners); a missing platform blocks publication
+      # because `needs: build` plus `fail-fast: false` already skipped this
+      # job on any build failure.
+      - name: Validate the six expected archives and checksums
+        run: |
+          set -euo pipefail
+          python3 - .github/workflows/release.yml <<'PY'
+          import pathlib, sys, yaml
+          workflow = yaml.safe_load(pathlib.Path(sys.argv[1]).read_text())
+          entries = workflow["jobs"]["build"]["strategy"]["matrix"]["include"]
+          assert len(entries) == 6, entries
+          for entry in entries:
+              archive = pathlib.Path("dist") / (entry["artifact"] + ".tar.gz")
+              checksum = pathlib.Path("dist") / (entry["artifact"] + ".tar.gz.sha256")
+              assert archive.is_file(), archive
+              assert checksum.is_file(), checksum
+              recorded = checksum.read_text().split()[0]
+              assert len(recorded) == 64, checksum
+          print("all six platform archives and checksums are present")
+          PY
+
+      - name: Produce the combined checksum file
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum *.tar.gz > SHA256SUMS
+
+      - name: Publish the release (authorized tag events only)
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: |
-          gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --generate-notes
-          shopt -s nullglob
-          gh release upload "$TAG" dist/* --clobber
+          set -euo pipefail
+          gh auth status
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG exists; re-uploading this pipeline's outputs (--clobber replaces only same-tag artifacts produced by this workflow)."
+          else
+            probe="$(gh release view "$TAG" 2>&1 >/dev/null || true)"
+            case "$probe" in
+              *"not found"*)
+                gh release create "$TAG" --title "$TAG" --generate-notes
+                ;;
+              *)
+                echo "gh release view failed for a reason other than a missing release; refusing to create or upload:" >&2
+                echo "$probe" >&2
+                exit 1
+                ;;
+            esac
+          fi
+          gh release upload "$TAG" dist/*.tar.gz dist/*.tar.gz.sha256 dist/SHA256SUMS --clobber
