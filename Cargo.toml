@@ -1,3 +1,5 @@
+cargo-features = ["panic-immediate-abort"]
+
 [package]
 name = "subsystem-for-arxumbra"
 version = "0.0.0-s0"
@@ -16,8 +18,11 @@ bevy = { git = "https://github.com/bevyengine/bevy", tag = "v0.20.0-rc.2", defau
     "bevy_core_pipeline",
     "bevy_camera",
     "bevy_image",
+    "png",
     "bevy_sprite",
     "bevy_sprite_render",
+    "bevy_text",
+    "default_font",
 ] }
 wgpu = { version = "30", default-features = false }
 
@@ -26,4 +31,8 @@ opt-level = 3
 lto = "fat"
 codegen-units = 1
 strip = true
-panic = "abort"
+debug = false
+debug-assertions = false
+overflow-checks = false
+panic = "immediate-abort"
+incremental = false
