@@ -28,15 +28,46 @@ previous, networked build against `v0.20.0-rc.2`).
 
 | change | rationale | runtime claim status |
 | --- | --- | --- |
+| **Guarded component writes**: `Visibility`/`Transform.scale.z`/slot `Sprite.color` are written (and their `Mut` wrappers consumed) only when an explicit equality comparison against the derived next value differs | Verified v0.20.0 semantics: `Mut::into_inner` sets the CHANGED tick unconditionally (`change_detection/traits.rs#L516-L523`), and the engine consumers are change-gated — visibility propagation on `Or<(Changed<Visibility>, Changed<ChildOf>)>` (`bevy_camera`), sprite mesh preparation on `Or<(Changed<Sprite>, …)>` (`bevy_sprite_render`). The baseline flagged all ~26 entities' components on every gated frame (e.g. every frame of a 7 s Escape hold) even when values were equal; now hold-only frames flag only the genuinely progressing `scale.z`, and settled frames flag nothing | unverified hypothesis until measured (no toolchain here); final values and frame timing are identical to baseline by construction |
+| One coherent keyboard snapshot: F1 edge + Escape level from a single `ButtonInput<KeyCode>` borrow | spec §22: no redundant input/window lookup when a coherent snapshot suffices (baseline fetched the resource twice per frame) | unverified hypothesis; zero behavior change |
 | Monitor geometry read once per site (`(width, height)` fold) instead of two `world.query::<&Monitor>()` constructions per site | duplicate `QueryState` construction + iteration for one coherent value pair | unverified hypothesis until measured; zero behavior change |
 | Exit detection computed from the uniform hold value instead of a `&mut [bool;1]` cell re-checked per entity | removes mutable-cell plumbing and a per-entity OR from the write pass | unverified hypothesis; algebraically identical |
 | Update gate preserved (`hud_gate`): idle frames with no input and zero hold perform only the input reads + one read-only fold | baseline optimization kept and regression-tested | behavior encoded in tests |
+| Launch transition extracted to named `next_launched` with the identical boolean expression | testability of the same-frame toggle+click boundary (spec §18.2), not speed | behavior encoded in tests |
 | Per-frame `Vec<Entity>::clone()` (recorded arena-branch issue) | does not exist in the chosen `main` baseline; nothing to remove | n/a |
 | Procedural textures generated exactly once in `Startup` | baseline behavior kept | n/a |
 
 No floating-point expression, branch structure, or iterator chain was
 replaced by a "supposedly faster" alternative; the pixel shaders are
-byte-for-byte the baseline formulas, now in named functions.
+byte-for-byte the baseline formulas, now in named functions, and `next_hold`
+preserves the baseline's exact operation order (spec §19: no accidental
+floating-point changes through reordering).
+
+## Acceptance properties of application-owned code (spec §22)
+
+Investigation targets for the application's own code — **not** claims that
+all transitive engine code allocates nothing. "Static" = verified by source
+inspection/structural scan in this sandbox; dynamic confirmation requires the
+blocked toolchain/GPU environment.
+
+| property | status | how established |
+| --- | --- | --- |
+| no avoidable entity-list clone in the steady-state frame path | PASS (static) | no `Vec<Entity>`/entity collection exists; state is a `(bool, bool, f32)` fold |
+| no procedural texture regeneration without an explicit trigger | PASS (static) | generation exists only in the Startup closure; no runtime call site |
+| no string formatting or font-size assignment per frame when inputs unchanged | PASS (static) | zero `format!`/text writes in the Update path; all text static after Startup |
+| no unbounded growth of application-owned collections | PASS (static) | application owns no collections at all |
+| no repeated plugin registration / schedule construction / resource setup after initialization | PASS (static) | single construction chain; systems registered once; no `World`-mutating setup at runtime beyond component writes |
+| no custom locks/atomics introduced to work around syntax restrictions | PASS (static + machine-checked) | scanner forbids `Mutex`/`RwLock`/`Cell`/`RefCell`/atomics; zero occurrences |
+| no extra dynamic-dispatch or heap-allocation layer to create a fluent chain | PASS (static) | chain is direct method calls; inner closures are monomorphic IIFEs; no `dyn`, no `Box` beyond the `RenderCreation::Automatic(Box<WgpuSettings>)` the engine API itself requires (once, at construction) |
+| no redundant input/window lookup when a coherent snapshot suffices | PASS (static) | one keyboard borrow; one monitor fold per site; one cursor fold; one window-independent state fold |
+| idle vs active workloads measured separately | BLOCKED | no toolchain/GPU — procedures below; idle = gate-closed frames, active = hold/transition frames |
+| micro-optimization discipline (`observed cost → hypothesis → isolated change → correctness check → repeated measurement → keep/revert`) | recorded | no micro-optimization was applied on speculation; every change above is either correctness-mandated (§20 guarded writes) or work-removal with identical output, each labeled "unverified hypothesis until measured" — none is claimed as a measured win |
+
+No hardware-specific intrinsics, custom allocators, manual SIMD, aggressive
+inlining hints, or backend-specific tuning were added: nothing is measured,
+so nothing is justified under §22's rule; `target-cpu=native` was removed for
+portability of distributed binaries.
+
 
 ## Reproducible measurement procedure (for a machine with GPU + display)
 

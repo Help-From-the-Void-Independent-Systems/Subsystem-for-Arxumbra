@@ -8,10 +8,14 @@
 //!   qualified `App` construction chain that ends in `.run()`;
 //! - no `use`/`pub use`/`extern crate`, no `let`, no `mut` bindings, no
 //!   author-defined `const`/`static` items, no `unsafe`;
-//! - the only `&mut` occurrences are signature positions mandated by Bevy's
+//! - the only `&mut` occurrences are positions mandated by Bevy's/std's
 //!   public API contracts (exclusive systems take `&mut World`, mutable
-//!   query items hand out `&mut T` through `Mut::into_inner`, and `scan`
-//!   hands the test scanner its state); they are never local `mut` bindings;
+//!   query data types are spelled `&mut T`, and `Iterator::scan`/`iter_mut`
+//!   hand the test module's scanners their state); they are never local
+//!   `mut` bindings. Write-pass closures take `Mut<T>` wrappers directly and
+//!   consume them through `into_inner` only when a guarded comparison found
+//!   an actual change, because `Mut::into_inner` unconditionally sets the
+//!   CHANGED tick and engine consumers are change-detection gated;
 //! - named pure functions below exist for exactly two sanctioned reasons:
 //!   reusable numeric logic shared by the chain and targeted regression
 //!   tests. Application assembly itself stays inside `main`.
@@ -22,13 +26,18 @@
 //!   resolution, cursor hidden, layout taken from the primary monitor);
 //! - F1 toggles the HUD (divider glow/core, header separator, tab pills,
 //!   Home / Extension Registry entries, badge, well, OS title);
-//! - clicking the Launch pill (only while the HUD is visible and F1 is not
-//!   toggling in the same frame) switches from the Laboratory menu to the
-//!   launched state, tinting the rocket slot opaque;
+//! - clicking the Launch pill switches from the Laboratory menu to the
+//!   launched state, tinting the rocket slot opaque; a click registers only
+//!   when the HUD is visible *after* that frame's F1 toggle (so a click on
+//!   the frame F1 hides the HUD is dropped, and one on the frame F1 reveals
+//!   it registers — baseline boundary semantics, regression-tested);
 //! - holding Escape accumulates `scale.z` on every non-camera entity;
 //!   releasing resets it to zero; reaching 7.0 writes `AppExit::Success`;
 //! - the per-frame update path runs only when F1/Escape/click input arrives
-//!   or an Escape hold is still accumulating;
+//!   or an Escape hold is still accumulating, and each component write is
+//!   guarded by an explicit equality comparison so settled frames invalidate
+//!   nothing (no spurious change detection on `Visibility`/`Transform`/
+//!   `Sprite` during hold-only or repeat-input frames);
 //! - eight procedural RGBA textures are generated once at startup; icons and
 //!   the app icon load from the external `assets/` folder via `AssetServer`.
 
@@ -234,6 +243,26 @@ fn launch_hit(cursor: bevy::math::Vec2, width: f32, height: f32) -> bool {
         && cursor.x <= width / 3.0 + 655.0
         && cursor.y >= height / 2.0 - 192.0
         && cursor.y <= height / 2.0 - 139.0
+}
+
+/// Launch-state transition, baseline semantics preserved exactly. A click
+/// registers only when the HUD is visible *after* this frame's F1 toggle
+/// (`hidden == f1_pressed` is equivalent to the post-toggle visibility being
+/// `Visible`), the cursor is inside the Launch pill region, and the launch
+/// has not already happened. The same-frame boundary is therefore defined as:
+/// a click on the frame whose F1 press *hides* the HUD is dropped; a click on
+/// the frame whose F1 press *reveals* the HUD registers. Regression-tested in
+/// `same_frame_toggle_and_click_boundary_uses_post_toggle_visibility`.
+fn next_launched(
+    launched: bool,
+    click_pressed: bool,
+    hidden: bool,
+    f1_pressed: bool,
+    cursor: bevy::math::Vec2,
+    width: f32,
+    height: f32,
+) -> bool {
+    launched || (click_pressed && hidden == f1_pressed && launch_hit(cursor, width, height))
 }
 
 /// Visibility for one entity of the uniform update pass:
@@ -1537,21 +1566,25 @@ fn main() {
         // the baseline, with the frame state read back from the ECS exactly
         // as the baseline does):
         //
-        // 1. read F1 edge, Escape hold, delta, click edge, cursor, monitor
-        //    size;
+        // 1. read one coherent keyboard snapshot (F1 edge + Escape level from
+        //    a single `ButtonInput` borrow), delta, click edge, cursor, and
+        //    monitor size;
         // 2. one read-only fold derives `(hidden, launched, hold)`:
         //    - `hidden`  — visibility of the unnamed HUD entities,
         //    - `launched`— slot-rocket sprite alpha > 0.5,
         //    - `hold`    — Escape-hold accumulator (uniform `scale.z`);
         // 3. only when `hud_gate` passes, one write pass applies the F1
-        //    toggle, the Launch click, the Escape accumulation, per-entity
-        //    visibility (`hud_visibility`) and slot tint (`slot_tint`);
+        //    toggle, the Launch click (`next_launched`), and the Escape
+        //    accumulation — each component write guarded by an explicit
+        //    equality comparison, because `Mut::into_inner` sets the CHANGED
+        //    tick unconditionally and engine consumers (visibility
+        //    propagation, sprite mesh preparation) are change-detection
+        //    gated; settled frames invalidate nothing;
         // 4. crossing the 7 s hold boundary writes `AppExit::Success`.
         .add_systems(
             bevy::app::Update,
             |world: &mut bevy::ecs::world::World| {
-                (|f1: bool,
-                  escape: bool,
+                (|(f1, escape): (bool, bool),
                   delta: f32,
                   pressed: bool,
                   cursor: bevy::math::Vec2,
@@ -1591,47 +1624,114 @@ fn main() {
                                         )| {
                                             (|slot: bool,
                                               named: bool,
-                                              visibility: &mut bevy::camera::visibility::Visibility,
-                                              transform: &mut bevy::transform::components::Transform,
+                                              transform: bevy::ecs::change_detection::Mut<
+                                                  bevy::transform::components::Transform,
+                                              >,
+                                              visibility: bevy::ecs::change_detection::Mut<
+                                                  bevy::camera::visibility::Visibility,
+                                              >,
                                               sprite: Option<
                                                   bevy::ecs::change_detection::Mut<
                                                       bevy::sprite::Sprite,
                                                   >,
                                               >| {
-                                                transform.scale.z = next_hold(
-                                                    transform.scale.z,
-                                                    delta,
-                                                    escape,
-                                                );
-                                                *visibility = hud_visibility(
-                                                    hidden_next, named, launched_next, slot,
+                                                // Guarded writes (spec §20):
+                                                // in Bevy v0.20.0
+                                                // `Mut::into_inner` itself
+                                                // sets the CHANGED tick
+                                                // (change_detection/traits.rs
+                                                // "while marking self as
+                                                // changed"), and the engine
+                                                // consumers are
+                                                // change-detection gated:
+                                                // visibility propagation on
+                                                // `Changed<Visibility>`
+                                                // (bevy_camera) and sprite
+                                                // mesh preparation on
+                                                // `Changed<Sprite>`
+                                                // (bevy_sprite_render).
+                                                // Reading through `Deref`
+                                                // never flags, so each
+                                                // component consumes its
+                                                // `Mut` wrapper only when the
+                                                // next value differs from the
+                                                // current one. Settled frames
+                                                // (e.g. every frame of an
+                                                // Escape hold after the
+                                                // toggle/launch transition)
+                                                // then produce only the
+                                                // `scale.z` progression and
+                                                // zero spurious invalidation.
+                                                // Exact comparisons are
+                                                // deliberate: they encode the
+                                                // discrete reset semantics
+                                                // (`next_hold` yields exactly
+                                                // `0.0` on release) and both
+                                                // sides evaluate the same
+                                                // expression, so no tolerance
+                                                // is appropriate.
+                                                (|hold_next: f32,
+                                                  vis_next:
+                                                      bevy::camera::visibility::Visibility,
+                                                  transform: bevy::ecs::change_detection::Mut<
+                                                      bevy::transform::components::Transform,
+                                                  >,
+                                                  visibility: bevy::ecs::change_detection::Mut<
+                                                      bevy::camera::visibility::Visibility,
+                                                  >| {
+                                                    if transform.scale.z != hold_next {
+                                                        transform.into_inner().scale.z = hold_next;
+                                                    }
+                                                    if *visibility != vis_next {
+                                                        *visibility.into_inner() = vis_next;
+                                                    }
+                                                })(
+                                                    next_hold(transform.scale.z, delta, escape),
+                                                    hud_visibility(
+                                                        hidden_next,
+                                                        named,
+                                                        launched_next,
+                                                        slot,
+                                                    ),
+                                                    transform,
+                                                    visibility,
                                                 );
                                                 sprite.into_iter().for_each(
                                                     |sprite: bevy::ecs::change_detection::Mut<
                                                         bevy::sprite::Sprite,
                                                     >| {
-                                                        (|sprite: &mut bevy::sprite::Sprite| {
-                                                            sprite.color = slot_tint(
-                                                                sprite.color,
-                                                                slot,
-                                                                launched_next,
+                                                        (|current: bevy::color::Color,
+                                                          sprite:
+                                                              bevy::ecs::change_detection::Mut<
+                                                                  bevy::sprite::Sprite,
+                                                              >| {
+                                                            (|next: bevy::color::Color| {
+                                                                if current != next {
+                                                                    sprite.into_inner().color =
+                                                                        next;
+                                                                }
+                                                            })(
+                                                                slot_tint(
+                                                                    current,
+                                                                    slot,
+                                                                    launched_next,
+                                                                ),
                                                             );
-                                                        })(sprite.into_inner());
+                                                        })(sprite.color, sprite);
                                                     },
                                                 );
                                             })(
                                                 slot_name(name),
                                                 name.is_some(),
-                                                visibility.into_inner(),
-                                                transform.into_inner(),
+                                                transform,
+                                                visibility,
                                                 sprite,
                                             );
                                         },
                                     );
                             })(
                                 hidden != f1,
-                                launched
-                                    || (pressed && hidden == f1 && launch_hit(cursor, width, height)),
+                                next_launched(launched, pressed, hidden, f1, cursor, width, height),
                                 next_hold(hold, delta, escape),
                                 world,
                             );
@@ -1674,12 +1774,18 @@ fn main() {
                         world,
                     );
                 })(
-                    world
-                        .resource::<bevy::input::ButtonInput<bevy::input::keyboard::KeyCode>>()
-                        .just_pressed(bevy::input::keyboard::KeyCode::F1),
-                    world
-                        .resource::<bevy::input::ButtonInput<bevy::input::keyboard::KeyCode>>()
-                        .pressed(bevy::input::keyboard::KeyCode::Escape),
+                    // One coherent keyboard snapshot: the F1 edge and the
+                    // Escape level come from a single borrow of the
+                    // `ButtonInput<KeyCode>` resource (spec §22: no redundant
+                    // input lookups when a coherent snapshot suffices).
+                    (|keys: &bevy::input::ButtonInput<bevy::input::keyboard::KeyCode>| {
+                        (
+                            keys.just_pressed(bevy::input::keyboard::KeyCode::F1),
+                            keys.pressed(bevy::input::keyboard::KeyCode::Escape),
+                        )
+                    })(
+                        world.resource::<bevy::input::ButtonInput<bevy::input::keyboard::KeyCode>>(),
+                    ),
                     world.resource::<bevy::time::Time>().delta_secs(),
                     world
                         .resource::<bevy::input::ButtonInput<bevy::input::mouse::MouseButton>>()
@@ -1769,6 +1875,38 @@ mod tests {
             180.0,
             120.0
         ));
+    }
+
+    #[test]
+    fn same_frame_toggle_and_click_boundary_uses_post_toggle_visibility() {
+        // Spec §18.2: when a state transition and a click occur in the same
+        // frame, the agreed semantics must be defined and tested rather than
+        // left to accidental ordering. Baseline semantics, preserved exactly:
+        // the click is evaluated against the HUD visibility *after* this
+        // frame's F1 toggle (`hidden == f1` is equivalent to
+        // post-toggle-visible, because `hidden_next = hidden != f1`). The
+        // cursor fixture is the inclusive corner of the launch pill band at
+        // 1920×1080.
+        (|cursor: bevy::math::Vec2, width: f32, height: f32| {
+            assert!(
+                super::launch_hit(cursor, width, height),
+                "fixture cursor must sit inside the launch region"
+            );
+            // HUD visible, no toggle: the click registers.
+            assert!(super::next_launched(false, true, false, false, cursor, width, height));
+            // HUD hidden, no toggle: the click is dropped (pill not shown).
+            assert!(!super::next_launched(false, true, true, false, cursor, width, height));
+            // F1 hides the HUD this frame (hidden=false, f1=true): the
+            // same-frame click is dropped — post-toggle visibility is Hidden.
+            assert!(!super::next_launched(false, true, false, true, cursor, width, height));
+            // F1 reveals the HUD this frame (hidden=true, f1=true): the
+            // same-frame click registers — post-toggle visibility is Visible.
+            assert!(super::next_launched(false, true, true, true, cursor, width, height));
+            // Already launched: stays launched under any click/toggle mix.
+            assert!(super::next_launched(true, true, false, true, cursor, width, height));
+            // No click: no transition.
+            assert!(!super::next_launched(false, false, false, false, cursor, width, height));
+        })(bevy::math::Vec2::new(721.0, 348.0), 1920.0, 1080.0);
     }
 
     #[test]
@@ -2170,6 +2308,12 @@ mod tests {
             ("include_bytes", 0),
             ("include_str", 0),
             ("no_implicit_prelude", 0),
+            // Spec §17.2 escape routes: no transmutes, no hand-built
+            // references, no raw-pointer conversions anywhere in project
+            // source.
+            ("transmute", 0),
+            ("from_raw_parts", 0),
+            ("as_mut_ptr", 0),
         ]
         .iter()
         .flat_map(|(keyword, exception): &(&str, u8)| {
@@ -2244,6 +2388,105 @@ mod tests {
                     },
                 );
             });
+    }
+
+    #[test]
+    fn checker_fixtures_separate_prohibited_constructs_from_harmless_text() {
+        // Spec §23: positive and negative fixtures for the policy checker,
+        // including cases where naive substring matching fails. The checker
+        // is pure std (no dev-only tools, no runtime coupling); these
+        // fixtures exercise the same functions the whole-tree scan uses.
+        //
+        // Negative fixtures — harmless text that contains prohibited keyword
+        // character sequences inside identifiers, strings, comments, or the
+        // permitted 'static lifetime must produce zero violations.
+        [
+            // Keywords as substrings of longer identifiers (§23 explicitly
+            // permits identifiers containing matching character sequences).
+            "fn f() { letter_head(); mutable_style(); constant_time(); static_assert_style(); }",
+            // `mut` inside an engine identifier, and keywords in a comment.
+            "fn f() { resource_mut(0); } // let use mut unsafe const static\n",
+            // Keywords sealed inside a string literal.
+            "fn f() { g(\"use std::io; let x = 1; unsafe { } static A\"); }",
+            // The permitted 'static lifetime.
+            "fn f(x: &'static str) -> &'static str { x }",
+            // Dependency-associated constants are permitted.
+            "fn f() { bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID; }",
+            // Standard derive expansion is permitted.
+            "#[derive(Clone, Debug, PartialEq)] struct S;",
+        ]
+        .iter()
+        .for_each(|fixture: &&str| {
+            assert_eq!(
+                contract_violations(&strip_comments_and_literals(fixture)).len(),
+                0,
+                "harmless fixture was rejected: {fixture}"
+            );
+        });
+        // Positive fixtures — each genuine prohibited construct must be
+        // flagged and the violation must name the offending keyword. Note
+        // that `&mut T` in signature positions is the single documented,
+        // explicitly requested relaxation (see docs/architecture.md §13) and
+        // is therefore *not* a positive fixture here, while bare `mut`
+        // bindings/parameters and raw pointers are.
+        [
+            ("use std::io;", "use"),
+            ("pub use std::io;", "use"),
+            ("extern crate std;", "extern"),
+            ("fn f() { let x = 1; }", "let"),
+            ("fn f() { let mut x = 1; }", "mut"),
+            ("fn f(mut x: u8) {}", "mut"),
+            ("fn f() { let Some(x) = g() else { return }; }", "let"),
+            ("fn f() { if let Some(x) = g() { } }", "let"),
+            ("const A: u8 = 0;", "const"),
+            ("static A: u8 = 0;", "static"),
+            ("static mut A: u8 = 0;", "static"),
+            ("fn f() { unsafe { } }", "unsafe"),
+            ("fn f(p: *const u8) {}", "const"),
+            ("fn f(p: *mut u8) {}", "mut"),
+            ("std::cell::RefCell::new(0);", "RefCell"),
+            ("std::cell::Cell::new(0);", "Cell"),
+            ("std::sync::Mutex::new(0);", "Mutex"),
+            ("std::sync::RwLock::new(0);", "RwLock"),
+            ("std::sync::atomic::AtomicBool::new(false);", "AtomicBool"),
+            ("std::sync::atomic::AtomicUsize::new(0);", "AtomicUsize"),
+            ("macro_rules! m { () => {} }", "macro_rules"),
+            ("include_bytes!(\"x.png\");", "include_bytes"),
+            ("include_str!(\"x.txt\");", "include_str"),
+            ("std::mem::transmute(x);", "transmute"),
+            ("std::slice::from_raw_parts(p, 1);", "from_raw_parts"),
+            ("x.as_mut_ptr();", "as_mut_ptr"),
+            ("fn f() -> std::boxed::Box<dyn Fn()> { g() }", "dyn"),
+            ("#![no_implicit_prelude]", "no_implicit_prelude"),
+        ]
+        .iter()
+        .for_each(|(fixture, keyword): &(&str, &str)| {
+            assert!(
+                contract_violations(&strip_comments_and_literals(fixture))
+                    .iter()
+                    .any(|violation: &std::string::String| violation
+                        .starts_with(&format!("{keyword} "))),
+                "prohibited construct `{keyword}` was accepted in: {fixture}"
+            );
+        });
+        // Block comments are stripped even when they hide keywords. The
+        // comment markers are assembled from chars so that this test file
+        // itself never contains a block-comment sequence (the scanner models
+        // block comments as non-nested and the whole-tree test guards that
+        // limitation).
+        (|open: std::string::String, close: std::string::String| {
+            assert_eq!(
+                contract_violations(&strip_comments_and_literals(&format!(
+                    "{open} use std::io; let x = 1; unsafe {{ }} {close} fn f() {{}}"
+                )))
+                .len(),
+                0,
+                "keywords hidden inside a block comment must be ignored"
+            );
+        })(
+            ['/', '*'].into_iter().collect::<std::string::String>(),
+            ['*', '/'].into_iter().collect::<std::string::String>(),
+        );
     }
 
     // Dependency policy (Section 7): Bevy from the official Git repository at

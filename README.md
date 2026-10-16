@@ -20,7 +20,10 @@ go through verified `bevy::render::settings` re-exports).
 - Holding **Escape** for 7 accumulated seconds exits with success; releasing
   resets the hold.
 - Idle frames perform no component writes (the update pass is gated on
-  relevant input or an active Escape hold).
+  relevant input), and every write that does happen is guarded by an
+  equality comparison, so settled frames flag nothing as changed — engine
+  change detection (visibility propagation, sprite mesh preparation) only
+  runs for real transitions.
 
 Icons and the app icon load from the external `assets/` folder; eight RGBA
 textures (divider glow/core, header separator, pill, menu card, lab tile,
@@ -64,7 +67,7 @@ exactly the executable `<artifact><extension>` and `assets/`, with a
 `.sha256` sibling; publication runs in a separate `contents: write` job only
 for tag events. The artifact/executable label `…-v0.0.0.0.0.0-s1` is a fixed
 external naming contract — it is intentionally **not** the Cargo package
-version (`0.0.0-s1`), see `docs/architecture.md` §6.
+version (`0.0.0-s1`), see `docs/architecture.md` §11.
 
 ## Documentation
 

@@ -11,6 +11,7 @@
 | Bevy | tag `v0.20.0` @ `b3bdd75becaffe9a16677cf5bae5bd6d198f052b` (previous pin: `v0.20.0-rc.2` @ `343a0233d6788a49f224a3684c8995e246663df3`) |
 | wgpu (transitive, via Bevy) | 30.x (`bevy_render` requires `wgpu = "30"`; default-semantics questions verified against `v30.0.1` source) |
 | toolchain | stable `1.99.1` pinned in `rust-toolchain.toml` (Bevy MSRV `1.97.1`) |
+| spec revision | second revision of the rewrite mandate (adds Sections 17–25: low-level control contract, construction/frame separation, ownership, invalidation, rendering/asset invariants, performance budgets, checker hardening, traceability, completion gates) — implemented in this document and in the guarded write pass |
 
 ## 2. Baseline comparison
 
@@ -25,11 +26,14 @@ baseline except where a mandate requirement forces a change.
 | --- | --- | --- | --- | --- |
 | Bevy pin | git tag `v0.20.0-rc.2` | — | git tag `v0.20.0` (final) | `Cargo.toml`; drift audit in docs/bevy-audit.md (rc.2→0.20.0 diffs are additive in all used APIs) |
 | direct wgpu dep | `wgpu = { version = "30", default-features = false }`, used once for `wgpu::MemoryBudgetThresholds` | same field observed (`instance_memory_budget_thresholds: wgpu::MemoryBudgetThresholds { … }`) | **removed**; field covered by `..WgpuSettings::default()` | `MemoryBudgetThresholds::default() == { None, None }` proven from wgpu 30.0.1 source — identical to both baseline values; unit test `manifest_pins_git_bevy_v0_20_0_without_direct_wgpu` |
-| GPU limits | hand-enumerated `WgpuLimits` with many zero fields | — | engine default limits under unchanged `WgpuSettingsPriority::Functionality` | bevy settings.rs#L91-L111 (defaults); rationale §5 below. Not compile-verified here (blocker, §9) |
-| window/HUD/launch/exit behavior | borderless fullscreen "Arxumbra", F1 toggle, Launch pill click, 7 s Escape-hold exit, gated update pass | Dashboard resource, per-frame `Vec<Entity>::clone()` (recorded observations) | main baseline preserved exactly | pure-logic regression tests in `src/main.rs` (`launch_hit`, `next_hold`, `exit_reached`, `hud_gate`, `hud_visibility`, `slot_tint`) |
+| GPU limits | hand-enumerated `WgpuLimits` with many zero fields | — | engine default limits under unchanged `WgpuSettingsPriority::Functionality` | bevy settings.rs#L91-L111 (defaults); rationale §10 below. Not compile-verified here (blocker, §14) |
+| window/HUD/launch/exit behavior | borderless fullscreen "Arxumbra", F1 toggle, Launch pill click, 7 s Escape-hold exit, gated update pass | Dashboard resource, per-frame `Vec<Entity>::clone()` (recorded observations) | main baseline preserved exactly | pure-logic regression tests in `src/main.rs` (`launch_hit`, `next_launched`, `next_hold`, `exit_reached`, `hud_gate`, `hud_visibility`, `slot_tint`) |
+| write-path change detection | `Mut::into_inner()` consumed unconditionally per gated frame, then assigned — in v0.20.0 `into_inner` **sets the CHANGED tick itself**, so every gated frame flagged `Visibility`/`Transform`/`Sprite` on all ~26 entities even when values were equal | — | guarded writes: values compared through non-flagging `Deref` reads; the `Mut` wrapper is consumed only when the next value differs (§8) | engine semantics read from `change_detection/traits.rs#L516-L523`; consumer gates read from `bevy_camera` visibility propagation and `bevy_sprite_render` mesh preparation; final values and frame timing identical to baseline |
+| input lookups | `ButtonInput<KeyCode>` resource fetched twice per frame (F1 edge, Escape level) | — | one coherent keyboard snapshot: single borrow yields both readings (§22 property) | Update closure source |
+| launch transition | inline `launched \|\| (pressed && hidden == f1 && launch_hit(…))` | — | named pure helper `next_launched` with the same expression; same-frame toggle+click boundary documented and regression-tested (§5.2) | test `same_frame_toggle_and_click_boundary_uses_post_toggle_visibility` |
 | per-frame allocation on paint path | none in main (no `Dashboard.ids`; state read back from ECS each gated frame) | `Vec<Entity>::clone()` per frame | main behavior kept (no clone exists to remove) | source inspection; `hud_gate` test documents the no-input-no-write property |
 | monitor lookups | two `world.query::<&Monitor>()` folds per read site (width, height separately) | — | one fold returning `(width, height)` per site | Startup/Update source; semantics identical (last-monitor-wins fold, 1920×1080 fallback) |
-| exit-hold accumulation | `&mut [bool; 1]` cell hack + per-entity `scale.z >= 7.0` re-check | — | computed from the uniform hold: `exit_reached(next_hold(hold, delta, escape))` | algebraically identical given the uniform-`scale.z` invariant (all entities spawn at 0.0 and are updated by the same expression); tests `escape_hold_accumulates_resets_and_crosses_the_exit_boundary` |
+| exit-hold accumulation | `&mut [bool; 1]` cell hack + per-entity `scale.z >= 7.0` re-check | — | computed from the uniform hold: `exit_reached(next_hold(hold, delta, escape))` | algebraically identical given the uniform-`scale.z` invariant (all entities spawn at 0.0 and are updated by the same expression); test `escape_hold_accumulates_resets_and_crosses_the_exit_boundary` |
 | toolchain | nightly (`cargo-features panic-immediate-abort`, `-Z` rustflags, `build-std`, `target-cpu=native`) | — | stable 1.99.1 pinned; `panic = "abort"`; portable codegen | `Cargo.toml`, `rust-toolchain.toml`; `.cargo/config.toml` deleted; policy test asserts it stays deleted |
 | release naming | artifacts `subsystem-for-arxumbra-<platform>-<arch>`, executable + separate `-assets` folder | — | mandated six-entry matrix, artifact `…-v0.0.0.0.0.0-s1`, one archive per platform containing renamed executable + `assets/` | `.github/workflows/release.yml`; Rust tests parse the matrix structurally and assert the six exact executable filenames |
 | Cargo version | `0.0.0-s0` | — | `0.0.0-s1` (valid semver) — the fixed label `v0.0.0.0.0.0-s1` is an external contract, *not* a Cargo version, and never appears in `Cargo.toml` | test `distribution_label_stays_separate_from_the_cargo_version` |
@@ -56,7 +60,7 @@ bevy::app::App::new()
                   (|(width, height), world| { (13 handles, world) => 24 spawns;
                                               (badge, world) => 2 spawns; })(monitor fold, world) })
   → .add_systems(Update,  |world: &mut World| { (inputs…, (width,height), world) =>
-                  ((hidden, launched, hold), world) => if hud_gate { exit check; uniform write pass } })
+                  ((hidden, launched, hold), world) => if hud_gate { exit check; guarded write pass } })
   → .run();
 ```
 
@@ -65,6 +69,9 @@ configure. There is no `build_app`-style wrapper, no custom plugin, no
 extension trait, no macro, and no second execution loop. Named functions
 outside `main` are pure numeric/logic helpers with two sanctioned purposes
 (reuse in the chain + regression tests); each is documented at its definition.
+The construction chain is deliberately readable top-to-bottom after rustfmt:
+it contains no closures-over-closures deeper than the two documented exclusive
+systems.
 
 ## 4. Control map
 
@@ -74,20 +81,345 @@ outside `main` are pure numeric/logic helpers with two sanctioned purposes
 | --- | --- | --- | --- | --- | --- |
 | window & presentation | `WindowPlugin` + winit | `main` chain: `Window` literal (borderless fullscreen on primary monitor, title, hidden cursor, min 180×120, non-resizable, `prevent_default_event_handling: true`) | before `Startup` systems; window events drive the `Update` schedule via `WinitPlugin` (`run_on_any_thread: false` → main thread owns the event loop) | mode, title, constraints, cursor visibility/grab, exit condition `OnAllClosed` | actual monitor resolution, DPI scaling, WM compositing, vsync behavior (`PresentMode::AutoVsync` is a request) |
 | time | `TimePlugin` | engine defaults | `Time` updated before `Update` | only consumption (`delta_secs` for the hold accumulator) | clock source, delta smoothing/maximum |
-| input | `InputPlugin` + winit | engine defaults | `ButtonInput` resources refreshed per frame before `Update` | F1 edge, Escape level, left-click edge, cursor position read | key repeat, device mapping, focus semantics |
+| input | `InputPlugin` + winit | engine defaults | `ButtonInput` resources refreshed per frame before `Update` | F1 edge, Escape level, left-click edge, cursor position read — as one coherent keyboard snapshot plus per-resource reads | key repeat, device mapping, focus semantics |
 | assets | `AssetPlugin` | `main` chain: `assets/` relative folder, `AssetMode::Unprocessed`, `AssetMetaCheck::Never`, `UnapprovedPathMode::Forbid` | `AssetServer` streams IO on the io task pool (1–4 threads); handles resolve asynchronously | paths, unprocessed mode, load sites (six PNGs at startup), failure policy (Forbid) | filesystem IO timing, PNG decode threads, load-failure propagation via asset events |
-| ECS scheduling | `App` schedules | `Startup` (one exclusive closure), `Update` (one exclusive closure) | `Startup` once after plugin `finish/cleanup`; `Update` every frame; deferred commands none (exclusive world access applies changes immediately) | the two systems' entire logic; gate that suppresses writes on no-input frames | task-pool thread counts (explicit policy: io/async ≤ 4, compute = all cores), system execution across frames |
+| ECS scheduling | `App` schedules | `Startup` (one exclusive closure), `Update` (one exclusive closure) | `Startup` once after plugin `finish/cleanup`; `Update` every frame; deferred commands none (exclusive world access applies changes immediately) | the two systems' entire logic; gate that suppresses writes on no-input frames; equality guards that suppress no-op writes (§8) | task-pool thread counts (explicit policy: io/async ≤ 4, compute = all cores), system execution across frames |
 | rendering | `RenderPlugin` + core pipeline + sprite/text plugins | `main` chain: backends VULKAN∥METAL∥DX12, `HighPerformance`, `Functionality` priority, `TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES`, FXC on DX12, `VALIDATION_INDIRECT_CALL`, `MemoryHints::Performance`, rest = `WgpuSettings::default()`; `PipelinedRenderingPlugin` keeps extraction on the render sub-app | extraction → preparation → render schedules, pipelined against the next main-world update | backend set, requested features/priority, MSAA off, clear color black, sprite/text layering via `Transform.translation.z` and 2D draw order | adapter/device selection within the backend set, actual limits (Functionality priority negotiates with the adapter), presentation, driver behavior |
-| GPU resource management | Bevy render world | engine defaults | per-frame extraction of changed sprites/text | nothing below the `Image`/`Sprite` component level (deliberate: standard sprite/text rendering satisfies this app; no custom node/pipeline) | buffer/texture allocation, memory budgets (`MemoryBudgetThresholds` defaults), shader compilation (async) |
+| GPU resource management | Bevy render world | engine defaults | per-frame extraction of changed sprites/text | nothing below the `Image`/`Sprite` component level (deliberate: standard sprite/text rendering satisfies this app; no custom node/pipeline — §6) | buffer/texture allocation, memory budgets (`MemoryBudgetThresholds` defaults), shader compilation (async) |
 | startup/shutdown | `App::run` | terminal `.run()` in `main` | startup → frame loop → `AppExit` message or last-window-closed → plugin cleanup | writing `AppExit::Success` after the 7 s Escape hold; `ExitCondition::OnAllClosed` | process exit code plumbing, winit loop teardown |
 
 Exclusive `&mut World` systems are retained deliberately (baseline
 architecture): the app is one tiny HUD; typed query items
-(`&mut Visibility`, `&mut Transform`, `Option<&mut Sprite>`) still scope
+(`Mut<Visibility>`, `Mut<Transform>`, `Option<Mut<Sprite>>`) still scope
 access inside the query, and there is no parallel system work to serialize.
 No `Cell`/`RefCell`/locks/atomics were introduced anywhere.
 
-## 5. Notable decisions
+## 5. Construction sequence vs runtime dependency graph (spec §18)
+
+Two distinct structures, documented separately. The builder chain in §3 is
+the **construction sequence** (registration order). It is *not* the frame
+schedule: nothing below infers execution order from the position of a plugin
+or system in a tuple.
+
+### 5.1 Runtime dependency graph / frame dataflow
+
+Conceptual phases `input observation → state transition → invalidation
+decision → layout/visual derivation → ECS changes → extraction/preparation/
+rendering`, mapped to the real engine structures of the pinned revision:
+
+| phase | inputs | outputs | resource/component access | prerequisites | run condition | deferred effects | verification |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| input observation | OS events (winit loop, engine-owned) | `ButtonInput<KeyCode>` (F1 edge, Escape level), `ButtonInput<MouseButton>` (click edge), `Time::delta_secs`, `Window::cursor_position` | reads: engine input/time/window resources | winit drained OS events for this frame iteration (engine-owned; exact internal placement not relied upon — the exclusive system reads resources, it does not order against engine systems) | every `Update` | none | resource types/paths verified in pinned source; runtime NOT RUN |
+| state transition (read-back) | `Visibility`/`Transform`/`Sprite.color`/`Name` of ~26 non-camera entities, `Monitor` | `(hidden, launched, hold)` frame state; `(width, height)` | one read-only `query_filtered` fold (`Without<Camera2d>`), one `Monitor` fold | input snapshot taken | every `Update` (read-only; cheap) | none | fold semantics transcribed from baseline; `hud_visibility`/`slot_tint`/hold tests |
+| invalidation decision | `hud_gate(f1, escape, pressed, hold)` | whether the write pass runs at all | none | state read-back | gate passes only on F1 edge, Escape held, click edge, or active hold | none | test `update_gate_runs_only_for_relevant_input_or_active_hold` |
+| layout/visual derivation | gate inputs, `(hidden, launched, hold)`, cursor, monitor size | `hidden_next`, `launched_next` (`next_launched`), `hold_next` (`next_hold`); per-entity `hud_visibility`/`slot_tint` values | pure functions; no ECS access | invalidation decision | inside gated block; per entity inside the write pass | none | pure-function regression tests incl. same-frame boundary (§5.2) |
+| ECS changes | derived next-values | guarded component writes (`scale.z`, `Visibility`, slot `Sprite.color`); `Messages<AppExit>::write(AppExit::Success)` at the 7 s boundary | `Mut<T>` items consumed **only** when the compared value differs (§8); exit check hoisted before the write pass | derivation | gated; per-entity equality guards | none — exclusive system, all changes immediate and visible in the same frame | engine `into_inner`/`Deref` tick semantics verified from source; runtime NOT RUN |
+| extraction/preparation/rendering | changed components | extracted sprites/text, prepared meshes, render passes, presentation | engine-owned (render sub-app) | main-world `Update` for the frame completed (pipelined rendering overlaps extraction with the *next* main-world update) | engine schedules; sprite mesh preparation gated on `Changed<Sprite>` etc. (verified) | engine-internal | gates read from `bevy_sprite_render`/`bevy_camera` source; runtime/GPU NOT RUN (blocker) |
+
+Ordering is explicit only where a phase consumes another phase's results:
+within the single exclusive Update system, ordering is program order
+(snapshot → fold → gate → derive → guarded write → exit message), which is
+guaranteed by the language, not by scheduler hints. There are **no** ordering
+edges between independent systems to get wrong, because the application owns
+exactly one Update system. No tuple-position inference is used anywhere:
+plugin registration order matters only where Bevy documents it (e.g.
+`RenderPlugin` before pipeline plugins that extend it — the chain keeps the
+baseline's verified order), and per-frame behavior depends only on the
+schedule model (Startup once before the first Update; Update before
+PostUpdate/extraction boundaries of the same frame).
+
+### 5.2 Deferred mutations and the same-frame boundary
+
+The application uses **no `Commands` and no deferred operations**: both
+systems take `&mut World` exclusively, so every spawn, insert, and component
+write is visible immediately and no flush points or schedule barriers exist —
+none are needed, and none were added (spec §18.2: no arbitrary flushes; each
+would need a concrete producer→consumer dependency, and there is none).
+
+The one genuine same-frame boundary — a state transition (F1 toggle) and a
+click arriving in the same frame — is **defined**, not left to ordering:
+`next_launched` evaluates the click against the *post-toggle* visibility
+(`hidden == f1_pressed` is exactly "the HUD is visible after this frame's
+toggle", since `hidden_next = hidden != f1_pressed`). Consequences, encoded
+in `same_frame_toggle_and_click_boundary_uses_post_toggle_visibility`:
+
+- click on the frame whose F1 press *hides* the HUD → dropped;
+- click on the frame whose F1 press *reveals* the HUD → registers;
+- click while the HUD is already visible, no toggle → registers;
+- click while the HUD stays hidden → dropped;
+- already-launched state is absorbing.
+
+This is the baseline semantics, preserved exactly (same boolean expression),
+now named and tested.
+
+### 5.3 Startup and shutdown states
+
+Distinct states, in order, with what each depends on:
+
+1. **Application construction** — `App::new()` + plugin registration (the §3
+   chain). No window, no device yet.
+2. **Plugin initialization** — engine `build`/`finish`/`cleanup` run inside
+   `App::run`; the render sub-app and schedules are constructed. Not
+   duplicated or bypassed: the standard runner is used (§6), so lifecycle
+   handling is entirely the engine's supported path.
+3. **Startup schedule** — the exclusive Startup closure inserts the clear
+   color, spawns the camera, reads the monitor fold, creates the eight
+   procedural images, requests the six external PNG loads, and spawns all 26
+   HUD entities (all `Visibility::Hidden`, `scale (1,1,0)` — the HUD starts
+   hidden exactly as in the baseline; F1 reveals it).
+4. **Renderer readiness** — device/adapter selection at first extraction
+   (engine-owned; `Functionality` priority + default limits maximize
+   compatibility). Not awaited or polled by application code.
+5. **Asset loading** — external PNGs stream in asynchronously on the io task
+   pool. The interface is **not** marked ready by asset completion and the
+   event loop is never blocked on assets: procedural textures (divider,
+   pills, cards, wells, badge) are synchronous `Image` assets available at
+   the first frame; icons/title font appear when their loads resolve —
+   baseline behavior. Missing assets surface as engine asset errors (§9.3).
+6. **Interactive readiness / normal running** — from the first `Update`
+   frame: input snapshot → gated transitions (§5.1).
+7. **Termination** — either `Messages<AppExit>::write(AppExit::Success)` when
+   the Escape hold crosses 7.0 s, or the engine's `ExitCondition::OnAllClosed`
+   path. Both stay inside the supported lifecycle: `App::run` observes
+   `AppExit`, runs plugin cleanup, and returns normally. No `process::exit`,
+   no abort-to-avoid-shutdown; `panic = "abort"` affects only panic paths
+   (unrecoverable by definition), never normal termination.
+
+## 6. Integration level selection (spec §17)
+
+### 6.1 Lowest sufficient public level per subsystem
+
+Levels per §17.1: (1) plugin/resource configuration, (2) typed systems +
+schedules + component/resource ownership, (3) public render-world
+extraction/preparation integration, (4) custom pipeline/graph nodes,
+(5) custom runner / manual renderer init.
+
+| subsystem | level chosen | capability gained | complexity introduced | public API used | verification needed |
+| --- | --- | --- | --- | --- | --- |
+| window/presentation | 1 | exact borderless-fullscreen config, cursor, constraints, exit condition | none beyond the literal | `WindowPlugin`, `Window`, `CursorOptions`, `ExitCondition` | fields verified in pinned source; visual check BLOCKED (no display) |
+| renderer configuration | 1 | backend set, power/priority, features, validation flag, memory hints — all baseline settings expressible without wgpu | struct-update defaulting for the one non-nameable field (proven equivalent) | `RenderPlugin`, `RenderCreation::Automatic(Box<WgpuSettings>)`, `bevy::render::settings::*` re-exports | `WgpuSettings` + wgpu 30.0.1 defaults read line-by-line (bevy-audit.md) |
+| frame logic (input→state→writes) | 2 | full per-frame control with immediate (non-deferred) mutation and read-back state; single system = no ordering ambiguity | exclusive-world closures are less idiomatic than typed params — accepted as the baseline architecture, kept | `add_systems(Startup/Update, FnMut(&mut World))`, `World::query_filtered`, `Mut`, `Messages::write` | tick semantics of `Mut` verified; behavior tests written (runtime NOT RUN) |
+| sprites/text rendering | **1–2 (standard rendering retained)** | everything the UI needs: textured quads, per-sprite color/alpha, 2D text, z-layering | none | `SpritePlugin`, `SpriteRenderPlugin`, `TextPlugin`, `Sprite`, `Text2d`, `TextFont`, `TextColor` | §17.1 explicitly allows this: no measured requirement or bottleneck justifies level 3–4; none used |
+| render-world integration | **not used (levels 3–4)** | — | — | — | justified absence: no application requirement needs custom extraction, nodes, or pipelines; introducing them would duplicate engine functionality (§17.1 rule) |
+| runner/lifecycle | **not used (level 5)** | — | — | — | `App::run` provides every needed lifecycle state (§5.3); a custom runner would risk duplicating plugin `finish`/`cleanup` |
+
+No deeper level was selected for appearance; the recorded decision for this
+UI application is that standard sprite/text rendering **is** the correct
+low-level integration, with explicit engine-configuration control (level 1)
+and explicit ECS ownership (level 2) as the depth actually required.
+
+### 6.2 No private-engine coupling (§17.2)
+
+- No private fields, internal ordering assumptions, memory-layout
+  assumptions, or source patches: every symbol used is public in the pinned
+  revision (bevy-audit.md table, commit-pinned permalinks).
+- No transmutation of engine handles (`transmute` is machine-checked
+  forbidden), no manufactured `Entity` identifiers (entities are only used
+  as spawned/queried; identity is the `Name` component, §7), no pointer
+  stability assumptions (`from_raw_parts`/`as_mut_ptr` machine-checked
+  forbidden), no backend-native handle access.
+- No direct backend dependency, second graphics device, second queue, or
+  competing surface lifecycle: exactly one `RenderPlugin`, one window, one
+  camera; wgpu is transitive-only (policy-tested).
+- **Hints vs guarantees**, distinguished explicitly: `PowerPreference::HighPerformance`,
+  `MemoryHints::Performance`, `PresentMode::AutoVsync` (engine default),
+  task-pool thread counts, and `WgpuSettingsPriority::Functionality` are
+  *requests*; the OS/driver/adapter decide the actual device, limits,
+  present mode, and scheduling. Nothing in the docs or tests claims these as
+  guarantees.
+
+## 7. Ownership, state transitions, and data representation (spec §19)
+
+Per application-relevant value: `authoritative owner | initialization |
+mutation authority | readers | invalidation triggers | lifetime`.
+
+| value | owner (single source of truth) | initialization | mutation authority | readers | invalidation triggers | lifetime |
+| --- | --- | --- | --- | --- | --- | --- |
+| HUD hidden/shown | `Visibility` of the unnamed HUD entities (ECS) | spawned `Hidden` in Startup | Update write pass only (guarded) | Update read-back fold; engine visibility propagation | F1 edge | process |
+| launched state | slot entity's `Sprite.color` alpha (> 0.5 ⇔ launched) | spawned transparent (`srgba(1,1,1,0)`) | Update write pass only (guarded) | read-back fold; sprite extraction | Launch click while post-toggle-visible | process |
+| Escape hold accumulator | `Transform.scale.z`, uniform across all non-camera entities | spawned `0.0` | Update write pass only (guarded) | read-back fold; exit check | Escape held/released | process |
+| entity role identity | `Name` component (`"menu"`, `"menu-ink"`, `"slot"`; unnamed = HUD chrome) | Startup spawns | never mutated | fold classification (`slot_name`, `named`) | none | process |
+| layout geometry | `Transform.translation`/`scale`, `Sprite.custom_size`, text anchors | Startup, from one `Monitor` fold (1920×1080 fallback) | never mutated afterwards | renderer | none at runtime — window is borderless fullscreen **and non-resizable**, so no resize path exists; scale-factor changes are engine-handled for the projection (verified: `camera_system` listens to `WindowScaleFactorChanged`) while the baseline layout is not recomputed — a documented baseline limitation (§9.1), not an oversight | process |
+| input observations | engine resources (`ButtonInput`, `Time`, `Window`) | engine | engine (winit/input systems) | Update snapshot (one keyboard borrow + per-resource reads + cursor/monitor folds) | every frame | engine-owned |
+| procedural images | `Assets<Image>` via `AssetServer`; strong `Handle`s stored in the `Sprite` components that use them | Startup, generated once | never (no regeneration trigger exists) | sprite/text extraction | none | process (handles held by components ⇒ no accidental unload, §9.2) |
+| external PNG assets | same (`Assets<Image>`, handles in components) | Startup load requests; async resolution | engine asset pipeline | extraction | none (no reload support in project scope) | process |
+| application `Resource`s | **none exist** | — | — | — | — | — |
+
+Representation decisions, per §19's rules:
+
+- **One authoritative representation**: state lives only in ECS components;
+  derived values (`hidden_next`, `launched_next`, `hold_next`) exist solely
+  as closure parameters within one frame and are never stored — there is no
+  second, independently mutable source of truth (the arena branch's recorded
+  `Dashboard` resource pattern is exactly what this avoids).
+- **No oversized Resource, no fragmentation**: no resource at all; components
+  used (`Visibility`, `Transform`, `Sprite`, `Name`, `Text2d`/`TextFont`/
+  `TextColor`) are the engine's own — no application-defined component
+  fragmentation, because the read-back fold over ~26 entities is the access
+  pattern and a query iterator serves it directly.
+- **No `Entity` numeric identity**: roles are `Name`-based; entities are
+  never indexed by hand, never stored in lists; despawned/missing entities
+  cannot occur (nothing despawns), and the fold handles the empty case
+  gracefully by construction (fold identity `(false, false, 0.0)`).
+- **Fixed-size storage only where the size is a true invariant**: `[u8; 4]`
+  pixels; texture buffers sized by closed formulas asserted against their
+  descriptors in `procedural_texture_buffers_match_their_descriptor_dimensions`;
+  the two-element lookup arrays in `hud_visibility`/`slot_tint` are indexed by
+  `bool as usize` — total by construction.
+- **No speculative containers**: no `Vec<Entity>`, no `HashMap`/`BTreeMap`/
+  registry introduced — the access pattern is "iterate all, classify by
+  `Name`", which a query fold serves with zero allocations; replacing it with
+  a map would add complexity without measured need (§19, §22).
+- **No state cloning for ownership**: the frame state is a `(bool, bool, f32)`
+  tuple passed by value; handles are moved into the spawns that own them
+  (`.clone()` only where two spawns genuinely share one image asset, plus one
+  redundant clone removed relative to baseline).
+- **Configuration vs dynamic state** stays distinguishable without `const`/
+  `static` items: immutable configuration exists as literals inside the
+  construction chain (window fields, plugin settings); dynamic state exists
+  only in ECS components.
+- **Floating-point discipline**: `next_hold` keeps the baseline expression
+  byte-for-byte — `(hold + delta_secs * escape_held as u8 as f32) *
+  escape_held as u8 as f32` — no reordering, so no accidental FP behavior
+  change. Exact comparisons are retained where they encode discrete state:
+  `alpha > 0.5` (launched detection), `scale.z >= 7.0` (exit boundary),
+  `hold != 0.0` (gate), and the §8 write guards (`!=` on `f32`/`Visibility`/
+  `Color` where both sides come from the same expression, so equality is
+  exact and meaningful; no tolerance is appropriate for a discrete reset to
+  `0.0`).
+- **No replay infrastructure, no state-machine framework**: the transitions
+  are three booleans and one float; small repeatable pure-function tests
+  cover them (§5.2, `mod tests`).
+
+## 8. Change detection and invalidation protocol (spec §20)
+
+### 8.1 Verified engine semantics (v0.20.0, commit-pinned in bevy-audit.md)
+
+- `Mut::into_inner(self)` → `&mut T` **marks the component changed
+  unconditionally** (`change_detection/traits.rs`: "Consume self … while
+  marking self as 'changed'"; it calls `set_changed()`). Merely obtaining
+  mutable access this way *is* a write as far as change detection is
+  concerned — the baseline pattern flagged every touched component on every
+  gated frame.
+- Reading through `Deref` (`&*m`, field reads) never flags.
+- Consumers are change-gated: visibility propagation runs from
+  `Or<(Changed<Visibility>, Changed<ChildOf>)>` sources; sprite mesh
+  preparation runs from `Or<(Changed<Sprite>, Changed<Anchor>, …)>`.
+- The engine does **not** compare old/new values on assignment; equal-value
+  writes through `Mut` still flag.
+
+### 8.2 Protocol implemented
+
+What causes each expensive operation to run:
+
+| operation | trigger | non-triggers (guarded out) |
+| --- | --- | --- |
+| procedural texture generation | Startup, once — no regeneration trigger exists | anything at runtime |
+| write pass (query iteration) | `hud_gate`: F1 edge ∥ Escape held ∥ click edge ∥ hold ≠ 0 | idle frames (no input, settled hold) |
+| `Transform.scale.z` write + CHANGED flag | hold value actually changes (accumulating or resetting) | gated frames where `next_hold` returns the current value (e.g. F1-only frame with settled hold) |
+| `Visibility` write + CHANGED flag → propagation re-run | F1 toggle or launch transition changes an entity's computed visibility | hold-only frames, repeat-input frames with unchanged visibility |
+| `Sprite.color` write + CHANGED flag → sprite mesh preparation | launch transition (slot tint transparent ↔ opaque) | all frames where the tint is unchanged |
+| exit message write | `next_hold` crosses 7.0 exactly once (hold resets/exit terminates immediately after) | every other gated frame |
+| layout recomputation | never at runtime (window non-resizable; §7 layout row) | resize/scale-factor events (documented baseline limitation, §9.1) |
+| text content / font / font-size changes | never after Startup (all text static) | every frame |
+
+Structural layout invalidation and color/opacity animation are separate by
+construction: the Escape-hold "fade" only ever touches `scale.z` (progress)
+and, at transitions, `Visibility`/`Sprite.color` — it never recomputes
+geometry or rewrites font sizes. Conversely, a visibility toggle never moves
+anything.
+
+Settled animations stop producing application-owned updates: once the hold
+resets to `0.0` and no input arrives, `hud_gate` closes the write pass
+entirely; while the gate is open on repeat input, the equality guards ensure
+only genuinely changed components are written and flagged. Hidden UI can
+never go stale: visibility is a pure function of the read-back state
+(`hud_visibility(hidden_next, named, launched_next, slot)`), recomputed from
+the authoritative ECS values every time the gate opens — there is no cached
+layout or shadow state that could drift.
+
+**Honest scope**: this eliminates *application-owned* spurious invalidation.
+It is explicitly **not** a claim of zero renderer work on idle frames —
+extraction of the (unchanged) visible set, presentation, and OS compositing
+continue every frame, engine-owned.
+
+No new generic change-detection layer was built: the guards are three direct
+explicit comparisons using the components' own `PartialEq` (verified derived
+for `Visibility` and `Color`), which §20 names as the sufficient approach.
+
+## 9. Coordinate spaces, rendering and asset-lifetime invariants (spec §21)
+
+### 9.1 Coordinate and visual correctness
+
+| space | convention | source of truth (verified) |
+| --- | --- | --- |
+| cursor input | **logical** pixels (`physical / scale_factor`), origin top-left of the window, y down | `Window::cursor_position` (window.rs#L618-L623); `physical_cursor_position` also exists but the baseline used the logical variant — preserved |
+| layout constants | monitor **physical** pixels (`Monitor::physical_width/height`), 1920×1080 fallback | monitor fold in Startup/Update |
+| world / camera projection | centered orthographic, y up, 1 world unit ↔ 1 pixel at scale factor 1; runtime projection updated from the **physical** target size | `Camera2d` `#[require(Projection::Orthographic(default_2d()))]`; `ScalingMode::WindowSize`; `camera_system` → `projection.update(physical size)` |
+| hit testing | baseline formula maps the pill's world rect into cursor space assuming the two coincide: `x ∈ [width/3+81, width/3+655]`, `y ∈ [height/2−192, height/2−139]` (inclusive) | `launch_hit`, regression-tested at 1920×1080 and at the 180×120 minimum |
+
+At scale factor 1.0 — the fullscreen 1920×1080 target environment — logical,
+physical, and world pixels coincide exactly and the hit test is exact. At
+other scale factors the preserved baseline mixes logical cursor coordinates
+with a physical-pixel layout (hit region effectively scaled by the factor).
+Per the spec's conflict rule (baseline preservation vs §21.1 "avoid mixing
+physical and logical pixels") this is **reported as an open decision** rather
+than silently changed: switching to `physical_cursor_position()` (or laying
+out in logical pixels) would alter baseline behavior at scale ≠ 1 and needs a
+product decision. Recorded in bevy-audit.md "Unresolved questions" #3.
+
+Camera orientation/origin were verified through the actual APIs above, not
+assumed. Alpha conventions are untouched: `Rgba8UnormSrgb` textures,
+`Color::srgba` authoring, default sprite alpha blending, `alpha > 0.5` as the
+discrete launched test — no sRGB/linear reinterpretation or blending change
+was made to obtain similar screenshots. Text uses fixed pixel font sizes as
+in the baseline; no character-count heuristic exists or is claimed as glyph
+measurement (all text is static; no runtime measurement is needed).
+
+### 9.2 CPU and GPU resource lifetime
+
+- Procedural image data is generated **once per process** (Startup); the
+  regeneration trigger set is empty by construction (§8.2).
+- Render-asset usage follows the baseline's explicit descriptors
+  (`TEXTURE_BINDING | COPY_DST`, `asset_usage` main+render worlds,
+  `copy_on_resize: false`): CPU-side data is not discarded blindly — the
+  baseline fields are kept verbatim.
+- Strong handles live **inside the components that render them**
+  (`Sprite.image`, `TextFont.font`): assets cannot unload accidentally, and
+  the style-driven rewrite moved no handle out of a component (the one
+  redundant `.clone()` removed was on a handle whose final use immediately
+  follows).
+- Steady state performs no repeated GPU uploads, pipeline creation, bind-group
+  rebuilds, or shader specialization from application code: images are static
+  after Startup, and §8's guards minimize `Changed<Sprite>` churn that would
+  drive mesh re-preparation. Engine-side costs were verified as gated
+  (bevy-audit.md) rather than assumed.
+- No custom render-world data exists, so no main-world/render-world
+  synchronization boundary was needed; no shared mutable state or manual
+  blocking sync was introduced.
+- Device-loss recovery and backend fallback remain the engine's supported
+  behavior — no custom initialization alters it (level 5 integration not
+  used, §6.1).
+
+### 9.3 Unsupported environments
+
+- **Missing/corrupt assets**: `AssetMode::Unprocessed` + engine asset error
+  events → Bevy logs load errors with paths; the HUD still renders with
+  procedural textures (no blank window, no silent exit).
+  `UnapprovedPathMode::Forbid` blocks path-escape attempts loudly.
+- **Unsupported graphics capabilities**: adapter/device request failures
+  surface the engine's wgpu error output; `Functionality` priority + default
+  limits (replacing the baseline's suspect zero-valued hand limits) maximize
+  the chance of a working device.
+- **No display access**: winit/Bevy fail at window creation with the engine's
+  error message — again no silent exit; this is also why every headless check
+  in this repo (tests, CI) avoids window creation entirely.
+- **Backends**: VULKAN ∥ METAL ∥ DX12 preserved per the baseline — no single
+  backend forced across platforms; `VALIDATION_INDIRECT_CALL` kept explicit
+  (note: `WgpuSettings::default()` would drop it in release builds without
+  DX12 — keeping it explicit preserves the baseline's validation intent).
+
+## 10. Notable decisions
 
 - **GPU limits**: the baseline enumerated every `wgpu::Limits` field by hand,
   with dozens of zeros (e.g. `max_color_attachment_bytes_per_sample: 32`,
@@ -104,6 +436,10 @@ No `Cell`/`RefCell`/locks/atomics were introduced anywhere.
   (private `use wgpu::MemoryBudgetThresholds` in settings.rs). The struct
   update `..WgpuSettings::default()` yields `{ None, None }` — proven equal to
   the baseline's explicit value from the wgpu 30.0.1 source.
+- **Guarded write pass** (§8): the single behavioral-mechanics change vs the
+  baseline — identical values, identical frame timing, strictly fewer
+  spurious CHANGED flags. Motivated by verified v0.20.0 `into_inner`
+  semantics; §20 requires exactly this treatment.
 - **Monitor reads**: one `(width, height)` fold per read site instead of two
   `QueryState` constructions (Startup and Update), same last-wins semantics
   and same 1920×1080 fallback.
@@ -112,6 +448,9 @@ No `Cell`/`RefCell`/locks/atomics were introduced anywhere.
   valid because `scale.z` is uniform across all non-camera entities by
   construction (spawned 0.0, updated by one expression). Removes one mutable
   cell plumbing from the hot path without changing observable behavior.
+- **Keyboard snapshot**: F1 edge and Escape level read from one
+  `ButtonInput` borrow (§22: no redundant input lookups when a coherent
+  snapshot suffices).
 - **Profiles**: `panic = "abort"` (stable) replaces nightly
   `immediate-abort`; fat LTO/1 codegen unit/strip kept; `target-cpu=native`,
   `-Z location-detail=none`, `-Z trap-unreachable`, and `build-std` removed —
@@ -119,7 +458,7 @@ No `Cell`/`RefCell`/locks/atomics were introduced anywhere.
   Diagnostic trade-off: `abort` loses unwinding but keeps the panic message;
   asset-load failures still surface through Bevy's asset error handling.
 
-## 6. Naming identities (Section 11.4 separation)
+## 11. Naming identities (Section 11.4 separation)
 
 | identity | value |
 | --- | --- |
@@ -133,7 +472,7 @@ No `Cell`/`RefCell`/locks/atomics were introduced anywhere.
 | actual executable filename inside the archive | `${{ matrix.artifact }}${{ matrix.extension }}` — the six exact filenames are asserted by `staged_executable_names_are_the_six_required_filenames` |
 | release tag | whatever `v*` tag triggers the workflow; if it differs from the fixed label, the label still governs file names (distinction documented here, per mandate) |
 
-## 7. Package layout and asset resolution
+## 12. Package layout and asset resolution
 
 ```text
 dist/<artifact>/                    → archived as <artifact>.tar.gz (root of archive = package root)
@@ -151,32 +490,74 @@ behavior and is validated in the workflow by checking the real staged files.
 Unix executable bits are preserved inside `.tar.gz`; the workflow re-applies
 `chmod +x` before archiving and verifies `test -x` after staging.
 
-## 8. Strict-syntax exceptions (explicit, narrow, Bevy/std-mandated)
+## 13. Strict-syntax exceptions, checker boundary, and prelude policy
 
-The only relaxation from the literal contract, present already in the `main`
-baseline and unavoidable with safe public APIs:
+### 13.1 The single relaxation, formally requested (original spec §135)
 
-- `&mut` in *signature positions* required by library contracts:
-  `|world: &mut bevy::ecs::world::World|` exclusive-system closures,
-  `&mut Visibility` / `&mut Transform` / `&mut Sprite` inner-closure
-  parameters fed from `Mut::into_inner()`, and
-  `state: &mut (…)` parameters of `Iterator::scan` / `Option::last_mut` items
-  in the test module. No `mut` binding, `mut` parameter, `Cell`-family
-  interior mutability, `unsafe`, raw pointer, or codegen escape hatch exists
-  anywhere; the automated checker (`strict_syntax_contract_holds_…`) enforces
-  exactly this rule set, token-boundary aware, over every handwritten `.rs`
-  file.
-- `'static` lifetime: unused in project source today; permitted by contract
-  if a future Bevy signature requires it (the checker already whitelists it).
+`&mut` appears in project source **only** where a public library signature
+mandates it. Exact APIs (all verified in the pinned revisions):
 
-## 9. Known limitations of this rewrite environment
+1. **Exclusive systems** — `App::add_systems(Startup/Update, closure)` with
+   `FnMut(&mut bevy::ecs::world::World)` closures: the exclusive-system
+   contract of `bevy_app`/`bevy_ecs` (`impl IntoSystem<…>` for
+   `FnMut(&mut World)`); there is no `&mut`-free spelling of an exclusive
+   system. Occurrences: the two system closures and their inner IIFE
+   parameters that thread the world.
+2. **Mutable query data types** — `World::query_filtered::<(&mut Visibility,
+   &mut Transform, Option<&Name>, Option<&mut Sprite>), Without<Camera2d>>`:
+   `&mut T` here is the *type-level* spelling required by the `QueryData`
+   trait; the items handed out are `Mut<T>` wrappers, which the write pass
+   now consumes through `into_inner` only under equality guards (§8). After
+   the §20 rework, no write-pass closure *parameter* is spelled `&mut T`
+   anymore — they take `Mut<T>` directly.
+3. **Std iterator adapters in the test module** — `Iterator::scan`
+   (`fn scan<St, B, R>(self, init: St, f: impl FnMut(&mut St, Self::Item) ->
+   Option<R>)`) and `iter_mut` item handling (`&mut MatrixEntry`) in the
+   release-matrix parser and syntax scanner: `#[cfg(test)]`-gated development
+   code, same mandated-signature category.
+
+Compiler diagnostics demonstrating the absence of alternatives are
+**unavailable in this sandbox (no Rust toolchain — blocker)**; the evidence
+substituted is the pinned-source signature reading above. No `mut` binding,
+no `mut` parameter, no raw pointer, no `Cell`/`RefCell`/`Mutex`/`RwLock`/
+atomic, no `unsafe`, no `transmute`/`from_raw_parts`/`as_mut_ptr`, and no
+codegen escape hatch exists anywhere; the automated checker enforces exactly
+this rule set, token-boundary aware, over every handwritten `.rs` file.
+
+`'static` lifetime: unused in project source today; permitted by contract if
+a future Bevy signature requires it (the checker whitelists `'static`
+precisely, via the preceding-apostrophe exception, and a fixture proves it).
+
+### 13.2 Inspection boundary (§23, honest scope)
+
+The checker is a tokenizer-level text scanner (comments and literals stripped,
+word-boundary matching, two narrow exceptions) — **not** an AST/macro
+expansion analysis, and it does not claim to prove anything about arbitrary
+macro expansion. The boundary is acceptable here because the audited surface
+is small and fully enumerated: the runtime portion of `src/main.rs` contains
+**zero** macro invocations (all `format!`/`assert*!`/`vec![]` uses live in the
+`#[cfg(test)]` module); there are no project-defined macros, no
+`include_bytes!`/`include_str!` (machine-checked forbidden), no `build.rs`
+(the test suite tolerates its absence and would scan it if added), and no
+other code-generation mechanism. There is no `no_implicit_prelude`, no
+`#[macro_use]`, and no hidden prelude module anywhere: the crate is a single
+file whose every engine/std integration point is spelled with fully qualified
+paths, so the no-`use` rule is satisfied by explicitness, not by a smuggled
+prelude. The checker itself is pure `std` — no dev-only tooling, no runtime
+coupling, no external version to document. Its fixtures (6 negative incl.
+identifier-substring and `'static` cases, 28 positive, 1 block-comment case)
+are committed in `checker_fixtures_separate_prohibited_constructs_from_harmless_text`.
+
+## 14. Known limitations of this rewrite environment
 
 - No Rust toolchain and no crates.io access existed in the rewrite sandbox
   (network allowlist: github.com/codeload/api.github/npm/pypi). Consequently
   `cargo fmt/check/clippy/test/build` and `cargo generate-lockfile` were
   **not executed**; verification was source-level (pinned Bevy/wgpu trees,
-  drift diff, structural scans). `Cargo.lock` was removed rather than left
-  stale — regenerate and commit it as the first step on a networked machine
-  (exact commands in docs/rewrite-log.md §Next steps).
+  drift diff, structural scans, parse-level simulations). `Cargo.lock` was
+  removed rather than left stale — regenerate and commit it as the first step
+  on a networked machine (exact commands in docs/rewrite-log.md §Next steps).
 - GPU/visual checks were not executed (no display). Reproducible scenario
   list in docs/performance.md.
+- The scale-factor question (§9.1) is an open product decision, reported
+  rather than resolved unilaterally.
