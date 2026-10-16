@@ -557,17 +557,26 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y xvfb mesa-vulkan-drivers libvulkan1
+          sudo apt-get install -y xvfb xauth mesa-vulkan-drivers libvulkan1 vulkan-tools
+          ls -l /usr/share/vulkan/icd.d/ || echo "no system ICD directory"
+          ICD=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+          if [ -f "$ICD" ]; then
+            export VK_ICD_FILENAMES="$ICD"
+          fi
+          echo "diagnostic probe (not a gate): vulkaninfo --summary"
+          vulkaninfo --summary > /tmp/vkinfo.log 2>&1 || true
+          cat /tmp/vkinfo.log
           LOG=/tmp/smoke.log
           rc=0
-          xvfb-run -a timeout -k 3 12 ./target/release/subsystem-for-arxumbra > "$LOG" 2>&1 || rc=$?
+          xvfb-run -a timeout -k 3 20 ./target/release/subsystem-for-arxumbra > "$LOG" 2>&1 || rc=$?
+          echo "smoke run exit status: $rc"
           cat "$LOG"
           if grep -q "panicked" "$LOG"; then
             echo "smoke check FAILED: the process panicked" >&2
             exit 1
           fi
           if [ "$rc" -ne 124 ]; then
-            echo "smoke check FAILED: exit status $rc (expected 124 = survived the 12 s window)" >&2
+            echo "smoke check FAILED: exit status $rc (expected 124 = survived the 20 s window)" >&2
             exit 1
           fi
-          echo "smoke check PASSED: Startup + 12 s of Update frames ran headless without panic or early exit"
+          echo "smoke check PASSED: Startup + 20 s of Update frames ran headless without panic or early exit"
