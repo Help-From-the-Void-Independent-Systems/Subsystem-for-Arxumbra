@@ -111,7 +111,10 @@ def check_lockfile():
     )
     require(len(bevy_entries) == 1, "exactly one git bevy 0.20.0 entry expected")
     match = BEVY_COMMIT_PATTERN.fullmatch(bevy_entries[0][0])
-    require(match is not None, "bevy must resolve from tag v0.20.0 of the official repository")
+    require(
+        match is not None,
+        "bevy must resolve from tag v0.20.0 of the official repository; found source %r" % bevy_entries[0],
+    )
     require(
         not re.search(r"name = \"wgpu\"\nversion", text) or True,
         "wgpu may exist only as a transitive bevy dependency",

@@ -118,7 +118,7 @@ jobs:
         run: |
           set +e
           summary=$(grep -m 1 -A 3 'name = "bevy"' Cargo.lock | tr '\n' '|' | cut -c 1-90)
-          reason=$(head -n 1 evidence/validation/policy.log 2>/dev/null | cut -c 1-90)
+          reason=$(grep -m 1 "found source" evidence/validation/policy.log 2>/dev/null | cut -c 25-200)
           locksize=$(wc -c < Cargo.lock)
           {
             echo "summary<<MARKER_POLICY_SUMMARY"
