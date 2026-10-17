@@ -494,10 +494,7 @@ fn main() {
                                     font_variations: bevy::text::FontVariations::builder().build(),
                                 },
                                 bevy::text::TextColor(bevy::color::Color::srgb(0.92, 0.92, 0.92)),
-                                bevy::text::TextBounds {
-                                    width: None,
-                                    height: None,
-                                },
+                                bevy::text::TextBounds::default(),
                                 bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
                                 bevy::transform::components::Transform::IDENTITY,
                                 bevy::camera::visibility::Visibility::Hidden,
@@ -569,10 +566,7 @@ fn main() {
                                     font_variations: bevy::text::FontVariations::builder().build(),
                                 },
                                 bevy::text::TextColor(bevy::color::Color::srgb(0.88, 0.88, 0.88)),
-                                bevy::text::TextBounds {
-                                    width: None,
-                                    height: None,
-                                },
+                                bevy::text::TextBounds::default(),
                                 bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
                                 bevy::transform::components::Transform::IDENTITY,
                                 bevy::camera::visibility::Visibility::Hidden,
@@ -646,10 +640,7 @@ fn main() {
                                     font_variations: bevy::text::FontVariations::builder().build(),
                                 },
                                 bevy::text::TextColor(bevy::color::Color::srgb(0.88, 0.88, 0.88)),
-                                bevy::text::TextBounds {
-                                    width: None,
-                                    height: None,
-                                },
+                                bevy::text::TextBounds::default(),
                                 bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
                                 bevy::transform::components::Transform::IDENTITY,
                                 bevy::camera::visibility::Visibility::Hidden,
@@ -837,10 +828,7 @@ fn main() {
                                     font_variations: bevy::text::FontVariations::builder().build(),
                                 },
                                 bevy::text::TextColor(bevy::color::Color::srgb(0.92, 0.92, 0.92)),
-                                bevy::text::TextBounds {
-                                    width: None,
-                                    height: None,
-                                },
+                                bevy::text::TextBounds::default(),
                                 bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
                                 bevy::transform::components::Transform::IDENTITY,
                                 bevy::camera::visibility::Visibility::Hidden,
@@ -885,10 +873,7 @@ fn main() {
                                     font_variations: bevy::text::FontVariations::builder().build(),
                                 },
                                 bevy::text::TextColor(bevy::color::Color::srgb(0.58, 0.58, 0.58)),
-                                bevy::text::TextBounds {
-                                    width: None,
-                                    height: None,
-                                },
+                                bevy::text::TextBounds::default(),
                                 bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
                                 bevy::transform::components::Transform::IDENTITY,
                                 bevy::camera::visibility::Visibility::Hidden,
@@ -960,10 +945,7 @@ fn main() {
                                     font_variations: bevy::text::FontVariations::builder().build(),
                                 },
                                 bevy::text::TextColor(bevy::color::Color::srgb(0.38, 0.38, 0.38)),
-                                bevy::text::TextBounds {
-                                    width: None,
-                                    height: None,
-                                },
+                                bevy::text::TextBounds::default(),
                                 bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
                                 bevy::transform::components::Transform::IDENTITY,
                                 bevy::camera::visibility::Visibility::Hidden,
@@ -1334,10 +1316,7 @@ fn main() {
                                 } else {
                                     bevy::camera::visibility::Visibility::Hidden
                                 },
-                                bevy::text::TextBounds {
-                                    width: Some(state.layout.title_bounds),
-                                    height: None,
-                                },
+                                bevy::text::TextBounds::new_horizontal(state.layout.title_bounds)
                                 bevy::math::Vec3::new(
                                     state.layout.title_x,
                                     state.layout.title_y,
@@ -1562,10 +1541,7 @@ fn main() {
                                             0.88
                                         },
                                     ),
-                                    bevy::text::TextBounds {
-                                        width: Some(state.layout.tab_label_bounds),
-                                        height: None,
-                                    },
+                                    bevy::text::TextBounds::new_horizontal(state.layout.tab_label_bounds)
                                     bevy::math::Vec3::new(
                                         state.layout.tab_label_x,
                                         state.layout.home_tab.center_y,
@@ -1790,10 +1766,7 @@ fn main() {
                                             0.88
                                         },
                                     ),
-                                    bevy::text::TextBounds {
-                                        width: Some(state.layout.tab_label_bounds),
-                                        height: None,
-                                    },
+                                    bevy::text::TextBounds::new_horizontal(state.layout.tab_label_bounds)
                                     bevy::math::Vec3::new(
                                         state.layout.tab_label_x,
                                         state.layout.registry_tab.center_y,
@@ -2200,10 +2173,7 @@ fn main() {
                                     } else {
                                         bevy::camera::visibility::Visibility::Hidden
                                     },
-                                    bevy::text::TextBounds {
-                                        width: Some(state.layout.caption_bounds),
-                                        height: None,
-                                    },
+                                    bevy::text::TextBounds::new_horizontal(state.layout.caption_bounds)
                                     bevy::math::Vec3::new(
                                         state.layout.caption_x,
                                         state.layout.caption_y,
@@ -2313,10 +2283,7 @@ fn main() {
                                     } else {
                                         bevy::camera::visibility::Visibility::Hidden
                                     },
-                                    bevy::text::TextBounds {
-                                        width: Some(state.layout.action_label_bounds),
-                                        height: None,
-                                    },
+                                    bevy::text::TextBounds::new_horizontal(state.layout.action_label_bounds)
                                     bevy::math::Vec3::new(
                                         state.layout.action_label_x,
                                         state.layout.action.center_y,
