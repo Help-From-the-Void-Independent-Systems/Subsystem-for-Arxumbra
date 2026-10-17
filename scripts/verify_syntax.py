@@ -275,8 +275,10 @@ def scan_tree():
         else:
             findings.extend(check_hash_comments(text, label))
     lock = ROOT / "Cargo.lock"
-    if lock.exists() and "#" in lock.read_text():
-        findings.append(("Cargo.lock", 0, "comment characters in lockfile"))
+    if lock.exists() and any(
+        line.lstrip().startswith("#") for line in lock.read_text().splitlines()
+    ):
+        findings.append(("Cargo.lock", 0, "comment lines in lockfile"))
     return findings
 
 

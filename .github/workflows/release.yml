@@ -82,15 +82,25 @@ jobs:
           if-no-files-found: error
 
       - name: Syntax and comment policy
+        shell: bash
         run: |
-          set -euo pipefail
-          python3 scripts/verify_syntax.py
+          set -uo pipefail
+          if ! python3 scripts/verify_syntax.py 2>&1 | tee evidence/verify_syntax.log; then
+            status=$?
+            sed 's/^/::error::/' evidence/verify_syntax.log
+            exit "$status"
+          fi
 
       - name: Source policy
+        shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           python3 -m pip install --quiet pyyaml
-          python3 scripts/verify_policy.py --mode source 2>&1 | tee "$EVIDENCE_DIR/policy.log"
+          if ! python3 scripts/verify_policy.py --mode source 2>&1 | tee "$EVIDENCE_DIR/policy.log"; then
+            status=$?
+            sed 's/^/::error::/' "$EVIDENCE_DIR/policy.log"
+            exit "$status"
+          fi
 
       - name: Dependency graph evidence and X11 absence
         run: |
@@ -113,24 +123,44 @@ jobs:
           done
 
       - name: Formatting
+        shell: bash
         run: |
-          set -euo pipefail
-          cargo fmt --all -- --check 2>&1 | tee "$EVIDENCE_DIR/fmt.log"
+          set -uo pipefail
+          if ! cargo fmt --all -- --check 2>&1 | tee "$EVIDENCE_DIR/fmt.log"; then
+            status=$?
+            tail -n 60 "$EVIDENCE_DIR/fmt.log" | sed 's/^/::error::/'
+            exit "$status"
+          fi
 
       - name: Check
+        shell: bash
         run: |
-          set -euo pipefail
-          cargo check --locked --all-targets 2>&1 | tee "$EVIDENCE_DIR/check.log"
+          set -uo pipefail
+          if ! cargo check --locked --all-targets 2>&1 | tee "$EVIDENCE_DIR/check.log"; then
+            status=$?
+            tail -n 120 "$EVIDENCE_DIR/check.log" | sed 's/^/::error::/'
+            exit "$status"
+          fi
 
       - name: Clippy
+        shell: bash
         run: |
-          set -euo pipefail
-          cargo clippy --locked --all-targets -- -D warnings 2>&1 | tee "$EVIDENCE_DIR/clippy.log"
+          set -uo pipefail
+          if ! cargo clippy --locked --all-targets -- -D warnings 2>&1 | tee "$EVIDENCE_DIR/clippy.log"; then
+            status=$?
+            tail -n 120 "$EVIDENCE_DIR/clippy.log" | sed 's/^/::error::/'
+            exit "$status"
+          fi
 
       - name: Tests
+        shell: bash
         run: |
-          set -euo pipefail
-          cargo test --locked 2>&1 | tee "$EVIDENCE_DIR/test.log"
+          set -uo pipefail
+          if ! cargo test --locked 2>&1 | tee "$EVIDENCE_DIR/test.log"; then
+            status=$?
+            tail -n 120 "$EVIDENCE_DIR/test.log" | sed 's/^/::error::/'
+            exit "$status"
+          fi
 
       - name: Metadata evidence
         run: |

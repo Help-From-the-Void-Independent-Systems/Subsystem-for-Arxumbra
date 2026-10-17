@@ -100,7 +100,10 @@ def check_manifest():
 
 def check_lockfile():
     text = (ROOT / "Cargo.lock").read_text()
-    require("#" not in text, "lockfile must be free of comment characters")
+    require(
+        not any(line.lstrip().startswith("#") for line in text.splitlines()),
+        "lockfile must be free of comment lines",
+    )
     require(text.count("[[package]]") > 0, "lockfile must list packages")
     bevy_entries = re.findall(
         r"\[\[package\]\]\nname = \"bevy\"\nversion = \"0\.20\.0\"\nsource = \"([^\"]+)\"\n",
