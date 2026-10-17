@@ -116,8 +116,10 @@ jobs:
         id: policy_reflect
         shell: bash
         run: |
+          set +e
           summary=$(grep -m 1 -A 3 'name = "bevy"' Cargo.lock | tr '\n' '|' | cut -c 1-90)
-          reason=$(head -n 1 evidence/policy.log 2>/dev/null | cut -c 1-90)
+          reason=$(head -n 1 evidence/validation/policy.log 2>/dev/null | cut -c 1-90)
+          locksize=$(wc -c < Cargo.lock)
           {
             echo "summary<<MARKER_POLICY_SUMMARY"
             echo "$summary"
@@ -125,9 +127,10 @@ jobs:
             echo "reason<<MARKER_POLICY_REASON"
             echo "$reason"
             echo "MARKER_POLICY_REASON"
+            echo "locksize=$locksize"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Policy bevy=${{ steps.policy_reflect.outputs.summary }} reason=${{ steps.policy_reflect.outputs.reason }}
+      - name: Policy bevy=${{ steps.policy_reflect.outputs.summary }} reason=${{ steps.policy_reflect.outputs.reason }} size=${{ steps.policy_reflect.outputs.locksize }}
         if: always()
         shell: bash
         run: echo recorded
@@ -190,7 +193,16 @@ jobs:
             exit "$status"
           fi
 
-      - name: Check reflector ${{ steps.check.outputs.message }}
+      - name: Check reflector
+        if: always()
+        id: check_reflect
+        shell: bash
+        run: |
+          set +e
+          message=$(grep -m 2 -E '^error' "$EVIDENCE_DIR/check.log" | cut -c 1-100 | tr '\n' ' ')
+          echo "message=$message" >> "$GITHUB_OUTPUT"
+
+      - name: Check errors: ${{ steps.check_reflect.outputs.message }}
         if: always()
         shell: bash
         run: echo recorded
@@ -209,7 +221,16 @@ jobs:
             exit "$status"
           fi
 
-      - name: Clippy reflector ${{ steps.clippy.outputs.message }}
+      - name: Clippy reflector
+        if: always()
+        id: clippy_reflect
+        shell: bash
+        run: |
+          set +e
+          message=$(grep -m 2 -E '^error' "$EVIDENCE_DIR/clippy.log" | cut -c 1-100 | tr '\n' ' ')
+          echo "message=$message" >> "$GITHUB_OUTPUT"
+
+      - name: Clippy errors: ${{ steps.clippy_reflect.outputs.message }}
         if: always()
         shell: bash
         run: echo recorded
