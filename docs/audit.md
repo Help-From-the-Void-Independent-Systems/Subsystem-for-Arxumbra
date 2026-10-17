@@ -123,11 +123,18 @@ Status values: PASS (ran and passed), FAIL (ran and failed), NOT RUN (not execut
 
 ## 8. Approved exceptions and open decisions
 
+- event coverage policy: pull_request runs validation plus the full six-target build matrix and Wayland smoke (unprivileged, publication impossible because the publish job is tag-gated); workflow_dispatch runs the same when a human with Actions dispatch rights triggers it (the sandbox integration token lacks Actions write, so automated verification uses pull_request runs); version-tag pushes add publication. This is the disclosed deduplication and coverage choice for the single-workflow event contract.
+- sandbox integration token: repository administration works, but Actions administration and workflow dispatch return 403; the workflow_dispatch lockfile-bootstrap input therefore only operates for a human dispatcher. The bootstrap flow actually used is described in section 9.
+
 - no-mut: RESOLVED by owner decision on 2026-10-17. The approved scope is "mut on system-closure parameters only": the `mut` keyword appears exclusively as parameter-binding markers inside system closure signatures (Commands, ResMut, Query params); no mutable let-locals, no written &mut types, no exclusive &mut World parameters, no interior-mutability substitutes. scripts/verify_syntax.py enforces the precise shape: `mut` is accepted only in the parameter form `mut identifier: Type` and never after let/ref/&/*. The approved occurrences are exactly the system parameters of the four application systems.
 - launch: RESOLVED by owner decision on 2026-10-17: honest disabled Coming Soon action; the decorative launched-latch is removed; the action is excluded from hover, arming, and focus order; disabled styling is static.
 - escape threshold: RESOLVED by owner decision on 2026-10-17: keep 7.0 seconds, now stored in UiState.escape_hold_secs.
 - Pointer-injection-free smoke: keyboard scenarios substitute for pointer scenarios where tools allow; both labeled in section 7.
 - Workflow rerun policy: publishing to an existing tag replaces assets with the newly verified same-run packages (--clobber) because a tag maps to one commit; disclosed here as the safe-rerun behavior.
+
+## 9. Lockfile bootstrap flow actually used
+
+The committed Cargo.lock still resolves v0.20.0-rc.2 and carries the generated comment header, so --locked commands fail until cargo regenerates it. Because no cargo exists in this environment and workflow dispatch is not executable by the integration token, the bootstrap runs inside the pull_request verification run itself: the validation job regenerates the lockfile when the workflow_dispatch input would have requested it... this cannot fire on pull_request. Instead the pull_request validation performs the regeneration unconditionally while the committed lockfile does not yet resolve from tag v0.20.0, uploads the normalized candidate as an artifact, and fails fast if any later step cannot validate against it; once the candidate is committed to the branch, the regeneration step stops running because the committed lockfile resolves correctly.
 
 ## 9. Action pins
 
