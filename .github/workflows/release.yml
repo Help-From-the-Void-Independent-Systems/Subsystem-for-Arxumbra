@@ -111,7 +111,23 @@ jobs:
             exit "$status"
           fi
 
-      - name: Policy outcome m=${{ steps.policy.outputs.marker }}/${{ steps.policy.outputs.message }} log=${{ steps.policy.outputs.log }}
+      - name: Policy outcome reflector
+        if: always()
+        id: policy_reflect
+        shell: bash
+        run: |
+          summary=$(grep -m 1 -A 3 'name = "bevy"' Cargo.lock | tr '\n' '|' | cut -c 1-90)
+          reason=$(head -n 1 evidence/policy.log 2>/dev/null | cut -c 1-90)
+          {
+            echo "summary<<MARKER_POLICY_SUMMARY"
+            echo "$summary"
+            echo "MARKER_POLICY_SUMMARY"
+            echo "reason<<MARKER_POLICY_REASON"
+            echo "$reason"
+            echo "MARKER_POLICY_REASON"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Policy bevy=${{ steps.policy_reflect.outputs.summary }} reason=${{ steps.policy_reflect.outputs.reason }}
         if: always()
         shell: bash
         run: echo recorded
