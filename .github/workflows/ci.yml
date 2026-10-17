@@ -723,6 +723,10 @@ jobs:
           FAIL=0
           REASONS=""
           AE_REPORT=""
+          rm -rf target/release/assets
+          cp -R assets target/release/assets
+          ASSET_COUNT=$(find target/release/assets -name '*.png' | wc -l | tr -d ' ')
+          echo "::notice title=smoke-assets::${ASSET_COUNT} PNG asset files staged beside the executable (the release package layout)"
           ./target/release/subsystem-for-arxumbra > "$LOG" 2>&1 &
           APP_PID=$!
           READY=0
@@ -747,6 +751,14 @@ jobs:
           if grep -q "panicked" "$LOG"; then
             FAIL=1
             REASONS="${REASONS}the process panicked; "
+          fi
+          if grep -q " ERROR " "$LOG"; then
+            FAIL=1
+            REASONS="${REASONS}the application logged ERROR records (asset loading or renderer errors); "
+          fi
+          if [ "$ASSET_COUNT" != 6 ]; then
+            FAIL=1
+            REASONS="${REASONS}expected 6 staged PNG assets, found ${ASSET_COUNT}; "
           fi
           ADAPTER=$(grep -i -m1 "AdapterInfo" "$LOG" || true)
           echo "adapter evidence: ${ADAPTER:-none found}"
@@ -897,13 +909,16 @@ jobs:
             esc=$(printf '\033')
             sed -e "s/${esc}\[[0-9;]*m//g" "$LOG" > /tmp/smoke.plain.log
             echo "::error title=smoke-failures::${REASONS}"
-            head -n 4 /tmp/smoke.plain.log | while IFS= read -r line; do
+            head -n 3 /tmp/smoke.plain.log | while IFS= read -r line; do
               echo "::warning title=smoke-log-head::${line}"
             done
             tail -n 9 /tmp/smoke.plain.log | while IFS= read -r line; do
               echo "::error title=smoke-log-tail::${line}"
             done
-            { tail -n 3 /tmp/xvfb.log || true; } | while IFS= read -r line; do
+            { grep -m 2 " ERROR " /tmp/smoke.plain.log || true; } | while IFS= read -r line; do
+              echo "::warning title=smoke-log-error::${line}"
+            done
+            { tail -n 2 /tmp/xvfb.log || true; } | while IFS= read -r line; do
               echo "::warning title=smoke-xvfb::${line}"
             done
             exit 1

@@ -2033,7 +2033,7 @@ fn main() {
                                     ),
                                     Role::TabRing(control) => (
                                         Some((|tab: bevy::math::Rect| {
-                                            bevy::math::Rect::new(tab.min.x - 3.0, tab.min.y - 3.0, tab.max.x + 3.0, tab.max.y + 3.0)
+                                            bevy::math::Rect::new(tab.min.x + 3.0, tab.min.y + 3.0, tab.max.x - 3.0, tab.max.y - 3.0)
                                         })(match *control {
                                             Control::HomeTab => next_state.layout.home_tab,
                                             Control::RegistryTab => next_state.layout.registry_tab,

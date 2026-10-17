@@ -533,6 +533,43 @@ SHA↔version mapping lives here (verified via the GitHub refs API and
     environment either: the artifact
     `smoke-evidence-linux-x11-lavapipe` (50,081 bytes) exists, but its
     download URL redirects to a blob host outside this sandbox's allowlist.
+38. (rev-4) The keyboard focus ring on the selected tab was invisible — a
+    real defect, found by the ring-region diagnostic added in decision 37.
+    Remote run `39039761084` measured `smoke-ring` `home1~focus1=64`
+    against `focus1~focus2=2288`: the first Tab changed 64 px inside the
+    Home-tab ring region, the second changed 2,288 px inside the Registry-tab
+    ring region. The cause is geometric. The ring rect was the tab rect
+    **expanded** by 3 px, so the 3 px stroke landed on the sidebar panel
+    (gray 12) instead of the tab body. The ring colour is chosen by
+    selection: 15 (dark) for the selected destination, 250 (bright)
+    otherwise. A dark ring on the dark panel is a luminance ratio of
+    ≈1.05:1 — invisible, and below the harness's 2% fuzz, so only the
+    rounded corners that overlapped the bright body registered (the 64 px).
+    The bright ring on the second Tab sat on the dark panel and was fully
+    visible (2,288 px). This contradicted docs/architecture.md §8, which
+    already specified "3 px stroke, drawn over the tab body", and the
+    documented contrast pairs (ring 250 vs body 28 = 16.33:1, ring 15 vs
+    selected body 235 = 16.08:1) are ring-versus-**body** pairs. Fix: the
+    ring rect is the tab rect **inset** by 3 px, so the stroke always lies
+    on the body it belongs to; both documented contrast pairs are now the
+    pairs actually rendered, and the ring still changes no dimensions and
+    no neighbour positions. §5's "expanded 3 on all sides" wording was
+    wrong and is corrected.
+39. (rev-4) The smoke run had no assets. The mirrored application log from
+    run `39039761084` contained five `ERROR bevy_asset::server: Path not
+    found: …/target/release/assets/…` records: `AssetPlugin.file_path` is
+    `"assets"` with `AssetMode::Unprocessed`, i.e. CWD-relative, and the
+    harness launched `./target/release/subsystem-for-arxumbra` from the
+    repository root, so the process looked for assets under
+    `target/release/`. The application is correct and the released package
+    is correct (release.yml stages `assets` beside the executable), but the
+    harness was not reproducing the package layout, so six external icons
+    were absent from every screenshot. Fix: the smoke step stages the asset
+    tree beside the executable before launch (`rm -rf` then `cp -R`, because
+    the restored `target/` cache can contain a stale copy), reports the
+    staged PNG count as a notice, asserts that count is 6, and asserts the
+    application log contains no `ERROR` record at all — the first two ERROR
+    lines are mirrored as annotations when it does.
 35. (rev-4) Equality-guarded snapshot write. `ResMut::into_inner` consumes
     the parameter and unconditionally calls `set_changed()`
     (`bevy_ecs/src/change_detection/traits.rs`, `impl_methods!`), so an
@@ -651,3 +688,31 @@ SHA↔version mapping lives here (verified via the GitHub refs API and
   the Escape hold. The single anomalous value (`home1~focus1=64`) is
   analysed in decision 37, together with the dead threshold check it
   exposed.
+- Remote CI iteration `74d9575` (run `39039761084`, job `117416658120`):
+  every gate green up to and including the release build; the smoke step
+  ✗ **with the AE thresholds now live**, reporting
+  `smoke-failures: the focus ring region around the Home tab changed by
+  only 64 pixels on the first Tab; home1 vs focus1 changed by only 64
+  pixels, expected more than 500`, `smoke-ring: home1~focus1=64
+  focus1~focus2=2288`, `smoke-ae` identical to the previous run
+  (`home0~home1=204000 home1~focus1=64 focus1~focus2=2352
+  home1~registry1=34333 registry1~hover1=16798 hover1~home2=34333
+  cancel1~registry1=34333 home2n~cancel1=0`), `smoke-shots` one
+  quiescence probe per capture (no mid-frame captures, so lag was ruled out
+  as the explanation for the 64 px), `smoke-exit` exit code 0, and a
+  mirrored log tail containing five `ERROR bevy_asset::server: Path not
+  found` records plus `ARXUMBRA-LAYOUT` lines showing the layout refining
+  from `home=16,64,308,56` (pre-measurement) to `home=16,80,308,56`
+  (settled `title_h = 48`) before the interactive line. Decisions 38 and 39
+  record the two defects this exposed and their fixes.
+- Local dry-run harness for the smoke step (outside the repository,
+  `/home/user/arc-parts/dryrun_smoke.sh`): every external tool stubbed
+  (`import`, `compare`, `xdotool`, `Xvfb`, `xdpyinfo`, `vulkaninfo`, `sudo`,
+  and the application binary) so the step's bash control flow, arithmetic
+  and annotation output can be exercised without spending a CI cycle. It
+  caught two harness defects before they reached the runner: the pair
+  metric temporaries were written as `/tmp/ae_$A_$B.txt`, which bash parses
+  as the unbound variable `A_` (every metric came back empty), and it
+  confirmed the fixed loop reports `exit=0` with healthy metrics and
+  `exit=1` with a single aggregated `smoke-failures` annotation listing
+  every breached threshold when the metrics are 64 px.
