@@ -169,15 +169,30 @@ jobs:
           done
 
       - name: Formatting
+        id: fmt
         shell: bash
         run: |
           set -uo pipefail
           cargo fmt --all -- --check 2>&1 | tee "$EVIDENCE_DIR/fmt.log"
-            status=$?
-            if [ "$status" -ne 0 ]; then
+          status=$?
+          if [ "$status" -ne 0 ]; then
             tail -n 60 "$EVIDENCE_DIR/fmt.log" | sed 's/^/::error::/'
             exit "$status"
           fi
+
+      - name: Formatting reflector
+        if: always()
+        id: fmt_reflect
+        shell: bash
+        run: |
+          set +e
+          block=$(tail -n 6 "$EVIDENCE_DIR/fmt.log" | tr '\n' '~' | cut -c 1-560)
+          echo "block=$block" >> "$GITHUB_OUTPUT"
+
+      - name: "Format diff: ${{ steps.fmt_reflect.outputs.block }}"
+        if: always()
+        shell: bash
+        run: echo recorded
 
       - name: Check
         id: check
