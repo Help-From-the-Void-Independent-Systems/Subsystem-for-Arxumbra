@@ -103,20 +103,29 @@ jobs:
           fi
 
       - name: Dependency graph evidence and X11 absence
+        shell: bash
         run: |
-          set -euo pipefail
-          cargo tree --locked --duplicates > "$EVIDENCE_DIR/duplicates.txt"
+          set -uo pipefail
+          if ! cargo tree --locked --duplicates > "$EVIDENCE_DIR/duplicates.txt" 2>&1; then
+            status=$?
+            sed 's/^/::error::/' "$EVIDENCE_DIR/duplicates.txt"
+            exit "$status"
+          fi
           for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu; do
             for package in x11 x11rb x11-dl arboard; do
               if cargo tree --locked --target "$target" --invert "$package" > /dev/null 2>&1; then
-                echo "unexpected $package inside the $target dependency graph"
+                echo "::error::unexpected $package inside the $target dependency graph"
                 exit 1
               fi
               echo "$target: $package absent" | tee -a "$EVIDENCE_DIR/x11-absence.log"
             done
-            cargo tree --locked --target "$target" --edges features --package winit > "$EVIDENCE_DIR/winit-features-$target.txt"
+            if ! cargo tree --locked --target "$target" --edges features --package winit > "$EVIDENCE_DIR/winit-features-$target.txt" 2>&1; then
+              echo "::error::cargo tree failed for winit features on $target"
+              cat "$EVIDENCE_DIR/winit-features-$target.txt" | sed 's/^/::error::/'
+              exit 1
+            fi
             if grep -q 'feature "x11"' "$EVIDENCE_DIR/winit-features-$target.txt"; then
-              echo "winit x11 feature activated for $target"
+              echo "::error::winit x11 feature activated for $target"
               exit 1
             fi
             echo "$target: winit x11 feature inactive" | tee -a "$EVIDENCE_DIR/x11-absence.log"
