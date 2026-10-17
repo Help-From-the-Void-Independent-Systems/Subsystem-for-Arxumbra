@@ -140,23 +140,23 @@ fn main() {
     #[derive(bevy::ecs::component::Component)]
     struct ActionLabel;
 
-    type SpriteSlot<M> = bevy::ecs::system::Query<
+    type SpriteSlot<'a, M> = bevy::ecs::system::Query<
         (
             bevy::ecs::entity::Entity,
-            &bevy::transform::components::Transform,
-            &bevy::camera::visibility::Visibility,
+            &'a bevy::transform::components::Transform,
+            &'a bevy::camera::visibility::Visibility,
             &bevy::sprite::Sprite,
         ),
         bevy::ecs::query::With<M>,
     >;
 
-    type TextSlot<M> = bevy::ecs::system::Query<
+    type TextSlot<'a, M> = bevy::ecs::system::Query<
         (
             bevy::ecs::entity::Entity,
-            &bevy::transform::components::Transform,
-            &bevy::camera::visibility::Visibility,
-            &bevy::text::TextColor,
-            &bevy::text::TextBounds,
+            &'a bevy::transform::components::Transform,
+            &'a bevy::camera::visibility::Visibility,
+            &'a bevy::text::TextColor,
+            &'a bevy::text::TextBounds,
         ),
         bevy::ecs::query::With<M>,
     >;
@@ -1206,17 +1206,17 @@ fn main() {
                 },
                 |state: bevy::ecs::system::Res<UiState>,
                  mut commands: bevy::ecs::system::Commands,
-                 sidebar_panel_sprites: SpriteSlot<SidebarPanel>,
-                 divider_sprites: SpriteSlot<Divider>,
-                 app_icon_sprites: SpriteSlot<AppIcon>,
-                 title_texts: TextSlot<Title>,
-                 home_pill_sprites: SpriteSlot<HomePill>,
-                 home_icon_sprites: SpriteSlot<HomeIcon>,
-                 home_label_texts: TextSlot<HomeLabel>,
-                 registry_pill_sprites: SpriteSlot<RegistryPill>,
-                 registry_icon_sprites: SpriteSlot<RegistryIcon>,
-                 registry_label_texts: TextSlot<RegistryLabel>,
-                 ring_home_sprites: SpriteSlot<RingHome>| {
+                 sidebar_panel_sprites: SpriteSlot<'_, SidebarPanel>,
+                 divider_sprites: SpriteSlot<'_, Divider>,
+                 app_icon_sprites: SpriteSlot<'_, AppIcon>,
+                 title_texts: TextSlot<'_, Title>,
+                 home_pill_sprites: SpriteSlot<'_, HomePill>,
+                 home_icon_sprites: SpriteSlot<'_, HomeIcon>,
+                 home_label_texts: TextSlot<'_, HomeLabel>,
+                 registry_pill_sprites: SpriteSlot<'_, RegistryPill>,
+                 registry_icon_sprites: SpriteSlot<'_, RegistryIcon>,
+                 registry_label_texts: TextSlot<'_, RegistryLabel>,
+                 ring_home_sprites: SpriteSlot<'_, RingHome>| {
                     sidebar_panel_sprites
                         .iter()
                         .for_each(|(entity, transform, visibility, sprite)| {
@@ -1889,17 +1889,17 @@ fn main() {
                 },
                 |state: bevy::ecs::system::Res<UiState>,
                  mut commands: bevy::ecs::system::Commands,
-                 ring_registry_sprites: SpriteSlot<RingRegistry>,
-                 content_panel_sprites: SpriteSlot<ContentPanel>,
-                 laboratory_card_sprites: SpriteSlot<LaboratoryCard>,
-                 laboratory_well_sprites: SpriteSlot<LaboratoryWell>,
-                 flask_sprites: SpriteSlot<Flask>,
-                 laboratory_title_texts: TextSlot<LaboratoryTitle>,
-                 separator_sprites: SpriteSlot<Separator>,
-                 caption_texts: TextSlot<Caption>,
-                 action_pill_sprites: SpriteSlot<ActionPill>,
-                 action_icon_sprites: SpriteSlot<ActionIcon>,
-                 action_label_texts: TextSlot<ActionLabel>| {
+                 ring_registry_sprites: SpriteSlot<'_, RingRegistry>,
+                 content_panel_sprites: SpriteSlot<'_, ContentPanel>,
+                 laboratory_card_sprites: SpriteSlot<'_, LaboratoryCard>,
+                 laboratory_well_sprites: SpriteSlot<'_, LaboratoryWell>,
+                 flask_sprites: SpriteSlot<'_, Flask>,
+                 laboratory_title_texts: TextSlot<'_, LaboratoryTitle>,
+                 separator_sprites: SpriteSlot<'_, Separator>,
+                 caption_texts: TextSlot<'_, Caption>,
+                 action_pill_sprites: SpriteSlot<'_, ActionPill>,
+                 action_icon_sprites: SpriteSlot<'_, ActionIcon>,
+                 action_label_texts: TextSlot<'_, ActionLabel>| {
                     (|registry_focused: bool| {
                         ring_registry_sprites
                             .iter()
