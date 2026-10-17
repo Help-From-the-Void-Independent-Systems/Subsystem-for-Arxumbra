@@ -234,9 +234,6 @@ jobs:
         if: always()
         shell: bash
         run: echo recorded
-        if: always()
-        shell: bash
-        run: echo recorded
 
       - name: Clippy
         id: clippy
