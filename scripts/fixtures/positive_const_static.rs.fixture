@@ -1,0 +1,9 @@
+const LIMIT: u32 = 3;
+static NAME: &str = "arxumbra";
+const fn folded() -> u32 {
+    LIMIT
+}
+
+fn main() {
+    println!("{}", folded());
+}

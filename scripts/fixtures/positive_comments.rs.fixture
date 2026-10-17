@@ -1,0 +1,9 @@
+/// doc comment about main
+// line comment
+/* block
+   comment /* nested */ still comment */
+fn main() {
+    #[doc = "attribute comment"]
+    let value = 1;
+    println!("{value}");
+}

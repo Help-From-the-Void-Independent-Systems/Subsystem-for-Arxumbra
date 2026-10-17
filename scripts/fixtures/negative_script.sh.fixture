@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+PREFIX="repo#fragment"
+TARGET=${PREFIX#*#}
+echo "$TARGET"
+case "$TARGET" in
+  *#*) echo "unexpected" ;;
+esac

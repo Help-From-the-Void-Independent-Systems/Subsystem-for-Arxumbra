@@ -1,0 +1,16 @@
+name: Fixture
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+  PATTERN: "value#inside-quotes"
+
+jobs:
+  example:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "${{ github.ref }} $PATTERN"
