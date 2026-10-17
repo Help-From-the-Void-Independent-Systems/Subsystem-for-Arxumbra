@@ -113,12 +113,14 @@ jobs:
           fi
           for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu; do
             for package in x11 x11rb x11-dl arboard; do
-              if cargo tree --locked --target "$target" --invert "$package" > /dev/null 2>&1; then
+              cargo tree --locked --target "$target" --invert "$package" > "$EVIDENCE_DIR/invert-$target-$package.txt" 2>&1 || true
+              if grep -q 'nothing to print' "$EVIDENCE_DIR/invert-$target-$package.txt"; then
+                echo "$target: $package absent" | tee -a "$EVIDENCE_DIR/x11-absence.log"
+              else
                 echo "::error::unexpected $package inside the $target dependency graph"
-                cargo tree --locked --target "$target" --invert "$package" 2>&1 | head -n 24 | sed 's/^/::error::/'
+                head -n 24 "$EVIDENCE_DIR/invert-$target-$package.txt" | sed 's/^/::error::/'
                 exit 1
               fi
-              echo "$target: $package absent" | tee -a "$EVIDENCE_DIR/x11-absence.log"
             done
             if ! cargo tree --locked --target "$target" --edges features --package winit > "$EVIDENCE_DIR/winit-features-$target.txt" 2>&1; then
               echo "::error::cargo tree failed for winit features on $target"
