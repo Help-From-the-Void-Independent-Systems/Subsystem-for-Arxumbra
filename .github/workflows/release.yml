@@ -189,7 +189,7 @@ jobs:
           if [ "$status" -ne 0 ]; then
             message=$(grep -m 2 -E '^error' "$EVIDENCE_DIR/check.log" | cut -c 1-110 | tr '\n' ' ')
             echo "message=$message" >> "$GITHUB_OUTPUT"
-            tail -n 120 "$EVIDENCE_DIR/check.log" | sed 's/^/::error::/'
+            tail -n 40 "$EVIDENCE_DIR/check.log" | sed 's/^/::error::/'
             exit "$status"
           fi
 
@@ -199,10 +199,18 @@ jobs:
         shell: bash
         run: |
           set +e
-          message=$(grep -m 2 -E '^error' "$EVIDENCE_DIR/check.log" | cut -c 1-100 | tr '\n' ' ')
-          echo "message=$message" >> "$GITHUB_OUTPUT"
+          message=$(grep -m 2 -E '^error' "$EVIDENCE_DIR/check.log" | cut -c 1-90 | tr '\n' ' ')
+          tailmessage=$(tail -n 2 "$EVIDENCE_DIR/check.log" | cut -c 1-90 | tr '\n' ' ')
+          {
+            echo "message<<MARKER_CHECK_MESSAGE"
+            echo "$message"
+            echo "MARKER_CHECK_MESSAGE"
+            echo "tailmessage<<MARKER_CHECK_TAIL"
+            echo "$tailmessage"
+            echo "MARKER_CHECK_TAIL"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: "Check errors: ${{ steps.check_reflect.outputs.message }}"
+      - name: "Check errors: ${{ steps.check_reflect.outputs.message }} tail: ${{ steps.check_reflect.outputs.tailmessage }}"
         if: always()
         shell: bash
         run: echo recorded
