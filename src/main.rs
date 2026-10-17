@@ -140,20 +140,26 @@ fn main() {
     #[derive(bevy::ecs::component::Component)]
     struct ActionLabel;
 
-    type SpriteSlot<M> = bevy::ecs::system::Query<(
-        bevy::ecs::entity::Entity,
-        &bevy::transform::components::Transform,
-        &bevy::camera::visibility::Visibility,
-        &bevy::sprite::Sprite,
-    ), bevy::ecs::query::With<M>>;
+    type SpriteSlot<M> = bevy::ecs::system::Query<
+        (
+            bevy::ecs::entity::Entity,
+            &bevy::transform::components::Transform,
+            &bevy::camera::visibility::Visibility,
+            &bevy::sprite::Sprite,
+        ),
+        bevy::ecs::query::With<M>,
+    >;
 
-    type TextSlot<M> = bevy::ecs::system::Query<(
-        bevy::ecs::entity::Entity,
-        &bevy::transform::components::Transform,
-        &bevy::camera::visibility::Visibility,
-        &bevy::text::TextColor,
-        &bevy::text::TextBounds,
-    ), bevy::ecs::query::With<M>>;
+    type TextSlot<M> = bevy::ecs::system::Query<
+        (
+            bevy::ecs::entity::Entity,
+            &bevy::transform::components::Transform,
+            &bevy::camera::visibility::Visibility,
+            &bevy::text::TextColor,
+            &bevy::text::TextBounds,
+        ),
+        bevy::ecs::query::With<M>,
+    >;
 
     bevy::app::App::new()
         .insert_resource(UiState {
