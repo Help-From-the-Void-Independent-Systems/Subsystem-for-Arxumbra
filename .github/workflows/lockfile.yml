@@ -39,15 +39,27 @@ jobs:
           set -euo pipefail
           cargo generate-lockfile
 
-      - name: Commit and push the Cargo-resolved lockfile
+      - name: Apply rustfmt to the sources
         run: |
           set -euo pipefail
+          cargo fmt --all
+
+      - name: Commit and push the Cargo-resolved lockfile and the rustfmt output
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if [ -n "$(git status --porcelain Cargo.lock)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add Cargo.lock
             git commit -m "Add the Cargo-resolved lockfile [skip ci]"
             git push
           else
             echo "Cargo.lock already tracked; nothing to commit"
+          fi
+          if [ -n "$(git status --porcelain src)" ]; then
+            git add src
+            git commit -m "Apply the pinned rustfmt to the sources"
+            git push
+          else
+            echo "sources already rustfmt clean; nothing to commit"
           fi

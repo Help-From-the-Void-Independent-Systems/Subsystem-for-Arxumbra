@@ -628,18 +628,27 @@ jobs:
             # A second, short-format pass yields one line per diagnostic with
             # an exact source location, which annotations can carry verbatim.
             CARGO_TERM_COLOR=never cargo clippy --locked --all-targets --message-format short -- -D warnings > /tmp/clippy-short.log 2>&1
-            grep -E '^src/[^ ]*\.rs:[0-9]+:[0-9]+: (error|warning)' /tmp/clippy-short.log | head -10 | while IFS= read -r line; do
-              location=${line%%: *}
-              file=${location%:*:*}
-              rest=${location#*.rs:}
-              echo "::error title=clippy,file=${file},line=${rest%:*}::${line}"
+            grep -E '^src/[^ ]*\.rs:[0-9]+:[0-9]+: (error|warning)' /tmp/clippy-short.log > /tmp/clippy-located.txt
+            # GitHub retains at most ten annotations per level per step, so the
+            # located diagnostics are spread over the three levels.
+            tier=0
+            for level in error warning notice; do
+              first=$((tier * 10 + 1))
+              sed -n "${first},$((first + 9))p" /tmp/clippy-located.txt | while IFS= read -r line; do
+                location=${line%%: *}
+                file=${location%:*:*}
+                rest=${location#*.rs:}
+                echo "::$level title=clippy,file=${file},line=${rest%:*}::${line}"
+              done
+              tier=$((tier + 1))
             done
-            # Mirror the plain tail unconditionally so a compiler crash or a
-            # cargo-level failure is still readable from the annotations.
-            echo "::error title=clippy-log::bytes=$(wc -c < /tmp/clippy.plain.log) short_bytes=$(wc -c < /tmp/clippy-short.log)"
-            tail -n 40 /tmp/clippy.plain.log | while IFS= read -r line; do
-              echo "::error title=clippy-tail::${line}"
-            done
+            # Mirror the plain tail when nothing was located, so a compiler
+            # crash or a cargo-level failure is still readable.
+            if [ ! -s /tmp/clippy-located.txt ]; then
+              tail -n 10 /tmp/clippy.plain.log | while IFS= read -r line; do
+                echo "::error title=clippy-tail::${line}"
+              done
+            fi
           fi
           exit $status
 

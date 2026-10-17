@@ -1245,8 +1245,14 @@ fn main() {
                  ),
                  bevy::ecs::query::Without<bevy::camera::Camera2d>,
              >| {
-                for window in windows.iter() {
-                    if keys.just_pressed(bevy::input::keyboard::KeyCode::F1)
+                (|(width_now, height_now, scale_now, window_focused, cursor_now): (
+                     f32,
+                     f32,
+                     f32,
+                     bool,
+                     Option<bevy::math::Vec2>,
+                 )| {
+                    (if keys.just_pressed(bevy::input::keyboard::KeyCode::F1)
                         || keys.just_pressed(bevy::input::keyboard::KeyCode::Tab)
                         || keys.just_pressed(bevy::input::keyboard::KeyCode::Enter)
                         || keys.just_pressed(bevy::input::keyboard::KeyCode::Space)
@@ -1257,13 +1263,13 @@ fn main() {
                         || state.armed.is_some()
                         || !state.interactive_logged
                         || !state.measured_settled
-                        || window.focused != state.window_focused
-                        || window.cursor_position() != state.last_cursor
-                        || window.width() != state.layout.width
-                        || window.height() != state.layout.height
-                        || window.scale_factor() != state.layout.scale
+                        || window_focused != state.window_focused
+                        || cursor_now != state.last_cursor
+                        || width_now != state.layout.width
+                        || height_now != state.layout.height
+                        || scale_now != state.layout.scale
                     {
-                        (|current: UiState,
+                        Some((|current: UiState,
                           title_measured: Option<f32>,
                           desc_measured: Option<f32>,
                           delta: f32,
@@ -1280,10 +1286,7 @@ fn main() {
                           down_edge: bool,
                           up_edge: bool,
                           window_focused: bool,
-                          cursor_now: Option<bevy::math::Vec2>,
-                          state,
-                          exit,
-                          entities| {
+                          cursor_now: Option<bevy::math::Vec2>| {
                             (|title_h_next: f32, desc_h_next: f32| {
                                 (|sidebar_w: f32,
                                   content_w: f32,
@@ -1309,57 +1312,7 @@ fn main() {
                                                               armed_next: Option<Control>,
                                                               focused_next: Option<Control>,
                                                               fk_next: bool| {
-                                                                if hold_next >= 7.0 {
-                                                                    exit.into_inner().write(
-                                                                        bevy::app::AppExit::Success,
-                                                                    );
-                                                                }
-                                                                if !current.interactive_logged
-                                                                    && elapsed >= 2.0
-                                                                {
-                                                                    bevy::log::info!(
-                                                                        "ARXUMBRA-INTERACTIVE selected={:?} hud={} launched={} w={} h={} s={} home={},{},{},{} registry={},{},{},{} launch={},{},{},{}",
-                                                                        selected_next,
-                                                                        hud_next,
-                                                                        launched_next,
-                                                                        layout_next.width,
-                                                                        layout_next.height,
-                                                                        layout_next.scale,
-                                                                        layout_next.home_tab.min.x,
-                                                                        layout_next.home_tab.min.y,
-                                                                        layout_next.home_tab.size().x,
-                                                                        layout_next.home_tab.size().y,
-                                                                        layout_next.registry_tab.min.x,
-                                                                        layout_next.registry_tab.min.y,
-                                                                        layout_next.registry_tab.size().x,
-                                                                        layout_next.registry_tab.size().y,
-                                                                        layout_next.launch.min.x,
-                                                                        layout_next.launch.min.y,
-                                                                        layout_next.launch.size().x,
-                                                                        layout_next.launch.size().y,
-                                                                    );
-                                                                }
-                                                                if layout_dirty {
-                                                                    bevy::log::info!(
-                                                                        "ARXUMBRA-LAYOUT w={} h={} s={} home={},{},{},{} registry={},{},{},{} launch={},{},{},{}",
-                                                                        layout_next.width,
-                                                                        layout_next.height,
-                                                                        layout_next.scale,
-                                                                        layout_next.home_tab.min.x,
-                                                                        layout_next.home_tab.min.y,
-                                                                        layout_next.home_tab.size().x,
-                                                                        layout_next.home_tab.size().y,
-                                                                        layout_next.registry_tab.min.x,
-                                                                        layout_next.registry_tab.min.y,
-                                                                        layout_next.registry_tab.size().x,
-                                                                        layout_next.registry_tab.size().y,
-                                                                        layout_next.launch.min.x,
-                                                                        layout_next.launch.min.y,
-                                                                        layout_next.launch.size().x,
-                                                                        layout_next.launch.size().y,
-                                                                    );
-                                                                }
-                                                                *state.into_inner() = UiState {
+                                                                (UiState {
                                                                     selected: selected_next,
                                                                     hud_visible: hud_next,
                                                                     hovered: hover_next,
@@ -1377,406 +1330,7 @@ fn main() {
                                                                     interactive_logged:
                                                                         current.interactive_logged
                                                                             || elapsed >= 2.0,
-                                                                };
-                                                                for (
-                                                                    role,
-                                                                    visibility,
-                                                                    transform,
-                                                                    sprite,
-                                                                    text_color,
-                                                                    text_bounds,
-                                                                    _layout_info,
-                                                                ) in entities
-                                                                {
-                                                                    (|rect: Option<
-                                                                            bevy::math::Rect,
-                                                                        >,
-                                                                      is_text: bool,
-                                                                      shown: bool,
-                                                                      tint: Option<
-                                                                            bevy::color::Color,
-                                                                        >,
-                                                                      ink: Option<
-                                                                            bevy::color::Color,
-                                                                        >,
-                                                                      wrap: Option<f32>| {
-                                                                        (|vis_next: bevy::camera::visibility::Visibility| {
-                                                                            if *visibility
-                                                                                != vis_next
-                                                                            {
-                                                                                *visibility
-                                                                                    .into_inner(
-                                                                                    ) = vis_next;
-                                                                            }
-                                                                        })([
-                                                                            bevy::camera::visibility::Visibility::Hidden,
-                                                                            bevy::camera::visibility::Visibility::Visible,
-                                                                        ][shown as usize]);
-                                                                        for rect in rect {
-                                                                                if layout_dirty {
-                                                                                    (|kept_z: f32, transform: bevy::ecs::change_detection::Mut<bevy::transform::components::Transform>| {
-                                                                                    (|next: bevy::transform::components::Transform| {
-                                                                                        if *transform
-                                                                                            != next
-                                                                                        {
-                                                                                            *transform
-                                                                                                .into_inner(
-                                                                                                ) = next;
-                                                                                        }
-                                                                                    })(bevy::transform::components::Transform {
-                                                                                        translation: bevy::math::Vec3::new(
-                                                                                            [
-                                                                                                (rect.min.x
-                                                                                                    + rect
-                                                                                                        .size(
-                                                                                                        )
-                                                                                                        .x
-                                                                                                        / 2.0
-                                                                                                    - layout_next
-                                                                                                        .width
-                                                                                                        / 2.0)
-                                                                                                    * layout_next
-                                                                                                        .scale,
-                                                                                                (rect.min.x
-                                                                                                    - layout_next
-                                                                                                        .width
-                                                                                                        / 2.0)
-                                                                                                    * layout_next
-                                                                                                        .scale,
-                                                                                            ][is_text
-                                                                                                as usize],
-                                                                                            [
-                                                                                                (layout_next
-                                                                                                    .height
-                                                                                                    / 2.0
-                                                                                                    - (rect.min.y
-                                                                                                        + rect
-                                                                                                            .size(
-                                                                                                            )
-                                                                                                            .y
-                                                                                                            / 2.0))
-                                                                                                    * layout_next
-                                                                                                        .scale,
-                                                                                                (layout_next
-                                                                                                    .height
-                                                                                                    / 2.0
-                                                                                                    - rect.min.y)
-                                                                                                    * layout_next
-                                                                                                        .scale,
-                                                                                            ][is_text
-                                                                                                as usize],
-                                                                                            kept_z,
-                                                                                        ),
-                                                                                        rotation: bevy::math::Quat::IDENTITY,
-                                                                                        scale: [
-                                                                                            bevy::math::Vec3::new(
-                                                                                                layout_next
-                                                                                                    .scale,
-                                                                                                layout_next
-                                                                                                    .scale,
-                                                                                                1.0,
-                                                                                            ),
-                                                                                            bevy::math::Vec3::new(
-                                                                                                1.0,
-                                                                                                1.0,
-                                                                                                1.0,
-                                                                                            ),
-                                                                                        ][is_text
-                                                                                            as usize],
-                                                                                    });
-                                                                                    })(transform.translation.z, transform);
-                                                                                }
-                                                                                sprite.into_iter().for_each(|sprite: bevy::ecs::change_detection::Mut<bevy::sprite::Sprite>| {
-                                                                                    (|current_sprite: bevy::sprite::Sprite, sprite: bevy::ecs::change_detection::Mut<bevy::sprite::Sprite>| {
-                                                                                        (|next: bevy::sprite::Sprite| {
-                                                                                            if current_sprite.color != next.color || current_sprite.custom_size != next.custom_size {
-                                                                                                *sprite.into_inner() = next;
-                                                                                            }
-                                                                                        })(bevy::sprite::Sprite {
-                                                                                            color: tint.unwrap_or(current_sprite.color),
-                                                                                            custom_size: [current_sprite.custom_size, Some(rect.size())][layout_dirty as usize],
-                                                                                            ..current_sprite
-                                                                                        });
-                                                                                    })(sprite.clone(), sprite);
-                                                                                });
-                                                                                text_color.into_iter().for_each(|text_color: bevy::ecs::change_detection::Mut<bevy::text::TextColor>| {
-                                                                                    (|current_ink: bevy::color::Color, text_color: bevy::ecs::change_detection::Mut<bevy::text::TextColor>| {
-                                                                                        (|next: bevy::text::TextColor| {
-                                                                                            if current_ink != next.0 {
-                                                                                                *text_color.into_inner() = next;
-                                                                                            }
-                                                                                        })(bevy::text::TextColor(ink.unwrap_or(current_ink)));
-                                                                                    })(text_color.0, text_color);
-                                                                                });
-                                                                                text_bounds.into_iter().for_each(|text_bounds: bevy::ecs::change_detection::Mut<bevy::text::TextBounds>| {
-                                                                                    if layout_dirty {
-                                                                                        (|next: Option<f32>| {
-                                                                                            if text_bounds.width != next {
-                                                                                                text_bounds.into_inner().width = next;
-                                                                                            }
-                                                                                        })(wrap);
-                                                                                    }
-                                                                                });
-                                                                        }
-                                                                    })(
-                                                                        match role {
-                                                                            Role::SidebarPanel => (
-                                                                                Some(bevy::math::Rect::new(0.0, 0.0, layout_next.sidebar_w, layout_next.height)),
-                                                                                false,
-                                                                                hud_next,
-                                                                                Some(bevy::color::Color::srgb(12.0 / 255.0, 12.0 / 255.0, 12.0 / 255.0)),
-                                                                                None,
-                                                                                None,
-                                                                            ),
-                                                                            Role::Divider => (
-                                                                                Some(bevy::math::Rect::new(layout_next.sidebar_w - 2.0, 0.0, layout_next.sidebar_w, layout_next.height)),
-                                                                                false,
-                                                                                hud_next,
-                                                                                Some(bevy::color::Color::srgb(56.0 / 255.0, 56.0 / 255.0, 56.0 / 255.0)),
-                                                                                None,
-                                                                                None,
-                                                                            ),
-                                                                            Role::AppIcon => (
-                                                                                Some(layout_next.icon),
-                                                                                false,
-                                                                                hud_next,
-                                                                                Some(bevy::color::Color::WHITE),
-                                                                                None,
-                                                                                None,
-                                                                            ),
-                                                                            Role::AppTitle => (
-                                                                                Some(layout_next.title),
-                                                                                true,
-                                                                                hud_next,
-                                                                                None,
-                                                                                Some(bevy::color::Color::srgb(240.0 / 255.0, 240.0 / 255.0, 240.0 / 255.0)),
-                                                                                Some(layout_next.title.size().x),
-                                                                            ),
-                                                                            Role::TabBody(control) => (
-                                                                                Some(match *control {
-                                                                                    Control::HomeTab => layout_next.home_tab,
-                                                                                    Control::RegistryTab => layout_next.registry_tab,
-                                                                                    Control::Launch => layout_next.launch,
-                                                                                }),
-                                                                                false,
-                                                                                hud_next,
-                                                                                Some((|gray: u8| {
-                                                                                    bevy::color::Color::srgb(gray as f32 / 255.0, gray as f32 / 255.0, gray as f32 / 255.0)
-                                                                                })(match (
-                                                                                    selected_next == match *control {
-                                                                                        Control::HomeTab => Destination::Home,
-                                                                                        Control::RegistryTab => Destination::Registry,
-                                                                                        Control::Launch => Destination::Home,
-                                                                                    },
-                                                                                    armed_next == Some(*control),
-                                                                                    hover_next == Some(*control),
-                                                                                ) {
-                                                                                    (true, true, _) => 215,
-                                                                                    (true, _, true) => 245,
-                                                                                    (true, _, _) => 235,
-                                                                                    (false, true, _) => 20,
-                                                                                    (false, _, true) => 44,
-                                                                                    (false, _, _) => 28,
-                                                                                })),
-                                                                                None,
-                                                                                None,
-                                                                            ),
-                                                                            Role::TabIcon(control) => (
-                                                                                Some((|tab: bevy::math::Rect| {
-                                                                                    bevy::math::Rect::new(tab.min.x + 14.0, tab.min.y + 16.0, tab.min.x + 38.0, tab.min.y + 40.0)
-                                                                                })(match *control {
-                                                                                    Control::HomeTab => layout_next.home_tab,
-                                                                                    Control::RegistryTab => layout_next.registry_tab,
-                                                                                    Control::Launch => layout_next.launch,
-                                                                                })),
-                                                                                false,
-                                                                                hud_next,
-                                                                                Some((|gray: u8| {
-                                                                                    bevy::color::Color::srgb(gray as f32 / 255.0, gray as f32 / 255.0, gray as f32 / 255.0)
-                                                                                })([
-                                                                                    225u8,
-                                                                                    20u8,
-                                                                                ][(selected_next == match *control {
-                                                                                    Control::HomeTab => Destination::Home,
-                                                                                    Control::RegistryTab => Destination::Registry,
-                                                                                    Control::Launch => Destination::Home,
-                                                                                }) as usize])),
-                                                                                None,
-                                                                                None,
-                                                                            ),
-                                                                            Role::TabLabel(control) => (
-                                                                                Some((|tab: bevy::math::Rect| {
-                                                                                    bevy::math::Rect::new(tab.min.x + 50.0, tab.min.y + 28.0, tab.max.x - 10.0, tab.min.y + 52.0)
-                                                                                })(match *control {
-                                                                                    Control::HomeTab => layout_next.home_tab,
-                                                                                    Control::RegistryTab => layout_next.registry_tab,
-                                                                                    Control::Launch => layout_next.launch,
-                                                                                })),
-                                                                                true,
-                                                                                hud_next,
-                                                                                None,
-                                                                                Some((|gray: u8| {
-                                                                                    bevy::color::Color::srgb(gray as f32 / 255.0, gray as f32 / 255.0, gray as f32 / 255.0)
-                                                                                })([
-                                                                                    225u8,
-                                                                                    20u8,
-                                                                                ][(selected_next == match *control {
-                                                                                    Control::HomeTab => Destination::Home,
-                                                                                    Control::RegistryTab => Destination::Registry,
-                                                                                    Control::Launch => Destination::Home,
-                                                                                }) as usize])),
-                                                                                Some((|tab: bevy::math::Rect| {
-                                                                                    tab.size().x - 60.0
-                                                                                })(match *control {
-                                                                                    Control::HomeTab => layout_next.home_tab,
-                                                                                    Control::RegistryTab => layout_next.registry_tab,
-                                                                                    Control::Launch => layout_next.launch,
-                                                                                })),
-                                                                            ),
-                                                                            Role::TabRing(control) => (
-                                                                                Some((|tab: bevy::math::Rect| {
-                                                                                    bevy::math::Rect::new(tab.min.x - 3.0, tab.min.y - 3.0, tab.max.x + 3.0, tab.max.y + 3.0)
-                                                                                })(match *control {
-                                                                                    Control::HomeTab => layout_next.home_tab,
-                                                                                    Control::RegistryTab => layout_next.registry_tab,
-                                                                                    Control::Launch => layout_next.launch,
-                                                                                })),
-                                                                                false,
-                                                                                hud_next
-                                                                                    && fk_next
-                                                                                    && focused_next == Some(*control),
-                                                                                Some((|gray: u8| {
-                                                                                    bevy::color::Color::srgb(gray as f32 / 255.0, gray as f32 / 255.0, gray as f32 / 255.0)
-                                                                                })([
-                                                                                    250u8,
-                                                                                    15u8,
-                                                                                ][(selected_next == match *control {
-                                                                                    Control::HomeTab => Destination::Home,
-                                                                                    Control::RegistryTab => Destination::Registry,
-                                                                                    Control::Launch => Destination::Home,
-                                                                                }) as usize])),
-                                                                                None,
-                                                                                None,
-                                                                            ),
-                                                                            Role::RegistryRoot => (
-                                                                                None,
-                                                                                false,
-                                                                                hud_next
-                                                                                    && selected_next == Destination::Registry,
-                                                                                None,
-                                                                                None,
-                                                                                None,
-                                                                            ),
-                                                                            Role::CardBackground => (
-                                                                                Some(layout_next.card),
-                                                                                false,
-                                                                                true,
-                                                                                Some(bevy::color::Color::srgb(18.0 / 255.0, 18.0 / 255.0, 18.0 / 255.0)),
-                                                                                None,
-                                                                                None,
-                                                                            ),
-                                                                            Role::CardIcon => (
-                                                                                Some(layout_next.card_icon),
-                                                                                false,
-                                                                                true,
-                                                                                Some(bevy::color::Color::WHITE),
-                                                                                None,
-                                                                                None,
-                                                                            ),
-                                                                            Role::CardTitle => (
-                                                                                Some(layout_next.card_title),
-                                                                                true,
-                                                                                true,
-                                                                                None,
-                                                                                Some(bevy::color::Color::srgb(240.0 / 255.0, 240.0 / 255.0, 240.0 / 255.0)),
-                                                                                Some(layout_next.card_title.size().x),
-                                                                            ),
-                                                                            Role::CardDescription => (
-                                                                                Some(layout_next.desc),
-                                                                                true,
-                                                                                !launched_next,
-                                                                                None,
-                                                                                Some(bevy::color::Color::srgb(170.0 / 255.0, 170.0 / 255.0, 170.0 / 255.0)),
-                                                                                Some(layout_next.desc.size().x),
-                                                                            ),
-                                                                            Role::CardSeparator => (
-                                                                                Some(layout_next.sep),
-                                                                                false,
-                                                                                !launched_next,
-                                                                                Some(bevy::color::Color::srgb(56.0 / 255.0, 56.0 / 255.0, 56.0 / 255.0)),
-                                                                                None,
-                                                                                None,
-                                                                            ),
-                                                                            Role::LaunchBody => (
-                                                                                Some(layout_next.launch),
-                                                                                false,
-                                                                                !launched_next,
-                                                                                Some((|gray: u8| {
-                                                                                    bevy::color::Color::srgb(gray as f32 / 255.0, gray as f32 / 255.0, gray as f32 / 255.0)
-                                                                                })(match (
-                                                                                    armed_next == Some(Control::Launch),
-                                                                                    hover_next == Some(Control::Launch),
-                                                                                ) {
-                                                                                    (true, _) => 215,
-                                                                                    (_, true) => 250,
-                                                                                    (_, _) => 235,
-                                                                                })),
-                                                                                None,
-                                                                                None,
-                                                                            ),
-                                                                            Role::LaunchIcon => (
-                                                                                Some(bevy::math::Rect::new(layout_next.launch.min.x + 16.0, layout_next.launch.min.y + 16.0, layout_next.launch.min.x + 40.0, layout_next.launch.min.y + 40.0)),
-                                                                                false,
-                                                                                !launched_next,
-                                                                                Some(bevy::color::Color::srgb(20.0 / 255.0, 20.0 / 255.0, 20.0 / 255.0)),
-                                                                                None,
-                                                                                None,
-                                                                            ),
-                                                                            Role::LaunchLabel => (
-                                                                                Some(bevy::math::Rect::new(layout_next.launch.min.x + 52.0, layout_next.launch.min.y + 28.0, layout_next.launch.max.x - 12.0, layout_next.launch.min.y + 52.0)),
-                                                                                true,
-                                                                                !launched_next,
-                                                                                None,
-                                                                                Some(bevy::color::Color::srgb(20.0 / 255.0, 20.0 / 255.0, 20.0 / 255.0)),
-                                                                                Some(layout_next.launch.size().x - 64.0),
-                                                                            ),
-                                                                            Role::Badge => (
-                                                                                Some(layout_next.badge),
-                                                                                false,
-                                                                                true,
-                                                                                Some(bevy::color::Color::srgb(30.0 / 255.0, 30.0 / 255.0, 30.0 / 255.0)),
-                                                                                None,
-                                                                                None,
-                                                                            ),
-                                                                            Role::BadgeLabel => (
-                                                                                Some(bevy::math::Rect::new((layout_next.badge.min.x + layout_next.badge.max.x) / 2.0, (layout_next.badge.min.y + layout_next.badge.max.y) / 2.0, (layout_next.badge.min.x + layout_next.badge.max.x) / 2.0, (layout_next.badge.min.y + layout_next.badge.max.y) / 2.0)),
-                                                                                true,
-                                                                                true,
-                                                                                None,
-                                                                                Some(bevy::color::Color::srgb(160.0 / 255.0, 160.0 / 255.0, 160.0 / 255.0)),
-                                                                                Some(layout_next.badge.size().x - 16.0),
-                                                                            ),
-                                                                            Role::Well => (
-                                                                                Some(layout_next.well),
-                                                                                false,
-                                                                                launched_next,
-                                                                                Some(bevy::color::Color::srgb(10.0 / 255.0, 10.0 / 255.0, 10.0 / 255.0)),
-                                                                                None,
-                                                                                None,
-                                                                            ),
-                                                                            Role::Rocket => (
-                                                                                Some((|well: bevy::math::Rect| {
-                                                                                    bevy::math::Rect::new(well.min.x + (well.size().x - 96.0) / 2.0, well.min.y + (well.size().y - 96.0) / 2.0, well.min.x + (well.size().x + 96.0) / 2.0, well.min.y + (well.size().y + 96.0) / 2.0)
-                                                                                })(layout_next.well)),
-                                                                                false,
-                                                                                launched_next,
-                                                                                Some(bevy::color::Color::WHITE),
-                                                                                None,
-                                                                                None,
-                                                                            ),
-                                                                        },
-                                                                    );
-                                                                }
+                                                                }, layout_dirty)
                                                             })(
                                                                 if (enter_edge || space_edge)
                                                                     && hud_next
@@ -1938,9 +1492,45 @@ fn main() {
                                                                                 hud_next,
                                                                                 hud_next,
                                                                                 hud_next
-                                                                                    && selected_r
+                                                                                    && (if up_edge
+                                                                                        && armed_mid
+                                                                                            .is_some()
+                                                                                        && hover_next
+                                                                                            == armed_mid
+                                                                                        && window_focused
+                                                                                    {
+                                                                                        match armed_mid
+                                                                                        {
+                                                                                            Some(
+                                                                                                Control::HomeTab,
+                                                                                            ) => {
+                                                                                                Destination::Home
+                                                                                            }
+                                                                                            Some(
+                                                                                                Control::RegistryTab,
+                                                                                            ) => {
+                                                                                                Destination::Registry
+                                                                                            }
+                                                                                            _ => {
+                                                                                                current
+                                                                                                    .selected
+                                                                                            }
+                                                                                        }
+                                                                                    } else {
+                                                                                        current
+                                                                                            .selected
+                                                                                    })
                                                                                         == Destination::Registry
-                                                                                    && !launched_r,
+                                                                                    && !(current
+                                                                                        .launched
+                                                                                        || (up_edge
+                                                                                            && armed_mid
+                                                                                                == Some(
+                                                                                                    Control::Launch,
+                                                                                                )
+                                                                                            && hover_next
+                                                                                                == armed_mid
+                                                                                            && window_focused)),
                                                                             ])
                                                                         },
                                                                     ),
@@ -2140,9 +1730,9 @@ fn main() {
                             ),
                             time.delta_secs(),
                             time.elapsed_secs(),
-                            window.width(),
-                            window.height(),
-                            window.scale_factor(),
+                            width_now,
+                            height_now,
+                            scale_now,
                             keys.just_pressed(bevy::input::keyboard::KeyCode::F1),
                             keys.just_pressed(bevy::input::keyboard::KeyCode::Tab),
                             keys.pressed(bevy::input::keyboard::KeyCode::ShiftLeft)
@@ -2152,14 +1742,478 @@ fn main() {
                             keys.pressed(bevy::input::keyboard::KeyCode::Escape),
                             mouse.just_pressed(bevy::input::mouse::MouseButton::Left),
                             mouse.just_released(bevy::input::mouse::MouseButton::Left),
+                            window_focused,
+                            cursor_now,
+                        ))
+                    } else {
+                        None
+                    })
+                        .map_or((), |(next_state, layout_dirty_now): (UiState, bool)| {
+                        if next_state.hold >= 7.0 {
+                            exit.into_inner().write(
+                                bevy::app::AppExit::Success,
+                            );
+                        }
+                        if next_state.interactive_logged && !state.interactive_logged {
+                            bevy::log::info!(
+                                "ARXUMBRA-INTERACTIVE selected={:?} hud={} launched={} w={} h={} s={} home={},{},{},{} registry={},{},{},{} launch={},{},{},{}",
+                                next_state.selected,
+                                next_state.hud_visible,
+                                next_state.launched,
+                                next_state.layout.width,
+                                next_state.layout.height,
+                                next_state.layout.scale,
+                                next_state.layout.home_tab.min.x,
+                                next_state.layout.home_tab.min.y,
+                                next_state.layout.home_tab.size().x,
+                                next_state.layout.home_tab.size().y,
+                                next_state.layout.registry_tab.min.x,
+                                next_state.layout.registry_tab.min.y,
+                                next_state.layout.registry_tab.size().x,
+                                next_state.layout.registry_tab.size().y,
+                                next_state.layout.launch.min.x,
+                                next_state.layout.launch.min.y,
+                                next_state.layout.launch.size().x,
+                                next_state.layout.launch.size().y,
+                            );
+                        }
+                        if layout_dirty_now {
+                            bevy::log::info!(
+                                "ARXUMBRA-LAYOUT w={} h={} s={} home={},{},{},{} registry={},{},{},{} launch={},{},{},{}",
+                                next_state.layout.width,
+                                next_state.layout.height,
+                                next_state.layout.scale,
+                                next_state.layout.home_tab.min.x,
+                                next_state.layout.home_tab.min.y,
+                                next_state.layout.home_tab.size().x,
+                                next_state.layout.home_tab.size().y,
+                                next_state.layout.registry_tab.min.x,
+                                next_state.layout.registry_tab.min.y,
+                                next_state.layout.registry_tab.size().x,
+                                next_state.layout.registry_tab.size().y,
+                                next_state.layout.launch.min.x,
+                                next_state.layout.launch.min.y,
+                                next_state.layout.launch.size().x,
+                                next_state.layout.launch.size().y,
+                            );
+                        }
+                        *state.into_inner() = next_state;
+                        for (
+                            role,
+                            visibility,
+                            transform,
+                            sprite,
+                            text_color,
+                            text_bounds,
+                            _layout_info,
+                        ) in entities
+                        {
+                            (|(
+                                 rect,
+                                 is_text,
+                                 shown,
+                                 tint,
+                                 ink,
+                                 wrap,
+                             ): (
+                                 Option<bevy::math::Rect>,
+                                 bool,
+                                 bool,
+                                 Option<bevy::color::Color>,
+                                 Option<bevy::color::Color>,
+                                 Option<f32>,
+                             )| {
+                                (|vis_next: bevy::camera::visibility::Visibility| {
+                                    if *visibility
+                                        != vis_next
+                                    {
+                                        *visibility
+                                            .into_inner(
+                                            ) = vis_next;
+                                    }
+                                })([
+                                    bevy::camera::visibility::Visibility::Hidden,
+                                    bevy::camera::visibility::Visibility::Visible,
+                                ][shown as usize]);
+                                for rect in rect {
+                                        if layout_dirty_now {
+                                            (|kept_z: f32, transform: bevy::ecs::change_detection::Mut<bevy::transform::components::Transform>| {
+                                            (|next: bevy::transform::components::Transform| {
+                                                if *transform
+                                                    != next
+                                                {
+                                                    *transform
+                                                        .into_inner(
+                                                        ) = next;
+                                                }
+                                            })(bevy::transform::components::Transform {
+                                                translation: bevy::math::Vec3::new(
+                                                    [
+                                                        (rect.min.x
+                                                            + rect
+                                                                .size(
+                                                                )
+                                                                .x
+                                                                / 2.0
+                                                            - next_state.layout
+                                                                .width
+                                                                / 2.0)
+                                                            * next_state.layout
+                                                                .scale,
+                                                        (rect.min.x
+                                                            - next_state.layout
+                                                                .width
+                                                                / 2.0)
+                                                            * next_state.layout
+                                                                .scale,
+                                                    ][is_text
+                                                        as usize],
+                                                    [
+                                                        (next_state.layout
+                                                            .height
+                                                            / 2.0
+                                                            - (rect.min.y
+                                                                + rect
+                                                                    .size(
+                                                                    )
+                                                                    .y
+                                                                    / 2.0))
+                                                            * next_state.layout
+                                                                .scale,
+                                                        (next_state.layout
+                                                            .height
+                                                            / 2.0
+                                                            - rect.min.y)
+                                                            * next_state.layout
+                                                                .scale,
+                                                    ][is_text
+                                                        as usize],
+                                                    kept_z,
+                                                ),
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: [
+                                                    bevy::math::Vec3::new(
+                                                        next_state.layout
+                                                            .scale,
+                                                        next_state.layout
+                                                            .scale,
+                                                        1.0,
+                                                    ),
+                                                    bevy::math::Vec3::new(
+                                                        1.0,
+                                                        1.0,
+                                                        1.0,
+                                                    ),
+                                                ][is_text
+                                                    as usize],
+                                            });
+                                            })(transform.translation.z, transform);
+                                        }
+                                        sprite.into_iter().for_each(|sprite: bevy::ecs::change_detection::Mut<bevy::sprite::Sprite>| {
+                                            (|current_sprite: bevy::sprite::Sprite, sprite: bevy::ecs::change_detection::Mut<bevy::sprite::Sprite>| {
+                                                (|next: bevy::sprite::Sprite| {
+                                                    if current_sprite.color != next.color || current_sprite.custom_size != next.custom_size {
+                                                        *sprite.into_inner() = next;
+                                                    }
+                                                })(bevy::sprite::Sprite {
+                                                    color: tint.unwrap_or(current_sprite.color),
+                                                    custom_size: [current_sprite.custom_size, Some(rect.size())][layout_dirty_now as usize],
+                                                    ..current_sprite
+                                                });
+                                            })(sprite.clone(), sprite);
+                                        });
+                                        text_color.into_iter().for_each(|text_color: bevy::ecs::change_detection::Mut<bevy::text::TextColor>| {
+                                            (|current_ink: bevy::color::Color, text_color: bevy::ecs::change_detection::Mut<bevy::text::TextColor>| {
+                                                (|next: bevy::text::TextColor| {
+                                                    if current_ink != next.0 {
+                                                        *text_color.into_inner() = next;
+                                                    }
+                                                })(bevy::text::TextColor(ink.unwrap_or(current_ink)));
+                                            })(text_color.0, text_color);
+                                        });
+                                        text_bounds.into_iter().for_each(|text_bounds: bevy::ecs::change_detection::Mut<bevy::text::TextBounds>| {
+                                            if layout_dirty_now {
+                                                (|next: Option<f32>| {
+                                                    if text_bounds.width != next {
+                                                        text_bounds.into_inner().width = next;
+                                                    }
+                                                })(wrap);
+                                            }
+                                        });
+                                }
+                            })(
+                                match role {
+                                    Role::SidebarPanel => (
+                                        Some(bevy::math::Rect::new(0.0, 0.0, next_state.layout.sidebar_w, next_state.layout.height)),
+                                        false,
+                                        next_state.hud_visible,
+                                        Some(bevy::color::Color::srgb(12.0 / 255.0, 12.0 / 255.0, 12.0 / 255.0)),
+                                        None,
+                                        None,
+                                    ),
+                                    Role::Divider => (
+                                        Some(bevy::math::Rect::new(next_state.layout.sidebar_w - 2.0, 0.0, next_state.layout.sidebar_w, next_state.layout.height)),
+                                        false,
+                                        next_state.hud_visible,
+                                        Some(bevy::color::Color::srgb(56.0 / 255.0, 56.0 / 255.0, 56.0 / 255.0)),
+                                        None,
+                                        None,
+                                    ),
+                                    Role::AppIcon => (
+                                        Some(next_state.layout.icon),
+                                        false,
+                                        next_state.hud_visible,
+                                        Some(bevy::color::Color::WHITE),
+                                        None,
+                                        None,
+                                    ),
+                                    Role::AppTitle => (
+                                        Some(next_state.layout.title),
+                                        true,
+                                        next_state.hud_visible,
+                                        None,
+                                        Some(bevy::color::Color::srgb(240.0 / 255.0, 240.0 / 255.0, 240.0 / 255.0)),
+                                        Some(next_state.layout.title.size().x),
+                                    ),
+                                    Role::TabBody(control) => (
+                                        Some(match *control {
+                                            Control::HomeTab => next_state.layout.home_tab,
+                                            Control::RegistryTab => next_state.layout.registry_tab,
+                                            Control::Launch => next_state.layout.launch,
+                                        }),
+                                        false,
+                                        next_state.hud_visible,
+                                        Some((|gray: u8| {
+                                            bevy::color::Color::srgb(gray as f32 / 255.0, gray as f32 / 255.0, gray as f32 / 255.0)
+                                        })(match (
+                                            next_state.selected == match *control {
+                                                Control::HomeTab => Destination::Home,
+                                                Control::RegistryTab => Destination::Registry,
+                                                Control::Launch => Destination::Home,
+                                            },
+                                            next_state.armed == Some(*control),
+                                            next_state.hovered == Some(*control),
+                                        ) {
+                                            (true, true, _) => 215,
+                                            (true, _, true) => 245,
+                                            (true, _, _) => 235,
+                                            (false, true, _) => 20,
+                                            (false, _, true) => 44,
+                                            (false, _, _) => 28,
+                                        })),
+                                        None,
+                                        None,
+                                    ),
+                                    Role::TabIcon(control) => (
+                                        Some((|tab: bevy::math::Rect| {
+                                            bevy::math::Rect::new(tab.min.x + 14.0, tab.min.y + 16.0, tab.min.x + 38.0, tab.min.y + 40.0)
+                                        })(match *control {
+                                            Control::HomeTab => next_state.layout.home_tab,
+                                            Control::RegistryTab => next_state.layout.registry_tab,
+                                            Control::Launch => next_state.layout.launch,
+                                        })),
+                                        false,
+                                        next_state.hud_visible,
+                                        Some((|gray: u8| {
+                                            bevy::color::Color::srgb(gray as f32 / 255.0, gray as f32 / 255.0, gray as f32 / 255.0)
+                                        })([
+                                            225u8,
+                                            20u8,
+                                        ][(next_state.selected == match *control {
+                                            Control::HomeTab => Destination::Home,
+                                            Control::RegistryTab => Destination::Registry,
+                                            Control::Launch => Destination::Home,
+                                        }) as usize])),
+                                        None,
+                                        None,
+                                    ),
+                                    Role::TabLabel(control) => (
+                                        Some((|tab: bevy::math::Rect| {
+                                            bevy::math::Rect::new(tab.min.x + 50.0, tab.min.y + 28.0, tab.max.x - 10.0, tab.min.y + 52.0)
+                                        })(match *control {
+                                            Control::HomeTab => next_state.layout.home_tab,
+                                            Control::RegistryTab => next_state.layout.registry_tab,
+                                            Control::Launch => next_state.layout.launch,
+                                        })),
+                                        true,
+                                        next_state.hud_visible,
+                                        None,
+                                        Some((|gray: u8| {
+                                            bevy::color::Color::srgb(gray as f32 / 255.0, gray as f32 / 255.0, gray as f32 / 255.0)
+                                        })([
+                                            225u8,
+                                            20u8,
+                                        ][(next_state.selected == match *control {
+                                            Control::HomeTab => Destination::Home,
+                                            Control::RegistryTab => Destination::Registry,
+                                            Control::Launch => Destination::Home,
+                                        }) as usize])),
+                                        Some((|tab: bevy::math::Rect| {
+                                            tab.size().x - 60.0
+                                        })(match *control {
+                                            Control::HomeTab => next_state.layout.home_tab,
+                                            Control::RegistryTab => next_state.layout.registry_tab,
+                                            Control::Launch => next_state.layout.launch,
+                                        })),
+                                    ),
+                                    Role::TabRing(control) => (
+                                        Some((|tab: bevy::math::Rect| {
+                                            bevy::math::Rect::new(tab.min.x - 3.0, tab.min.y - 3.0, tab.max.x + 3.0, tab.max.y + 3.0)
+                                        })(match *control {
+                                            Control::HomeTab => next_state.layout.home_tab,
+                                            Control::RegistryTab => next_state.layout.registry_tab,
+                                            Control::Launch => next_state.layout.launch,
+                                        })),
+                                        false,
+                                        next_state.hud_visible
+                                            && next_state.focus_keyboard
+                                            && next_state.focused == Some(*control),
+                                        Some((|gray: u8| {
+                                            bevy::color::Color::srgb(gray as f32 / 255.0, gray as f32 / 255.0, gray as f32 / 255.0)
+                                        })([
+                                            250u8,
+                                            15u8,
+                                        ][(next_state.selected == match *control {
+                                            Control::HomeTab => Destination::Home,
+                                            Control::RegistryTab => Destination::Registry,
+                                            Control::Launch => Destination::Home,
+                                        }) as usize])),
+                                        None,
+                                        None,
+                                    ),
+                                    Role::RegistryRoot => (
+                                        None,
+                                        false,
+                                        next_state.hud_visible
+                                            && next_state.selected == Destination::Registry,
+                                        None,
+                                        None,
+                                        None,
+                                    ),
+                                    Role::CardBackground => (
+                                        Some(next_state.layout.card),
+                                        false,
+                                        true,
+                                        Some(bevy::color::Color::srgb(18.0 / 255.0, 18.0 / 255.0, 18.0 / 255.0)),
+                                        None,
+                                        None,
+                                    ),
+                                    Role::CardIcon => (
+                                        Some(next_state.layout.card_icon),
+                                        false,
+                                        true,
+                                        Some(bevy::color::Color::WHITE),
+                                        None,
+                                        None,
+                                    ),
+                                    Role::CardTitle => (
+                                        Some(next_state.layout.card_title),
+                                        true,
+                                        true,
+                                        None,
+                                        Some(bevy::color::Color::srgb(240.0 / 255.0, 240.0 / 255.0, 240.0 / 255.0)),
+                                        Some(next_state.layout.card_title.size().x),
+                                    ),
+                                    Role::CardDescription => (
+                                        Some(next_state.layout.desc),
+                                        true,
+                                        !next_state.launched,
+                                        None,
+                                        Some(bevy::color::Color::srgb(170.0 / 255.0, 170.0 / 255.0, 170.0 / 255.0)),
+                                        Some(next_state.layout.desc.size().x),
+                                    ),
+                                    Role::CardSeparator => (
+                                        Some(next_state.layout.sep),
+                                        false,
+                                        !next_state.launched,
+                                        Some(bevy::color::Color::srgb(56.0 / 255.0, 56.0 / 255.0, 56.0 / 255.0)),
+                                        None,
+                                        None,
+                                    ),
+                                    Role::LaunchBody => (
+                                        Some(next_state.layout.launch),
+                                        false,
+                                        !next_state.launched,
+                                        Some((|gray: u8| {
+                                            bevy::color::Color::srgb(gray as f32 / 255.0, gray as f32 / 255.0, gray as f32 / 255.0)
+                                        })(match (
+                                            next_state.armed == Some(Control::Launch),
+                                            next_state.hovered == Some(Control::Launch),
+                                        ) {
+                                            (true, _) => 215,
+                                            (_, true) => 250,
+                                            (_, _) => 235,
+                                        })),
+                                        None,
+                                        None,
+                                    ),
+                                    Role::LaunchIcon => (
+                                        Some(bevy::math::Rect::new(next_state.layout.launch.min.x + 16.0, next_state.layout.launch.min.y + 16.0, next_state.layout.launch.min.x + 40.0, next_state.layout.launch.min.y + 40.0)),
+                                        false,
+                                        !next_state.launched,
+                                        Some(bevy::color::Color::srgb(20.0 / 255.0, 20.0 / 255.0, 20.0 / 255.0)),
+                                        None,
+                                        None,
+                                    ),
+                                    Role::LaunchLabel => (
+                                        Some(bevy::math::Rect::new(next_state.layout.launch.min.x + 52.0, next_state.layout.launch.min.y + 28.0, next_state.layout.launch.max.x - 12.0, next_state.layout.launch.min.y + 52.0)),
+                                        true,
+                                        !next_state.launched,
+                                        None,
+                                        Some(bevy::color::Color::srgb(20.0 / 255.0, 20.0 / 255.0, 20.0 / 255.0)),
+                                        Some(next_state.layout.launch.size().x - 64.0),
+                                    ),
+                                    Role::Badge => (
+                                        Some(next_state.layout.badge),
+                                        false,
+                                        true,
+                                        Some(bevy::color::Color::srgb(30.0 / 255.0, 30.0 / 255.0, 30.0 / 255.0)),
+                                        None,
+                                        None,
+                                    ),
+                                    Role::BadgeLabel => (
+                                        Some(bevy::math::Rect::new((next_state.layout.badge.min.x + next_state.layout.badge.max.x) / 2.0, (next_state.layout.badge.min.y + next_state.layout.badge.max.y) / 2.0, (next_state.layout.badge.min.x + next_state.layout.badge.max.x) / 2.0, (next_state.layout.badge.min.y + next_state.layout.badge.max.y) / 2.0)),
+                                        true,
+                                        true,
+                                        None,
+                                        Some(bevy::color::Color::srgb(160.0 / 255.0, 160.0 / 255.0, 160.0 / 255.0)),
+                                        Some(next_state.layout.badge.size().x - 16.0),
+                                    ),
+                                    Role::Well => (
+                                        Some(next_state.layout.well),
+                                        false,
+                                        next_state.launched,
+                                        Some(bevy::color::Color::srgb(10.0 / 255.0, 10.0 / 255.0, 10.0 / 255.0)),
+                                        None,
+                                        None,
+                                    ),
+                                    Role::Rocket => (
+                                        Some((|well: bevy::math::Rect| {
+                                            bevy::math::Rect::new(well.min.x + (well.size().x - 96.0) / 2.0, well.min.y + (well.size().y - 96.0) / 2.0, well.min.x + (well.size().x + 96.0) / 2.0, well.min.y + (well.size().y + 96.0) / 2.0)
+                                        })(next_state.layout.well)),
+                                        false,
+                                        next_state.launched,
+                                        Some(bevy::color::Color::WHITE),
+                                        None,
+                                        None,
+                                    ),
+                                },
+                            );
+                        }
+                    })
+                })(windows.iter().fold(
+                    (0.0, 0.0, 1.0, false, None),
+                    |_: (f32, f32, f32, bool, Option<bevy::math::Vec2>),
+                     window: &bevy::window::Window| {
+                        (
+                            window.width(),
+                            window.height(),
+                            window.scale_factor(),
                             window.focused,
                             window.cursor_position(),
-                            state,
-                            exit,
-                            entities,
-                        );
-                    }
-                }
+                        )
+                    },
+                ))
             },
         )
         .run();
