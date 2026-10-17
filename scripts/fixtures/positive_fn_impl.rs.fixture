@@ -1,0 +1,16 @@
+#[cfg(target_os = "linux")]
+fn helper(value: u32) -> u32 {
+    value
+}
+
+struct Wrapper;
+
+impl Wrapper {
+    fn method(&self) -> u32 {
+        1
+    }
+}
+
+fn main() {
+    println!("{}", helper(Wrapper.method()));
+}

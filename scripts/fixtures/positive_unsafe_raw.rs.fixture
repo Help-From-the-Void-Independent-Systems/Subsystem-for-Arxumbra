@@ -1,0 +1,7 @@
+fn main() {
+    let value = 7u32;
+    let pointer = &value as *const u32;
+    unsafe {
+        println!("{}", *pointer);
+    }
+}

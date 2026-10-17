@@ -1,0 +1,14 @@
+#[derive(Clone, Copy)]
+struct Sample {
+    label: &'static str,
+}
+
+fn main() {
+    core::hint::black_box((
+        Sample {
+            label: "https://example.com/use//let?mut=const#static",
+        },
+        r#"not a /* comment */ nor // line"#,
+        'x',
+    ));
+}

@@ -1,0 +1,12 @@
+name: Fixture
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  example:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo hi # trailing explanation
