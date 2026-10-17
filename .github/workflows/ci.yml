@@ -613,15 +613,32 @@ jobs:
           set +e
           cargo clippy --locked --all-targets -- -D warnings > /tmp/clippy.log 2>&1
           status=$?
+          # CARGO_TERM_COLOR is "always" for this workflow, so the raw log
+          # carries ANSI escapes; strip them before any text is matched or
+          # mirrored, otherwise the diagnostic patterns never fire.
+          esc=$(printf '\033')
+          sed -e "s/${esc}\[[0-9;]*m//g" /tmp/clippy.log > /tmp/clippy.plain.log
           {
             echo "## cargo clippy diagnostic (exit $status)"
             echo '```text'
-            tail -c 50000 /tmp/clippy.log
+            tail -c 50000 /tmp/clippy.plain.log
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           if [ "$status" != 0 ]; then
-            grep -E "^(error|warning)" -A 5 /tmp/clippy.log | grep -v "^--$" | head -60 | while IFS= read -r line; do
-              echo "::error title=clippy::${line}"
+            # A second, short-format pass yields one line per diagnostic with
+            # an exact source location, which annotations can carry verbatim.
+            CARGO_TERM_COLOR=never cargo clippy --locked --all-targets --message-format short -- -D warnings > /tmp/clippy-short.log 2>&1
+            grep -E '^src/[^ ]*\.rs:[0-9]+:[0-9]+: (error|warning)' /tmp/clippy-short.log | head -10 | while IFS= read -r line; do
+              location=${line%%: *}
+              file=${location%:*:*}
+              rest=${location#*.rs:}
+              echo "::error title=clippy,file=${file},line=${rest%:*}::${line}"
+            done
+            # Mirror the plain tail unconditionally so a compiler crash or a
+            # cargo-level failure is still readable from the annotations.
+            echo "::error title=clippy-log::bytes=$(wc -c < /tmp/clippy.plain.log) short_bytes=$(wc -c < /tmp/clippy-short.log)"
+            tail -n 40 /tmp/clippy.plain.log | while IFS= read -r line; do
+              echo "::error title=clippy-tail::${line}"
             done
           fi
           exit $status
