@@ -123,7 +123,9 @@ Status values: PASS (ran and passed), FAIL (ran and failed), NOT RUN (not execut
 
 ## 8. Approved exceptions and open decisions
 
-- no-mut: conflict documented in section 4; decision requested from the repository owner. Until approved, src/main.rs remains pre-edit.
+- no-mut: RESOLVED by owner decision on 2026-10-17. The approved scope is "mut on system-closure parameters only": the `mut` keyword appears exclusively as parameter-binding markers inside system closure signatures (Commands, ResMut, Query params); no mutable let-locals, no written &mut types, no exclusive &mut World parameters, no interior-mutability substitutes. scripts/verify_syntax.py enforces the precise shape: `mut` is accepted only in the parameter form `mut identifier: Type` and never after let/ref/&/*. The approved occurrences are exactly the system parameters of the four application systems.
+- launch: RESOLVED by owner decision on 2026-10-17: honest disabled Coming Soon action; the decorative launched-latch is removed; the action is excluded from hover, arming, and focus order; disabled styling is static.
+- escape threshold: RESOLVED by owner decision on 2026-10-17: keep 7.0 seconds, now stored in UiState.escape_hold_secs.
 - Pointer-injection-free smoke: keyboard scenarios substitute for pointer scenarios where tools allow; both labeled in section 7.
 - Workflow rerun policy: publishing to an existing tag replaces assets with the newly verified same-run packages (--clobber) because a tag maps to one commit; disclosed here as the safe-rerun behavior.
 

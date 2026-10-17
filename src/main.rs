@@ -1,5 +1,119 @@
 fn main() {
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    enum Destination {
+        Home,
+        ExtensionRegistry,
+    }
+
+    #[derive(Clone, Copy, PartialEq, Debug, Default)]
+    struct TabFrame {
+        center_x: f32,
+        center_y: f32,
+        half_width: f32,
+        half_height: f32,
+    }
+
+    #[derive(Clone, Copy, PartialEq, Debug, Default)]
+    struct CardFrame {
+        center_x: f32,
+        center_y: f32,
+        half_width: f32,
+        half_height: f32,
+    }
+
+    #[derive(Clone, Copy, PartialEq, Debug, Default)]
+    struct LayoutFrame {
+        width: f32,
+        height: f32,
+        scale_factor: f32,
+        margin: f32,
+        sidebar_width: f32,
+        tab_width: f32,
+        tab_icon_x: f32,
+        tab_label_x: f32,
+        tab_label_bounds: f32,
+        title_x: f32,
+        title_y: f32,
+        title_bounds: f32,
+        home_tab: TabFrame,
+        registry_tab: TabFrame,
+        content: CardFrame,
+        laboratory: CardFrame,
+        header_x: f32,
+        header_y: f32,
+        laboratory_title_x: f32,
+        laboratory_title_bounds: f32,
+        separator_y: f32,
+        caption_x: f32,
+        caption_y: f32,
+        caption_bounds: f32,
+        action: CardFrame,
+        action_icon_x: f32,
+        action_label_x: f32,
+        action_label_bounds: f32,
+    }
+
+    #[derive(Resource)]
+    struct UiState {
+        selected: Destination,
+        hud_visible: bool,
+        hover: Option<Destination>,
+        focus: Option<Destination>,
+        focus_from_keyboard: bool,
+        armed: Option<Destination>,
+        escape_hold_secs: f32,
+        exit_requested: bool,
+        cursor: Option<bevy::math::Vec2>,
+        layout: LayoutFrame,
+    }
+
+    #[derive(Resource)]
+    struct UiImages {
+        pill: bevy::asset::Handle<bevy::image::Image>,
+        panel: bevy::asset::Handle<bevy::image::Image>,
+        ring: bevy::asset::Handle<bevy::image::Image>,
+    }
+
+    #[derive(Resource)]
+    struct UiEntities {
+        sidebar_panel: bevy::ecs::entity::Entity,
+        divider: bevy::ecs::entity::Entity,
+        app_icon: bevy::ecs::entity::Entity,
+        title: bevy::ecs::entity::Entity,
+        home_pill: bevy::ecs::entity::Entity,
+        home_icon: bevy::ecs::entity::Entity,
+        home_label: bevy::ecs::entity::Entity,
+        registry_pill: bevy::ecs::entity::Entity,
+        registry_icon: bevy::ecs::entity::Entity,
+        registry_label: bevy::ecs::entity::Entity,
+        ring_home: bevy::ecs::entity::Entity,
+        ring_registry: bevy::ecs::entity::Entity,
+        content_panel: bevy::ecs::entity::Entity,
+        laboratory_card: bevy::ecs::entity::Entity,
+        laboratory_well: bevy::ecs::entity::Entity,
+        flask: bevy::ecs::entity::Entity,
+        laboratory_title: bevy::ecs::entity::Entity,
+        separator: bevy::ecs::entity::Entity,
+        caption: bevy::ecs::entity::Entity,
+        action_pill: bevy::ecs::entity::Entity,
+        action_icon: bevy::ecs::entity::Entity,
+        action_label: bevy::ecs::entity::Entity,
+    }
+
     bevy::app::App::new()
+        .insert_resource(UiState {
+            selected: Destination::Home,
+            hud_visible: true,
+            hover: None,
+            focus: None,
+            focus_from_keyboard: false,
+            armed: None,
+            escape_hold_secs: 0.0,
+            exit_requested: false,
+            cursor: None,
+            layout: LayoutFrame::default(),
+        })
+        .insert_resource(bevy::camera::ClearColor(bevy::color::Color::srgb(0.03, 0.03, 0.03)))
         .add_plugins((
             bevy::app::TaskPoolPlugin {
                 task_pool_options: bevy::app::TaskPoolOptions {
@@ -33,63 +147,25 @@ fn main() {
             bevy::transform::TransformPlugin,
             bevy::input::InputPlugin,
             bevy::a11y::AccessibilityPlugin,
+            bevy::log::LogPlugin::default(),
             bevy::window::WindowPlugin {
                 primary_window: Some(bevy::window::Window {
                     present_mode: bevy::window::PresentMode::AutoVsync,
                     mode: bevy::window::WindowMode::BorderlessFullscreen(
                         bevy::window::MonitorSelection::Primary,
                     ),
-                    position: bevy::window::WindowPosition::Automatic,
-                    resolution: bevy::window::WindowResolution::new(1920, 1080),
+                    resolution: bevy::window::WindowResolution::new(1920.0, 1080.0),
                     title: std::string::String::from("Arxumbra"),
-                    name: None,
-                    composite_alpha_mode: bevy::window::CompositeAlphaMode::Auto,
-                    resize_constraints: bevy::window::WindowResizeConstraints {
-                        min_width: 180.0,
-                        min_height: 120.0,
-                        max_width: f32::INFINITY,
-                        max_height: f32::INFINITY,
-                    },
                     resizable: false,
-                    enabled_buttons: bevy::window::EnabledButtons {
-                        minimize: true,
-                        maximize: true,
-                        close: true,
-                    },
                     decorations: false,
-                    transparent: false,
                     focused: true,
-                    window_level: bevy::window::WindowLevel::Normal,
-                    canvas: None,
-                    fit_canvas_to_parent: false,
-                    prevent_default_event_handling: true,
-                    internal: bevy::window::InternalWindowState::default(),
-                    ime_enabled: false,
-                    ime_position: bevy::math::Vec2::ZERO,
-                    window_theme: None,
                     visible: true,
                     skip_taskbar: true,
-                    clip_children: true,
-                    desired_maximum_frame_latency: None,
-                    recognize_pinch_gesture: false,
-                    recognize_rotation_gesture: false,
-                    recognize_doubletap_gesture: false,
-                    recognize_pan_gesture: None,
-                    movable_by_window_background: false,
-                    fullsize_content_view: false,
-                    has_shadow: true,
-                    titlebar_shown: true,
-                    titlebar_transparent: false,
-                    titlebar_show_title: true,
-                    titlebar_show_buttons: true,
                     borderless_game: true,
-                    prefers_home_indicator_hidden: false,
-                    prefers_status_bar_hidden: false,
-                    preferred_screen_edges_deferring_system_gestures:
-                        bevy::window::ScreenEdge::None,
+                    ..bevy::window::Window::default()
                 }),
                 primary_cursor_options: Some(bevy::window::CursorOptions {
-                    visible: false,
+                    visible: true,
                     grab_mode: bevy::window::CursorGrabMode::None,
                     hit_test: true,
                 }),
@@ -97,13 +173,8 @@ fn main() {
                 close_when_requested: true,
             },
             bevy::asset::AssetPlugin {
-                file_path: std::string::String::from("assets"),
-                processed_file_path: std::string::String::from("imported_assets/Default"),
-                watch_for_changes_override: None,
-                use_asset_processor_override: None,
-                mode: bevy::asset::AssetMode::Unprocessed,
                 meta_check: bevy::asset::AssetMetaCheck::Never,
-                unapproved_path_mode: bevy::asset::UnapprovedPathMode::Forbid,
+                ..bevy::asset::AssetPlugin::default()
             },
             bevy::winit::WinitPlugin {
                 run_on_any_thread: false,
@@ -113,7 +184,6 @@ fn main() {
             bevy::render::RenderPlugin {
                 render_creation: bevy::render::settings::RenderCreation::Automatic(
                     std::boxed::Box::new(bevy::render::settings::WgpuSettings {
-                        device_label: None,
                         backends: Some(
                             bevy::render::settings::Backends::VULKAN
                                 | bevy::render::settings::Backends::METAL
@@ -123,83 +193,20 @@ fn main() {
                         priority: bevy::render::settings::WgpuSettingsPriority::Functionality,
                         features:
                             bevy::render::settings::WgpuFeatures::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
-                        disabled_features: None,
                         limits: bevy::render::settings::WgpuLimits {
-                            max_texture_dimension_1d: 8192,
                             max_texture_dimension_2d: 16384,
-                            max_texture_dimension_3d: 2048,
-                            max_texture_array_layers: 256,
-                            max_bind_groups: 4,
-                            max_bind_groups_plus_vertex_buffers: 24,
-                            max_bindings_per_bind_group: 1000,
-                            max_dynamic_uniform_buffers_per_pipeline_layout: 8,
-                            max_dynamic_storage_buffers_per_pipeline_layout: 4,
-                            max_sampled_textures_per_shader_stage: 16,
-                            max_samplers_per_shader_stage: 16,
-                            max_storage_buffers_per_shader_stage: 8,
-                            max_storage_textures_per_shader_stage: 4,
-                            max_uniform_buffers_per_shader_stage: 12,
-                            max_binding_array_elements_per_shader_stage: 0,
-                            max_binding_array_acceleration_structure_elements_per_shader_stage: 0,
-                            max_binding_array_sampler_elements_per_shader_stage: 0,
-                            max_uniform_buffer_binding_size: 65536,
-                            max_storage_buffer_binding_size: 134217728,
-                            max_vertex_buffers: 8,
-                            max_buffer_size: 268435456,
-                            max_vertex_attributes: 16,
-                            max_vertex_buffer_array_stride: 2048,
-                            max_inter_stage_shader_variables: 16,
-                            min_uniform_buffer_offset_alignment: 256,
-                            min_storage_buffer_offset_alignment: 256,
-                            max_color_attachments: 8,
-                            max_color_attachment_bytes_per_sample: 32,
-                            max_compute_workgroup_storage_size: 16384,
-                            max_compute_invocations_per_workgroup: 256,
-                            max_compute_workgroup_size_x: 256,
-                            max_compute_workgroup_size_y: 256,
-                            max_compute_workgroup_size_z: 64,
-                            max_compute_workgroups_per_dimension: 65535,
-                            max_immediate_size: 0,
-                            max_non_sampler_bindings: 1000000,
-                            max_task_workgroup_total_count: 0,
-                            max_task_workgroups_per_dimension: 0,
-                            max_mesh_workgroup_total_count: 0,
-                            max_mesh_workgroups_per_dimension: 0,
-                            max_task_invocations_per_workgroup: 0,
-                            max_task_invocations_per_dimension: 0,
-                            max_mesh_invocations_per_workgroup: 0,
-                            max_mesh_invocations_per_dimension: 0,
-                            max_task_payload_size: 0,
-                            max_mesh_output_vertices: 0,
-                            max_mesh_output_primitives: 0,
-                            max_mesh_output_layers: 0,
-                            max_mesh_multiview_view_count: 0,
-                            max_blas_primitive_count: 0,
-                            max_blas_geometry_count: 0,
-                            max_tlas_instance_count: 0,
-                            max_acceleration_structures_per_shader_stage: 0,
-                            max_buffers_and_acceleration_structures_per_shader_stage: 28,
-                            max_multiview_view_count: 0,
-                            max_ray_dispatch_count: 0,
-                            max_ray_recursion_depth: 0,
+                            ..bevy::render::settings::WgpuLimits::default()
                         },
-                        constrained_limits: None,
                         dx12_shader_compiler: bevy::render::settings::Dx12Compiler::Fxc,
-                        gles3_minor_version:
-                            bevy::render::settings::Gles3MinorVersion::Automatic,
                         instance_flags:
                             bevy::render::settings::InstanceFlags::VALIDATION_INDIRECT_CALL,
                         memory_hints: bevy::render::settings::MemoryHints::Performance,
-                        instance_memory_budget_thresholds: wgpu::MemoryBudgetThresholds {
-                            for_resource_creation: None,
-                            for_device_loss: None,
-                        },
-                        force_fallback_adapter: false,
-                        adapter_name: None,
+                        instance_memory_budget_thresholds: std::default::Default::default(),
+                        ..bevy::render::settings::WgpuSettings::default()
                     }),
                 ),
                 synchronous_pipeline_compilation: false,
-                debug_flags: bevy::render::RenderDebugFlags::empty(),
+                debug_flags: bevy::render::RenderDebugFlags::default(),
             },
             bevy::image::ImagePlugin {
                 default_sampler: bevy::image::ImageSamplerDescriptor::linear(),
@@ -214,1532 +221,2116 @@ fn main() {
         ))
         .add_systems(
             bevy::app::Startup,
-            |world: &mut bevy::ecs::world::World| {
-                world.insert_resource(bevy::camera::ClearColor(bevy::color::Color::BLACK));
-                world.spawn((bevy::camera::Camera2d, bevy::render::view::Msaa::Off));
-                (|width: f32, height: f32, world: &mut bevy::ecs::world::World| {
-                    (|glow: bevy::asset::Handle<bevy::image::Image>,
-                      core: bevy::asset::Handle<bevy::image::Image>,
-                      separator: bevy::asset::Handle<bevy::image::Image>,
-                      pill: bevy::asset::Handle<bevy::image::Image>,
-                      house: bevy::asset::Handle<bevy::image::Image>,
-                      registry: bevy::asset::Handle<bevy::image::Image>,
-                      app_icon: bevy::asset::Handle<bevy::image::Image>,
-                      menu_card: bevy::asset::Handle<bevy::image::Image>,
-                      lab: bevy::asset::Handle<bevy::image::Image>,
-                      well: bevy::asset::Handle<bevy::image::Image>,
-                      flask: bevy::asset::Handle<bevy::image::Image>,
-                      rocket: bevy::asset::Handle<bevy::image::Image>,
-                      rocket_pill: bevy::asset::Handle<bevy::image::Image>,
-                      world: &mut bevy::ecs::world::World| {
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: glow,
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(48.0, height)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 6.0 - 24.0,
-                                    0.0,
-                                    3.0,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: core,
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(4.0, height)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 6.0 - 2.0,
-                                    0.0,
-                                    4.0,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: separator,
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(width / 3.0 - 48.0, 3.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 3.0,
-                                    height / 2.0 - 103.5,
-                                    6.0,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: pill.clone(),
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(width / 3.0 - 40.0, 64.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
-                                    bevy::sprite::TextureSlicer {
-                                        border: bevy::sprite::BorderRect {
-                                            min_inset: bevy::math::Vec2::new(32.0, 0.0),
-                                            max_inset: bevy::math::Vec2::new(32.0, 0.0),
-                                        },
-                                        center_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
-                                        sides_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
-                                        max_corner_scale: 1.0,
+            bevy::ecs::schedule::IntoScheduleConfigs::chain((
+                |mut commands: Commands, server: Res<AssetServer>| {
+                    commands.spawn((bevy::camera::Camera2d, bevy::render::view::Msaa::Off));
+                    commands.insert_resource(UiImages {
+                        pill: server.add(bevy::image::Image {
+                            data: Some(
+                                (0..4096u32)
+                                    .flat_map(|index: u32| {
+                                        (|x: f32, y: f32| {
+                                            (|offset_x: f32, offset_y: f32| {
+                                                (|distance: f32| {
+                                                    [
+                                                        255u8,
+                                                        255,
+                                                        255,
+                                                        (f32::clamp(
+                                                            0.5 - distance,
+                                                            0.0,
+                                                            1.0,
+                                                        ) * 255.0)
+                                                            as u8,
+                                                    ]
+                                                })(f32::hypot(
+                                                    f32::max(offset_x, 0.0),
+                                                    f32::max(offset_y, 0.0),
+                                                ) - 16.0)
+                                            })(
+                                                f32::abs(x - 32.0) - 16.0,
+                                                f32::abs(y - 32.0) - 16.0,
+                                            )
+                                        })(
+                                            (index % 64) as f32 + 0.5,
+                                            (index / 64) as f32 + 0.5,
+                                        )
+                                    })
+                                    .collect::<std::vec::Vec<u8>>(),
+                            ),
+                            data_order: bevy::render::render_resource::TextureDataOrder::LayerMajor,
+                            texture_descriptor:
+                                bevy::render::render_resource::TextureDescriptor {
+                                    label: Some("arxumbra-pill"),
+                                    size: bevy::render::render_resource::Extent3d {
+                                        width: 64,
+                                        height: 64,
+                                        depth_or_array_layers: 1,
                                     },
-                                ),
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 3.0,
-                                    height / 2.0 - 152.0,
-                                    5.0,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: house,
-                                texture_atlas: None,
-                                color: bevy::color::Color::BLACK,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(26.0, 22.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 2.0 + 56.0,
-                                    height / 2.0 - 152.0,
-                                    5.5,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Text2d(std::string::String::from("Home")),
-                            bevy::text::TextFont {
-                                font: bevy::text::FontSource::Handle(bevy::asset::Handle::Uuid(
-                                    bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
-                                    core::marker::PhantomData,
+                                    mip_level_count: 1,
+                                    sample_count: 1,
+                                    dimension: bevy::render::render_resource::TextureDimension::D2,
+                                    format:
+                                        bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+                                    usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
+                                        | bevy::render::render_resource::TextureUsages::COPY_DST,
+                                    view_formats: &[],
+                                },
+                            sampler: bevy::image::ImageSampler::Default,
+                            texture_view_descriptor: None,
+                            asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
+                                | bevy::asset::RenderAssetUsages::RENDER_WORLD,
+                            copy_on_resize: false,
+                        }),
+                        panel: server.add(bevy::image::Image {
+                            data: Some(
+                                (0..9216u32)
+                                    .flat_map(|index: u32| {
+                                        (|x: f32, y: f32| {
+                                            (|offset_x: f32, offset_y: f32| {
+                                                (|distance: f32| {
+                                                    [
+                                                        255u8,
+                                                        255,
+                                                        255,
+                                                        (f32::clamp(
+                                                            0.5 - distance,
+                                                            0.0,
+                                                            1.0,
+                                                        ) * 255.0)
+                                                            as u8,
+                                                    ]
+                                                })(f32::hypot(
+                                                    f32::max(offset_x, 0.0),
+                                                    f32::max(offset_y, 0.0),
+                                                ) - 24.0)
+                                            })(
+                                                f32::abs(x - 48.0) - 24.0,
+                                                f32::abs(y - 48.0) - 24.0,
+                                            )
+                                        })(
+                                            (index % 96) as f32 + 0.5,
+                                            (index / 96) as f32 + 0.5,
+                                        )
+                                    })
+                                    .collect::<std::vec::Vec<u8>>(),
+                            ),
+                            data_order: bevy::render::render_resource::TextureDataOrder::LayerMajor,
+                            texture_descriptor:
+                                bevy::render::render_resource::TextureDescriptor {
+                                    label: Some("arxumbra-panel"),
+                                    size: bevy::render::render_resource::Extent3d {
+                                        width: 96,
+                                        height: 96,
+                                        depth_or_array_layers: 1,
+                                    },
+                                    mip_level_count: 1,
+                                    sample_count: 1,
+                                    dimension: bevy::render::render_resource::TextureDimension::D2,
+                                    format:
+                                        bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+                                    usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
+                                        | bevy::render::render_resource::TextureUsages::COPY_DST,
+                                    view_formats: &[],
+                                },
+                            sampler: bevy::image::ImageSampler::Default,
+                            texture_view_descriptor: None,
+                            asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
+                                | bevy::asset::RenderAssetUsages::RENDER_WORLD,
+                            copy_on_resize: false,
+                        }),
+                        ring: server.add(bevy::image::Image {
+                            data: Some(
+                                (0..4096u32)
+                                    .flat_map(|index: u32| {
+                                        (|x: f32, y: f32| {
+                                            (|offset_x: f32, offset_y: f32| {
+                                                (|distance: f32| {
+                                                    [
+                                                        255u8,
+                                                        255,
+                                                        255,
+                                                        (f32::clamp(
+                                                            2.0 - f32::abs(distance),
+                                                            0.0,
+                                                            1.0,
+                                                        ) * 255.0)
+                                                            as u8,
+                                                    ]
+                                                })(f32::hypot(
+                                                    f32::max(offset_x, 0.0),
+                                                    f32::max(offset_y, 0.0),
+                                                ) - 16.0)
+                                            })(
+                                                f32::abs(x - 32.0) - 16.0,
+                                                f32::abs(y - 32.0) - 16.0,
+                                            )
+                                        })(
+                                            (index % 64) as f32 + 0.5,
+                                            (index / 64) as f32 + 0.5,
+                                        )
+                                    })
+                                    .collect::<std::vec::Vec<u8>>(),
+                            ),
+                            data_order: bevy::render::render_resource::TextureDataOrder::LayerMajor,
+                            texture_descriptor:
+                                bevy::render::render_resource::TextureDescriptor {
+                                    label: Some("arxumbra-ring"),
+                                    size: bevy::render::render_resource::Extent3d {
+                                        width: 64,
+                                        height: 64,
+                                        depth_or_array_layers: 1,
+                                    },
+                                    mip_level_count: 1,
+                                    sample_count: 1,
+                                    dimension: bevy::render::render_resource::TextureDimension::D2,
+                                    format:
+                                        bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+                                    usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
+                                        | bevy::render::render_resource::TextureUsages::COPY_DST,
+                                    view_formats: &[],
+                                },
+                            sampler: bevy::image::ImageSampler::Default,
+                            texture_view_descriptor: None,
+                            asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
+                                | bevy::asset::RenderAssetUsages::RENDER_WORLD,
+                            copy_on_resize: false,
+                        }),
+                    });
+                },
+                bevy::ecs::schedule::ApplyDeferred,
+                |mut commands: Commands, images: Res<UiImages>, server: Res<AssetServer>| {
+                    commands.insert_resource(UiEntities {
+                        sidebar_panel: commands
+                            .spawn((
+                                bevy::sprite::Sprite {
+                                    image: images.panel.clone(),
+                                    texture_atlas: None,
+                                    color: bevy::color::Color::srgb(0.07, 0.07, 0.07),
+                                    flip_x: false,
+                                    flip_y: false,
+                                    custom_size: Some(bevy::math::Vec2::ZERO),
+                                    rect: None,
+                                    image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                        bevy::sprite::TextureSlicer {
+                                            border: bevy::sprite::BorderRect {
+                                                min_inset: bevy::math::Vec2::new(34.0, 34.0),
+                                                max_inset: bevy::math::Vec2::new(34.0, 34.0),
+                                            },
+                                            center_scale_mode:
+                                                bevy::sprite::SliceScaleMode::Stretch,
+                                            sides_scale_mode:
+                                                bevy::sprite::SliceScaleMode::Stretch,
+                                            max_corner_scale: 1.0,
+                                        },
+                                    ),
+                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                                },
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        divider: commands
+                            .spawn((
+                                bevy::sprite::Sprite {
+                                    image: bevy::asset::Handle::Uuid(
+                                        bevy::asset::AssetId::<bevy::image::Image>::DEFAULT_UUID,
+                                        core::marker::PhantomData,
+                                    ),
+                                    texture_atlas: None,
+                                    color: bevy::color::Color::srgb(0.16, 0.16, 0.16),
+                                    flip_x: false,
+                                    flip_y: false,
+                                    custom_size: Some(bevy::math::Vec2::ZERO),
+                                    rect: None,
+                                    image_mode: bevy::sprite::SpriteImageMode::Auto,
+                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Opaque,
+                                },
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        app_icon: commands
+                            .spawn((
+                                bevy::sprite::Sprite {
+                                    image: server
+                                        .load::<bevy::image::Image>("app-icon.png"),
+                                    texture_atlas: None,
+                                    color: bevy::color::Color::srgb(0.92, 0.92, 0.92),
+                                    flip_x: false,
+                                    flip_y: false,
+                                    custom_size: Some(bevy::math::Vec2::new(28.0, 28.0)),
+                                    rect: None,
+                                    image_mode: bevy::sprite::SpriteImageMode::Auto,
+                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                                },
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        title: commands
+                            .spawn((
+                                bevy::sprite::Text2d(std::string::String::from(
+                                    [
+                                        "Linux-Subsystem-for-Arxumbra",
+                                        "macOS-Subsystem-for-Arxumbra",
+                                        "Windows-Subsystem-for-Arxumbra",
+                                    ][(cfg!(target_os = "windows") as usize) * 2
+                                        + (cfg!(target_os = "macos") as usize)],
                                 )),
-                                font_size: bevy::text::FontSize::Px(24.0),
-                                weight: bevy::text::FontWeight::NORMAL,
-                                width: bevy::text::FontWidth::NORMAL,
-                                style: bevy::text::FontStyle::Normal,
-                                font_smoothing: bevy::text::FontSmoothing::AntiAliased,
-                                font_features: bevy::text::FontFeatures::builder().build(),
-                                font_variations: bevy::text::FontVariations::builder().build(),
-                            },
-                            bevy::text::TextColor(bevy::color::Color::BLACK),
-                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 2.0 + 88.0,
-                                    height / 2.0 - 152.0,
-                                    6.0,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: pill.clone(),
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(width / 3.0 - 40.0, 64.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
-                                    bevy::sprite::TextureSlicer {
-                                        border: bevy::sprite::BorderRect {
-                                            min_inset: bevy::math::Vec2::new(32.0, 0.0),
-                                            max_inset: bevy::math::Vec2::new(32.0, 0.0),
+                                bevy::text::TextFont {
+                                    font: bevy::text::FontSource::Handle(
+                                        bevy::asset::Handle::Uuid(
+                                            bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
+                                            core::marker::PhantomData,
+                                        ),
+                                    ),
+                                    font_size: bevy::text::FontSize::Px(24.0),
+                                    weight: bevy::text::FontWeight::NORMAL,
+                                    width: bevy::text::FontWidth::NORMAL,
+                                    style: bevy::text::FontStyle::Normal,
+                                    font_smoothing: bevy::text::FontSmoothing::AntiAliased,
+                                    font_features: bevy::text::FontFeatures::builder().build(),
+                                    font_variations: bevy::text::FontVariations::builder().build(),
+                                },
+                                bevy::text::TextColor(bevy::color::Color::srgb(0.92, 0.92, 0.92)),
+                                bevy::text::TextBounds {
+                                    width: None,
+                                    height: None,
+                                },
+                                bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        home_pill: commands
+                            .spawn((
+                                bevy::sprite::Sprite {
+                                    image: images.pill.clone(),
+                                    texture_atlas: None,
+                                    color: bevy::color::Color::srgb(0.12, 0.12, 0.12),
+                                    flip_x: false,
+                                    flip_y: false,
+                                    custom_size: Some(bevy::math::Vec2::ZERO),
+                                    rect: None,
+                                    image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                        bevy::sprite::TextureSlicer {
+                                            border: bevy::sprite::BorderRect {
+                                                min_inset: bevy::math::Vec2::new(32.0, 32.0),
+                                                max_inset: bevy::math::Vec2::new(32.0, 32.0),
+                                            },
+                                            center_scale_mode:
+                                                bevy::sprite::SliceScaleMode::Stretch,
+                                            sides_scale_mode:
+                                                bevy::sprite::SliceScaleMode::Stretch,
+                                            max_corner_scale: 1.0,
                                         },
-                                        center_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
-                                        sides_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
-                                        max_corner_scale: 1.0,
-                                    },
-                                ),
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 3.0,
-                                    height / 2.0 - 227.0,
-                                    5.0,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: registry,
-                                texture_atlas: None,
-                                color: bevy::color::Color::BLACK,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(26.0, 22.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 2.0 + 56.0,
-                                    height / 2.0 - 227.0,
-                                    5.5,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: app_icon,
-                                texture_atlas: None,
-                                color: bevy::color::Color::BLACK,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(26.0, 26.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 2.0 + 52.0,
-                                    height / 2.0 - 52.0,
-                                    2.5,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Text2d(std::string::String::from("Extension Registry")),
-                            bevy::text::TextFont {
-                                font: bevy::text::FontSource::Handle(bevy::asset::Handle::Uuid(
-                                    bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
-                                    core::marker::PhantomData,
+                                    ),
+                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                                },
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        home_icon: commands
+                            .spawn((
+                                bevy::sprite::Sprite {
+                                    image: server
+                                        .load::<bevy::image::Image>("icons/house.png"),
+                                    texture_atlas: None,
+                                    color: bevy::color::Color::srgb(0.88, 0.88, 0.88),
+                                    flip_x: false,
+                                    flip_y: false,
+                                    custom_size: Some(bevy::math::Vec2::new(26.0, 22.0)),
+                                    rect: None,
+                                    image_mode: bevy::sprite::SpriteImageMode::Auto,
+                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                                },
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        home_label: commands
+                            .spawn((
+                                bevy::sprite::Text2d(std::string::String::from("Home")),
+                                bevy::text::TextFont {
+                                    font: bevy::text::FontSource::Handle(
+                                        bevy::asset::Handle::Uuid(
+                                            bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
+                                            core::marker::PhantomData,
+                                        ),
+                                    ),
+                                    font_size: bevy::text::FontSize::Px(24.0),
+                                    weight: bevy::text::FontWeight::NORMAL,
+                                    width: bevy::text::FontWidth::NORMAL,
+                                    style: bevy::text::FontStyle::Normal,
+                                    font_smoothing: bevy::text::FontSmoothing::AntiAliased,
+                                    font_features: bevy::text::FontFeatures::builder().build(),
+                                    font_variations: bevy::text::FontVariations::builder().build(),
+                                },
+                                bevy::text::TextColor(bevy::color::Color::srgb(0.88, 0.88, 0.88)),
+                                bevy::text::TextBounds {
+                                    width: None,
+                                    height: None,
+                                },
+                                bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        registry_pill: commands
+                            .spawn((
+                                bevy::sprite::Sprite {
+                                    image: images.pill.clone(),
+                                    texture_atlas: None,
+                                    color: bevy::color::Color::srgb(0.12, 0.12, 0.12),
+                                    flip_x: false,
+                                    flip_y: false,
+                                    custom_size: Some(bevy::math::Vec2::ZERO),
+                                    rect: None,
+                                    image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                        bevy::sprite::TextureSlicer {
+                                            border: bevy::sprite::BorderRect {
+                                                min_inset: bevy::math::Vec2::new(32.0, 32.0),
+                                                max_inset: bevy::math::Vec2::new(32.0, 32.0),
+                                            },
+                                            center_scale_mode:
+                                                bevy::sprite::SliceScaleMode::Stretch,
+                                            sides_scale_mode:
+                                                bevy::sprite::SliceScaleMode::Stretch,
+                                            max_corner_scale: 1.0,
+                                        },
+                                    ),
+                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                                },
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        registry_icon: commands
+                            .spawn((
+                                bevy::sprite::Sprite {
+                                    image: server
+                                        .load::<bevy::image::Image>("icons/registry.png"),
+                                    texture_atlas: None,
+                                    color: bevy::color::Color::srgb(0.88, 0.88, 0.88),
+                                    flip_x: false,
+                                    flip_y: false,
+                                    custom_size: Some(bevy::math::Vec2::new(26.0, 22.0)),
+                                    rect: None,
+                                    image_mode: bevy::sprite::SpriteImageMode::Auto,
+                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                                },
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        registry_label: commands
+                            .spawn((
+                                bevy::sprite::Text2d(std::string::String::from(
+                                    "Extension Registry",
                                 )),
-                                font_size: bevy::text::FontSize::Px(24.0),
-                                weight: bevy::text::FontWeight::NORMAL,
-                                width: bevy::text::FontWidth::NORMAL,
-                                style: bevy::text::FontStyle::Normal,
-                                font_smoothing: bevy::text::FontSmoothing::AntiAliased,
-                                font_features: bevy::text::FontFeatures::builder().build(),
-                                font_variations: bevy::text::FontVariations::builder().build(),
-                            },
-                            bevy::text::TextColor(bevy::color::Color::BLACK),
-                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 2.0 + 88.0,
-                                    height / 2.0 - 227.0,
-                                    6.0,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: well.clone(),
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(72.0, 72.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    84.0 - width / 6.0,
-                                    height / 2.0 - 84.0,
-                                    2.9,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: menu_card,
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(
-                                    width - width / 3.0 - 48.0,
-                                    height - 48.0,
-                                )),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
-                                    bevy::sprite::TextureSlicer {
-                                        border: bevy::sprite::BorderRect {
-                                            min_inset: bevy::math::Vec2::new(40.0, 28.0),
-                                            max_inset: bevy::math::Vec2::new(40.0, 28.0),
+                                bevy::text::TextFont {
+                                    font: bevy::text::FontSource::Handle(
+                                        bevy::asset::Handle::Uuid(
+                                            bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
+                                            core::marker::PhantomData,
+                                        ),
+                                    ),
+                                    font_size: bevy::text::FontSize::Px(24.0),
+                                    weight: bevy::text::FontWeight::NORMAL,
+                                    width: bevy::text::FontWidth::NORMAL,
+                                    style: bevy::text::FontStyle::Normal,
+                                    font_smoothing: bevy::text::FontSmoothing::AntiAliased,
+                                    font_features: bevy::text::FontFeatures::builder().build(),
+                                    font_variations: bevy::text::FontVariations::builder().build(),
+                                },
+                                bevy::text::TextColor(bevy::color::Color::srgb(0.88, 0.88, 0.88)),
+                                bevy::text::TextBounds {
+                                    width: None,
+                                    height: None,
+                                },
+                                bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        ring_home: commands
+                            .spawn((
+                                bevy::sprite::Sprite {
+                                    image: images.ring.clone(),
+                                    texture_atlas: None,
+                                    color: bevy::color::Color::srgb(1.0, 1.0, 1.0),
+                                    flip_x: false,
+                                    flip_y: false,
+                                    custom_size: Some(bevy::math::Vec2::ZERO),
+                                    rect: None,
+                                    image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                        bevy::sprite::TextureSlicer {
+                                            border: bevy::sprite::BorderRect {
+                                                min_inset: bevy::math::Vec2::new(26.0, 26.0),
+                                                max_inset: bevy::math::Vec2::new(26.0, 26.0),
+                                            },
+                                            center_scale_mode:
+                                                bevy::sprite::SliceScaleMode::Stretch,
+                                            sides_scale_mode:
+                                                bevy::sprite::SliceScaleMode::Stretch,
+                                            max_corner_scale: 1.0,
                                         },
-                                        center_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
-                                        sides_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
-                                        max_corner_scale: 1.0,
-                                    },
-                                ),
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::ecs::name::Name::new("menu"),
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    width / 6.0,
-                                    0.0,
-                                    2.0,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: lab,
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(640.0, 288.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
-                                    bevy::sprite::TextureSlicer {
-                                        border: bevy::sprite::BorderRect {
-                                            min_inset: bevy::math::Vec2::new(40.0, 20.0),
-                                            max_inset: bevy::math::Vec2::new(40.0, 20.0),
+                                    ),
+                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                                },
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        ring_registry: commands
+                            .spawn((
+                                bevy::sprite::Sprite {
+                                    image: images.ring.clone(),
+                                    texture_atlas: None,
+                                    color: bevy::color::Color::srgb(1.0, 1.0, 1.0),
+                                    flip_x: false,
+                                    flip_y: false,
+                                    custom_size: Some(bevy::math::Vec2::ZERO),
+                                    rect: None,
+                                    image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                        bevy::sprite::TextureSlicer {
+                                            border: bevy::sprite::BorderRect {
+                                                min_inset: bevy::math::Vec2::new(26.0, 26.0),
+                                                max_inset: bevy::math::Vec2::new(26.0, 26.0),
+                                            },
+                                            center_scale_mode:
+                                                bevy::sprite::SliceScaleMode::Stretch,
+                                            sides_scale_mode:
+                                                bevy::sprite::SliceScaleMode::Stretch,
+                                            max_corner_scale: 1.0,
                                         },
-                                        center_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
-                                        sides_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
-                                        max_corner_scale: 1.0,
-                                    },
-                                ),
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::ecs::name::Name::new("menu"),
-bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-    368.0 - width / 6.0,
-    252.0,
-    2.5,
-),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: well,
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(72.0, 72.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::ecs::name::Name::new("menu"),
-bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-    111.5 - width / 6.0,
-    332.0,
-    2.6,
-),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: flask,
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(48.0, 40.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::ecs::name::Name::new("menu"),
-bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-    111.5 - width / 6.0,
-    332.5,
-    2.7,
-),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: bevy::asset::Handle::Uuid(
-                                    bevy::asset::AssetId::<bevy::image::Image>::DEFAULT_UUID,
-                                    core::marker::PhantomData,
-                                ),
-                                texture_atlas: None,
-                                color: bevy::color::Color::srgb(0.36, 0.36, 0.36),
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(2.0, 72.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Opaque,
-                            },
-                            bevy::ecs::name::Name::new("menu"),
-bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-    172.5 - width / 6.0,
-    332.5,
-    2.7,
-),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Text2d(std::string::String::from("Laboratory")),
-                            bevy::text::TextFont {
-                                font: bevy::text::FontSource::Handle(bevy::asset::Handle::Uuid(
-                                    bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
-                                    core::marker::PhantomData,
-                                )),
-                                font_size: bevy::text::FontSize::Px(30.0),
-                                weight: bevy::text::FontWeight::NORMAL,
-                                width: bevy::text::FontWidth::NORMAL,
-                                style: bevy::text::FontStyle::Normal,
-                                font_smoothing: bevy::text::FontSmoothing::AntiAliased,
-                                font_features: bevy::text::FontFeatures::builder().build(),
-                                font_variations: bevy::text::FontVariations::builder().build(),
-                            },
-                            bevy::text::TextColor(bevy::color::Color::WHITE),
-                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
-                            bevy::ecs::name::Name::new("menu"),
-bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-    196.0 - width / 6.0,
-    332.0,
-    2.8,
-),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: bevy::asset::Handle::Uuid(
-                                    bevy::asset::AssetId::<bevy::image::Image>::DEFAULT_UUID,
-                                    core::marker::PhantomData,
-                                ),
-                                texture_atlas: None,
-                                color: bevy::color::Color::srgb(0.36, 0.36, 0.36),
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(584.0, 2.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Opaque,
-                            },
-                            bevy::ecs::name::Name::new("menu"),
-bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-    368.0 - width / 6.0,
-    271.0,
-    2.7,
-),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Text2d(std::string::String::from("Coming Soon")),
-                            bevy::text::TextFont {
-                                font: bevy::text::FontSource::Handle(bevy::asset::Handle::Uuid(
-                                    bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
-                                    core::marker::PhantomData,
-                                )),
-                                font_size: bevy::text::FontSize::Px(20.0),
-                                weight: bevy::text::FontWeight::NORMAL,
-                                width: bevy::text::FontWidth::NORMAL,
-                                style: bevy::text::FontStyle::Normal,
-                                font_smoothing: bevy::text::FontSmoothing::AntiAliased,
-                                font_features: bevy::text::FontFeatures::builder().build(),
-                                font_variations: bevy::text::FontVariations::builder().build(),
-                            },
-                            bevy::text::TextColor(bevy::color::Color::srgb(0.58, 0.58, 0.58)),
-                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
-                            bevy::ecs::name::Name::new("menu"),
-bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-    76.0 - width / 6.0,
-    240.0,
-    2.7,
-),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: bevy::asset::Handle::Uuid(
-                                    bevy::asset::AssetId::<bevy::image::Image>::DEFAULT_UUID,
-                                    core::marker::PhantomData,
-                                ),
-                                texture_atlas: None,
-                                color: bevy::color::Color::srgb(0.36, 0.36, 0.36),
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(584.0, 2.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Opaque,
-                            },
-                            bevy::ecs::name::Name::new("menu"),
-bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-    368.0 - width / 6.0,
-    207.0,
-    2.7,
-),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: pill,
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(584.0, 64.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
-                                    bevy::sprite::TextureSlicer {
-                                        border: bevy::sprite::BorderRect {
-                                            min_inset: bevy::math::Vec2::new(32.0, 0.0),
-                                            max_inset: bevy::math::Vec2::new(32.0, 0.0),
+                                    ),
+                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                                },
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        content_panel: commands
+                            .spawn((
+                                bevy::sprite::Sprite {
+                                    image: images.panel.clone(),
+                                    texture_atlas: None,
+                                    color: bevy::color::Color::srgb(0.09, 0.09, 0.09),
+                                    flip_x: false,
+                                    flip_y: false,
+                                    custom_size: Some(bevy::math::Vec2::ZERO),
+                                    rect: None,
+                                    image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                        bevy::sprite::TextureSlicer {
+                                            border: bevy::sprite::BorderRect {
+                                                min_inset: bevy::math::Vec2::new(34.0, 34.0),
+                                                max_inset: bevy::math::Vec2::new(34.0, 34.0),
+                                            },
+                                            center_scale_mode:
+                                                bevy::sprite::SliceScaleMode::Stretch,
+                                            sides_scale_mode:
+                                                bevy::sprite::SliceScaleMode::Stretch,
+                                            max_corner_scale: 1.0,
                                         },
-                                        center_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
-                                        sides_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
-                                        max_corner_scale: 1.0,
-                                    },
-                                ),
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::ecs::name::Name::new("menu"),
-bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-    368.0 - width / 6.0,
-    164.0,
-    2.7,
-),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-
-                            bevy::sprite::Sprite {
-                                image: rocket_pill.clone(),
-                                texture_atlas: None,
-                                color: bevy::color::Color::BLACK,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(26.0, 26.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::ecs::name::Name::new("menu-ink"),
-bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-    323.0 - width / 6.0,
-    164.0,
-    2.8,
-),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Text2d(std::string::String::from("Launch")),
-                            bevy::text::TextFont {
-                                font: bevy::text::FontSource::Handle(bevy::asset::Handle::Uuid(
-                                    bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
-                                    core::marker::PhantomData,
-                                )),
-                                font_size: bevy::text::FontSize::Px(24.0),
-                                weight: bevy::text::FontWeight::NORMAL,
-                                width: bevy::text::FontWidth::NORMAL,
-                                style: bevy::text::FontStyle::Normal,
-                                font_smoothing: bevy::text::FontSmoothing::AntiAliased,
-                                font_features: bevy::text::FontFeatures::builder().build(),
-                                font_variations: bevy::text::FontVariations::builder().build(),
-                            },
-                            bevy::text::TextColor(bevy::color::Color::BLACK),
-                            bevy::sprite::Anchor(bevy::math::Vec2::new(0.0, 0.0)),
-                            bevy::ecs::name::Name::new("menu"),
-bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-    386.0 - width / 6.0,
-    164.0,
-    2.8,
-),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: rocket,
-                                texture_atlas: None,
-                                color: bevy::color::Color::srgba(1.0, 1.0, 1.0, 0.0),
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(44.0, 44.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    84.0 - width / 6.0,
-                                    height / 2.0 - 84.0,
-                                    2.95,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                            bevy::ecs::name::Name::new("slot"),
-                        ));
-                    })(
-world
-                            .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
-                            .add(bevy::image::Image {
-                                data: Some(
-                                    (0..24576u32)
-                                        .flat_map(|index: u32| {
-                                            (
-                                                                                        |x: f32, y: f32| {
-                                                                                            [
-                                                                                                255u8,
-                                                                                                255u8,
-                                                                                                255u8,
-                                                                                                ((0.48
-                                                                                                    * (x / 47.5).powf(2.0)
-                                                                                                    * f32::min(f32::min(y, 511.0 - y) / 12.0, 1.0))
-                                                                                                    .clamp(0.0, 1.0)
-                                                                                                    * 255.0) as u8,
-                                                                                            ]
-                                                                                        }
-                                                                                    )(
-                                                                                        (index % 48) as f32 + 0.5,
-                                                                                        (index / 48) as f32 + 0.5,
-                                                                                    )
-                                        })
-                                        .collect::<std::vec::Vec<u8>>(),
-                                ),
-                                data_order:
-                                    bevy::render::render_resource::TextureDataOrder::LayerMajor,
-                                texture_descriptor:
-                                    bevy::render::render_resource::TextureDescriptor {
-                                        label: Some("divider-glow"),
-                                        size: bevy::render::render_resource::Extent3d {
-                                            width: 48,
-                                            height: 512,
-                                            depth_or_array_layers: 1,
+                                    ),
+                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                                },
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        laboratory_card: commands
+                            .spawn((
+                                bevy::sprite::Sprite {
+                                    image: images.panel.clone(),
+                                    texture_atlas: None,
+                                    color: bevy::color::Color::srgb(0.13, 0.13, 0.13),
+                                    flip_x: false,
+                                    flip_y: false,
+                                    custom_size: Some(bevy::math::Vec2::ZERO),
+                                    rect: None,
+                                    image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                        bevy::sprite::TextureSlicer {
+                                            border: bevy::sprite::BorderRect {
+                                                min_inset: bevy::math::Vec2::new(34.0, 34.0),
+                                                max_inset: bevy::math::Vec2::new(34.0, 34.0),
+                                            },
+                                            center_scale_mode:
+                                                bevy::sprite::SliceScaleMode::Stretch,
+                                            sides_scale_mode:
+                                                bevy::sprite::SliceScaleMode::Stretch,
+                                            max_corner_scale: 1.0,
                                         },
-                                        mip_level_count: 1,
-                                        sample_count: 1,
-                                        dimension:
-                                            bevy::render::render_resource::TextureDimension::D2,
-                                        format: bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-                                        usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
-                                            | bevy::render::render_resource::TextureUsages::COPY_DST,
-                                        view_formats: &[],
-                                    },
-                                sampler: bevy::image::ImageSampler::Default,
-                                texture_view_descriptor: None,
-                                asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
-                                    | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-                                copy_on_resize: false,
-                            }),
-                        world
-                            .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
-                            .add(bevy::image::Image {
-                                data: Some(
-                                    (0..2048u32)
-                                        .flat_map(|index: u32| {
-                                            (
-                                                                                        |x: f32, y: f32| {
-                                                                                            [
-                                                                                                255u8,
-                                                                                                255u8,
-                                                                                                255u8,
-                                                                                                ((0.5
-                                                                                                    - (f32::hypot(
-                                                                                                        f32::max(2.0 - x, 0.0),
-                                                                                                        f32::max(f32::max(2.0 - y, y - 510.0), 0.0),
-                                                                                                    ) - 2.0))
-                                                                                                    .clamp(0.0, 1.0)
-                                                                                                    * 255.0) as u8,
-                                                                                            ]
-                                                                                        }
-                                                                                    )(
-                                                                                        (index % 4) as f32 + 0.5,
-                                                                                        (index / 4) as f32 + 0.5,
-                                                                                    )
-                                        })
-                                        .collect::<std::vec::Vec<u8>>(),
-                                ),
-                                data_order:
-                                    bevy::render::render_resource::TextureDataOrder::LayerMajor,
-                                texture_descriptor:
-                                    bevy::render::render_resource::TextureDescriptor {
-                                        label: Some("divider-core"),
-                                        size: bevy::render::render_resource::Extent3d {
-                                            width: 4,
-                                            height: 512,
-                                            depth_or_array_layers: 1,
+                                    ),
+                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                                },
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        laboratory_well: commands
+                            .spawn((
+                                bevy::sprite::Sprite {
+                                    image: images.panel.clone(),
+                                    texture_atlas: None,
+                                    color: bevy::color::Color::srgb(0.18, 0.18, 0.18),
+                                    flip_x: false,
+                                    flip_y: false,
+                                    custom_size: Some(bevy::math::Vec2::new(56.0, 56.0)),
+                                    rect: None,
+                                    image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                        bevy::sprite::TextureSlicer {
+                                            border: bevy::sprite::BorderRect {
+                                                min_inset: bevy::math::Vec2::new(34.0, 34.0),
+                                                max_inset: bevy::math::Vec2::new(34.0, 34.0),
+                                            },
+                                            center_scale_mode:
+                                                bevy::sprite::SliceScaleMode::Stretch,
+                                            sides_scale_mode:
+                                                bevy::sprite::SliceScaleMode::Stretch,
+                                            max_corner_scale: 1.0,
                                         },
-                                        mip_level_count: 1,
-                                        sample_count: 1,
-                                        dimension:
-                                            bevy::render::render_resource::TextureDimension::D2,
-                                        format: bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-                                        usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
-                                            | bevy::render::render_resource::TextureUsages::COPY_DST,
-                                        view_formats: &[],
-                                    },
-                                sampler: bevy::image::ImageSampler::Default,
-                                texture_view_descriptor: None,
-                                asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
-                                    | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-                                copy_on_resize: false,
-                            }),
-                        world
-                            .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
-                            .add(bevy::image::Image {
-                                data: Some(
-                                    (0..1776u32)
-                                        .flat_map(|index: u32| {
-                                            (
-                                                                                        |x: f32, y: f32| {
-                                                                                            [
-                                                                                                255u8,
-                                                                                                255u8,
-                                                                                                255u8,
-                                                                                                ((0.5
-                                                                                                    - (f32::hypot(
-                                                                                                        f32::max(f32::max(1.5 - x, x - 590.5), 0.0),
-                                                                                                        f32::abs(y - 1.5),
-                                                                                                    ) - 1.5))
-                                                                                                    .clamp(0.0, 1.0)
-                                                                                                    * 255.0) as u8,
-                                                                                            ]
-                                                                                        }
-                                                                                    )(
-                                                                                        (index % 592) as f32 + 0.5,
-                                                                                        (index / 592) as f32 + 0.5,
-                                                                                    )
-                                        })
-                                        .collect::<std::vec::Vec<u8>>(),
-                                ),
-                                data_order:
-                                    bevy::render::render_resource::TextureDataOrder::LayerMajor,
-                                texture_descriptor:
-                                    bevy::render::render_resource::TextureDescriptor {
-                                        label: Some("header-separator"),
-                                        size: bevy::render::render_resource::Extent3d {
-                                            width: 592,
-                                            height: 3,
-                                            depth_or_array_layers: 1,
+                                    ),
+                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                                },
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        flask: commands
+                            .spawn((
+                                bevy::sprite::Sprite {
+                                    image: server
+                                        .load::<bevy::image::Image>("icons/flask.png"),
+                                    texture_atlas: None,
+                                    color: bevy::color::Color::srgb(0.92, 0.92, 0.92),
+                                    flip_x: false,
+                                    flip_y: false,
+                                    custom_size: Some(bevy::math::Vec2::new(48.0, 40.0)),
+                                    rect: None,
+                                    image_mode: bevy::sprite::SpriteImageMode::Auto,
+                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                                },
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        laboratory_title: commands
+                            .spawn((
+                                bevy::sprite::Text2d(std::string::String::from("Laboratory")),
+                                bevy::text::TextFont {
+                                    font: bevy::text::FontSource::Handle(
+                                        bevy::asset::Handle::Uuid(
+                                            bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
+                                            core::marker::PhantomData,
+                                        ),
+                                    ),
+                                    font_size: bevy::text::FontSize::Px(30.0),
+                                    weight: bevy::text::FontWeight::NORMAL,
+                                    width: bevy::text::FontWidth::NORMAL,
+                                    style: bevy::text::FontStyle::Normal,
+                                    font_smoothing: bevy::text::FontSmoothing::AntiAliased,
+                                    font_features: bevy::text::FontFeatures::builder().build(),
+                                    font_variations: bevy::text::FontVariations::builder().build(),
+                                },
+                                bevy::text::TextColor(bevy::color::Color::srgb(0.92, 0.92, 0.92)),
+                                bevy::text::TextBounds {
+                                    width: None,
+                                    height: None,
+                                },
+                                bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        separator: commands
+                            .spawn((
+                                bevy::sprite::Sprite {
+                                    image: bevy::asset::Handle::Uuid(
+                                        bevy::asset::AssetId::<bevy::image::Image>::DEFAULT_UUID,
+                                        core::marker::PhantomData,
+                                    ),
+                                    texture_atlas: None,
+                                    color: bevy::color::Color::srgb(0.22, 0.22, 0.22),
+                                    flip_x: false,
+                                    flip_y: false,
+                                    custom_size: Some(bevy::math::Vec2::ZERO),
+                                    rect: None,
+                                    image_mode: bevy::sprite::SpriteImageMode::Auto,
+                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Opaque,
+                                },
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        caption: commands
+                            .spawn((
+                                bevy::sprite::Text2d(std::string::String::from("Coming Soon")),
+                                bevy::text::TextFont {
+                                    font: bevy::text::FontSource::Handle(
+                                        bevy::asset::Handle::Uuid(
+                                            bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
+                                            core::marker::PhantomData,
+                                        ),
+                                    ),
+                                    font_size: bevy::text::FontSize::Px(20.0),
+                                    weight: bevy::text::FontWeight::NORMAL,
+                                    width: bevy::text::FontWidth::NORMAL,
+                                    style: bevy::text::FontStyle::Normal,
+                                    font_smoothing: bevy::text::FontSmoothing::AntiAliased,
+                                    font_features: bevy::text::FontFeatures::builder().build(),
+                                    font_variations: bevy::text::FontVariations::builder().build(),
+                                },
+                                bevy::text::TextColor(bevy::color::Color::srgb(0.58, 0.58, 0.58)),
+                                bevy::text::TextBounds {
+                                    width: None,
+                                    height: None,
+                                },
+                                bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        action_pill: commands
+                            .spawn((
+                                bevy::sprite::Sprite {
+                                    image: images.pill.clone(),
+                                    texture_atlas: None,
+                                    color: bevy::color::Color::srgb(0.10, 0.10, 0.10),
+                                    flip_x: false,
+                                    flip_y: false,
+                                    custom_size: Some(bevy::math::Vec2::ZERO),
+                                    rect: None,
+                                    image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                        bevy::sprite::TextureSlicer {
+                                            border: bevy::sprite::BorderRect {
+                                                min_inset: bevy::math::Vec2::new(32.0, 32.0),
+                                                max_inset: bevy::math::Vec2::new(32.0, 32.0),
+                                            },
+                                            center_scale_mode:
+                                                bevy::sprite::SliceScaleMode::Stretch,
+                                            sides_scale_mode:
+                                                bevy::sprite::SliceScaleMode::Stretch,
+                                            max_corner_scale: 1.0,
                                         },
-                                        mip_level_count: 1,
-                                        sample_count: 1,
-                                        dimension:
-                                            bevy::render::render_resource::TextureDimension::D2,
-                                        format: bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-                                        usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
-                                            | bevy::render::render_resource::TextureUsages::COPY_DST,
-                                        view_formats: &[],
-                                    },
-                                sampler: bevy::image::ImageSampler::Default,
-                                texture_view_descriptor: None,
-                                asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
-                                    | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-                                copy_on_resize: false,
-                            }),
-                        world
-                            .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
-                            .add(bevy::image::Image {
-                                data: Some(
-                                    (0..4864u32)
-                                        .flat_map(|index: u32| {
-                                            (
-                                                                                        |x: f32, y: f32| {
-                                                                                            (|d: f32, lum: f32| {
-                                                                                                [
-                                                                                                    lum as u8,
-                                                                                                    lum as u8,
-                                                                                                    lum as u8,
-                                                                                                    ((f32::max(
-                                                                                                        f32::min(
-                                                                                                            f32::max(0.5 - d, 0.0),
-                                                                                                            1.0,
-                                                                                                        ),
-                                                                                                        0.35
-                                                                                                            * f32::max(
-                                                                                                                1.0 - (d - 0.5) / 4.0,
-                                                                                                                0.0,
-                                                                                                            )
-                                                                                                            .powf(1.4),
-                                                                                                    )) * 255.0)
-                                                                                                        as u8,
-                                                                                                ]
-                                                                                            })(
-                                                                                                f32::hypot(
-                                                                                                    f32::max(
-                                                                                                        f32::max(32.0 - x, x - 43.0),
-                                                                                                        0.0,
-                                                                                                    ),
-                                                                                                    f32::abs(y - 31.5),
-                                                                                                ) - 28.0,
-                                                                                                255.0
-                                                                                                    - 22.0
-                                                                                                        * f32::min(
-                                                                                                            f32::max(
-                                                                                                                (y - 4.0) / 56.0,
-                                                                                                                0.0,
-                                                                                                            ),
-                                                                                                            1.0,
-                                                                                                        )
-                                                                                                        .powi(2)
-                                                                                                    - 18.0
-                                                                                                        * ((y >= 58.0) as u8 as f32),
-                                                                                            )
-                                                                                        }
-                                                                                    )(
-                                                                                        (index % 76) as f32 + 0.5,
-                                                                                        (index / 76) as f32 + 0.5,
-                                                                                    )
-                                        })
-                                        .collect::<std::vec::Vec<u8>>(),
-                                ),
-                                data_order:
-                                    bevy::render::render_resource::TextureDataOrder::LayerMajor,
-                                texture_descriptor:
-                                    bevy::render::render_resource::TextureDescriptor {
-                                        label: Some("pill"),
-                                        size: bevy::render::render_resource::Extent3d {
-                                            width: 76,
-                                            height: 64,
-                                            depth_or_array_layers: 1,
-                                        },
-                                        mip_level_count: 1,
-                                        sample_count: 1,
-                                        dimension:
-                                            bevy::render::render_resource::TextureDimension::D2,
-                                        format: bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-                                        usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
-                                            | bevy::render::render_resource::TextureUsages::COPY_DST,
-                                        view_formats: &[],
-                                    },
-                                sampler: bevy::image::ImageSampler::Default,
-                                texture_view_descriptor: None,
-                                asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
-                                    | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-                                copy_on_resize: false,
-                            }),
-                            world
-                                .resource::<bevy::asset::AssetServer>()
-                                .load::<bevy::image::Image>("icons/house.png"),
-                            world
-                                .resource::<bevy::asset::AssetServer>()
-                                .load::<bevy::image::Image>("icons/registry.png"),
-                            world
-                                .resource::<bevy::asset::AssetServer>()
-                                .load::<bevy::image::Image>("app-icon.png"),
-world
-                            .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
-                            .add(bevy::image::Image {
-                                data: Some(
-                                    (0..(96 * ((height - 48.0) as u32)))
-                                        .flat_map(|index: u32| {
-                                        (
-                                                                                    |x: f32, y: f32| {
-                                                                                        (|d: f32, lum: f32| {
-                                                                                            [
-                                                                                                (lum
-                                                                                                    + 0.22
-                                                                                                        * (1.0 + (d + 0.5) / 3.0)
-                                                                                                            .clamp(0.0, 1.0)
-                                                                                                            .powf(1.4)
-                                                                                                        * 255.0) as u8,
-                                                                                                (lum
-                                                                                                    + 0.22
-                                                                                                        * (1.0 + (d + 0.5) / 3.0)
-                                                                                                            .clamp(0.0, 1.0)
-                                                                                                            .powf(1.4)
-                                                                                                        * 255.0) as u8,
-                                                                                                (lum
-                                                                                                    + 0.22
-                                                                                                        * (1.0 + (d + 0.5) / 3.0)
-                                                                                                            .clamp(0.0, 1.0)
-                                                                                                            .powf(1.4)
-                                                                                                        * 255.0) as u8,
-                                                                                                (f32::max(
-                                                                                                    f32::min(f32::max(0.5 - d, 0.0), 1.0),
-                                                                                                    0.22
-                                                                                                        * (1.0 + (d + 0.5) / 3.0)
-                                                                                                            .clamp(0.0, 1.0)
-                                                                                                            .powf(1.4),
-                                                                                                ) * 255.0)
-                                                                                                    as u8,
-                                                                                            ]
-                                                                                        })(
-                                                                                            f32::hypot(
-                                                                                                f32::max(
-                                                                                                    f32::max(28.0 - x, x - 68.0),
-                                                                                                    0.0,
-                                                                                                ),
-                                                                                                f32::max(
-                                                                                                    f32::max(
-                                                                                                        28.0 - y,
-                                                                                                        y - (height - 48.0 - 28.0),
-                                                                                                    ),
-                                                                                                    0.0,
-                                                                                                ),
-                                                                                            ) - 28.0,
-                                                                                            12.0
-                                                                                                + 8.0
-                                                                                                    * f32::min(
-                                                                                                        f32::max(
-                                                                                                            (6.0 - y) / 3.0,
-                                                                                                            0.0,
-                                                                                                        ),
-                                                                                                        1.0,
-                                                                                                    )
-                                                                                                - 7.0
-                                                                                                    * f32::min(
-                                                                                                        f32::max(
-                                                                                                            (y
-                                                                                                                + ((x * 0.618).fract()
-                                                                                                                    * 2.0
-                                                                                                                    - 1.0)
-                                                                                                                    * 0.95)
-                                                                                                                / (height - 48.0),
-                                                                                                            0.0,
-                                                                                                        ),
-                                                                                                        1.0,
-                                                                                                    ),
-                                                                                        )
-                                                                                    }
-                                                                                )(
-                                                                                    (index % 96) as f32 + 0.5,
-                                                                                    (index / 96) as f32 + 0.5,
-                                                                                )
-                                        })
-                                        .collect::<std::vec::Vec<u8>>(),
-                                ),
-                                data_order:
-                                    bevy::render::render_resource::TextureDataOrder::LayerMajor,
-                                texture_descriptor:
-                                    bevy::render::render_resource::TextureDescriptor {
-                                        label: Some("menu-card"),
-                                        size: bevy::render::render_resource::Extent3d {
-                                            width: 96,
-                                            height: (height - 48.0) as u32,
-                                            depth_or_array_layers: 1,
-                                        },
-                                        mip_level_count: 1,
-                                        sample_count: 1,
-                                        dimension:
-                                            bevy::render::render_resource::TextureDimension::D2,
-                                        format: bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-                                        usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
-                                            | bevy::render::render_resource::TextureUsages::COPY_DST,
-                                        view_formats: &[],
-                                    },
-                                sampler: bevy::image::ImageSampler::Default,
-                                texture_view_descriptor: None,
-                                asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
-                                    | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-                                copy_on_resize: false,
-                            }),
-world
-                            .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
-                            .add(bevy::image::Image {
-                                data: Some(
-                                    (0..27648u32)
-                                        .flat_map(|index: u32| {
-                                            (
-                                                                                        |x: f32, y: f32| {
-                                                                                            (|d: f32, lum: f32| {
-                                                                                                [
-                                                                                                    (lum
-                                                                                                        + 0.22
-                                                                                                            * (1.0 + (d + 0.5) / 2.5)
-                                                                                                                .clamp(0.0, 1.0)
-                                                                                                                .powf(1.4)
-                                                                                                            * 255.0) as u8,
-                                                                                                    (lum
-                                                                                                        + 0.22
-                                                                                                            * (1.0 + (d + 0.5) / 2.5)
-                                                                                                                .clamp(0.0, 1.0)
-                                                                                                                .powf(1.4)
-                                                                                                            * 255.0) as u8,
-                                                                                                    (lum
-                                                                                                        + 0.22
-                                                                                                            * (1.0 + (d + 0.5) / 2.5)
-                                                                                                                .clamp(0.0, 1.0)
-                                                                                                                .powf(1.4)
-                                                                                                            * 255.0) as u8,
-                                                                                                    (f32::max(
-                                                                                                        f32::min(f32::max(0.5 - d, 0.0), 1.0),
-                                                                                                        0.22
-                                                                                                            * (1.0 + (d + 0.5) / 2.5)
-                                                                                                                .clamp(0.0, 1.0)
-                                                                                                                .powf(1.4),
-                                                                                                    ) * 255.0)
-                                                                                                        as u8,
-                                                                                                ]
-                                                                                            })(
-                                                                                                f32::hypot(
-                                                                                                    f32::max(
-                                                                                                        f32::max(20.0 - x, x - 76.0),
-                                                                                                        0.0,
-                                                                                                    ),
-                                                                                                    f32::max(
-                                                                                                        f32::max(
-                                                                                                            20.0 - y,
-                                                                                                            y - (288.0 - 20.0),
-                                                                                                        ),
-                                                                                                        0.0,
-                                                                                                    ),
-                                                                                                ) - 20.0,
-                                                                                                24.0
-                                                                                                    + 10.0
-                                                                                                        * f32::min(
-                                                                                                            f32::max(
-                                                                                                                (6.0 - y) / 3.0,
-                                                                                                                0.0,
-                                                                                                            ),
-                                                                                                            1.0,
-                                                                                                        )
-                                                                                                    - 4.0
-                                                                                                        * f32::min(
-                                                                                                            f32::max(y / 288.0, 0.0),
-                                                                                                            1.0,
-                                                                                                        )
-                                                                                                    - 5.0
-                                                                                                        * f32::min(
-                                                                                                            f32::max(
-                                                                                                                (y - 284.0) / 4.0,
-                                                                                                                0.0,
-                                                                                                            ),
-                                                                                                            1.0,
-                                                                                                        ),
-                                                                                            )
-                                                                                        }
-                                                                                    )(
-                                                                                        (index % 96) as f32 + 0.5,
-                                                                                        (index / 96) as f32 + 0.5,
-                                                                                    )
-                                        })
-                                        .collect::<std::vec::Vec<u8>>(),
-                                ),
-                                data_order:
-                                    bevy::render::render_resource::TextureDataOrder::LayerMajor,
-                                texture_descriptor:
-                                    bevy::render::render_resource::TextureDescriptor {
-                                        label: Some("lab-tile"),
-                                        size: bevy::render::render_resource::Extent3d {
-                                            width: 96,
-                                            height: 288,
-                                            depth_or_array_layers: 1,
-                                        },
-                                        mip_level_count: 1,
-                                        sample_count: 1,
-                                        dimension:
-                                            bevy::render::render_resource::TextureDimension::D2,
-                                        format: bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-                                        usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
-                                            | bevy::render::render_resource::TextureUsages::COPY_DST,
-                                        view_formats: &[],
-                                    },
-                                sampler: bevy::image::ImageSampler::Default,
-                                texture_view_descriptor: None,
-                                asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
-                                    | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-                                copy_on_resize: false,
-                            }),
-                        world
-                            .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
-                            .add(bevy::image::Image {
-                                data: Some(
-                                    (0..5184u32)
-                                        .flat_map(|index: u32| {
-                                            (
-                                                                                        |x: f32, y: f32| {
-                                                                                            (|d: f32| {
-                                                                                                (|rim: f32| [
-                                                                                                    (rim * 255.0) as u8,
-                                                                                                    (rim * 255.0) as u8,
-                                                                                                    (rim * 255.0) as u8,
-                                                                                                    ((f32::min(
-                                                                                                        f32::max(0.5 - d, 0.0),
-                                                                                                        1.0,
-                                                                                                    )) * 255.0) as u8,
-                                                                                                ])(
-                                                                                                    (0.30
-                                                                                                        * (1.0 + d / 2.5)
-                                                                                                            .clamp(0.0, 1.0)
-                                                                                                            .powf(1.4))
-                                                                                                        .clamp(0.0, 1.0),
-                                                                                                )
-                                                                                            })(
-                                                                                                f32::hypot(
-                                                                                                    f32::max(
-                                                                                                        f32::max(12.0 - x, x - 60.0),
-                                                                                                        0.0,
-                                                                                                    ),
-                                                                                                    f32::max(
-                                                                                                        f32::max(12.0 - y, y - 60.0),
-                                                                                                        0.0,
-                                                                                                    ),
-                                                                                                ) - 12.0,
-                                                                                            )
-                                                                                        }
-                                                                                    )(
-                                                                                        (index % 72) as f32 + 0.5,
-                                                                                        (index / 72) as f32 + 0.5,
-                                                                                    )
-                                        })
-                                        .collect::<std::vec::Vec<u8>>(),
-                                ),
-                                data_order:
-                                    bevy::render::render_resource::TextureDataOrder::LayerMajor,
-                                texture_descriptor:
-                                    bevy::render::render_resource::TextureDescriptor {
-                                        label: Some("lab-well"),
-                                        size: bevy::render::render_resource::Extent3d {
-                                            width: 72,
-                                            height: 72,
-                                            depth_or_array_layers: 1,
-                                        },
-                                        mip_level_count: 1,
-                                        sample_count: 1,
-                                        dimension:
-                                            bevy::render::render_resource::TextureDimension::D2,
-                                        format: bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-                                        usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
-                                            | bevy::render::render_resource::TextureUsages::COPY_DST,
-                                        view_formats: &[],
-                                    },
-                                sampler: bevy::image::ImageSampler::Default,
-                                texture_view_descriptor: None,
-                                asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
-                                    | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-                                copy_on_resize: false,
-                            }),
-                            world
-                                .resource::<bevy::asset::AssetServer>()
-                                .load::<bevy::image::Image>("icons/flask.png"),
-                            world
-                                .resource::<bevy::asset::AssetServer>()
-                                .load::<bevy::image::Image>("icons/rocket.png"),
-                            world
-                                .resource::<bevy::asset::AssetServer>()
-                                .load::<bevy::image::Image>("icons/rocket-pill.png"),
-                        world,
-                    );
-                    (|badge: bevy::asset::Handle<bevy::image::Image>,
-                      world: &mut bevy::ecs::world::World| {
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: badge,
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(56.0, 56.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 2.0 + 52.0,
-                                    height / 2.0 - 52.0,
-                                    2.0,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Text2d(std::string::String::from(
-                                [
-                                    "Linux-Subsystem-for-Arxumbra",
-                                    "macOS-Subsystem-for-Arxumbra",
-                                    "Windows-Subsystem-for-Arxumbra",
-                                ][(cfg!(target_os = "windows") as usize) * 2
-                                    + (cfg!(target_os = "macos") as usize)],
-                            )),
-                            bevy::text::TextFont {
-                                font: bevy::text::FontSource::Handle(bevy::asset::Handle::Uuid(
-                                    bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
-                                    core::marker::PhantomData,
-                                )),
-                                font_size: bevy::text::FontSize::Px(24.0),
-                                weight: bevy::text::FontWeight::NORMAL,
-                                width: bevy::text::FontWidth::NORMAL,
-                                style: bevy::text::FontStyle::Normal,
-                                font_smoothing: bevy::text::FontSmoothing::AntiAliased,
-                                font_features: bevy::text::FontFeatures::builder().build(),
-                                font_variations: bevy::text::FontVariations::builder().build(),
-                            },
-                            bevy::text::TextColor(bevy::color::Color::WHITE),
-                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 2.0 + 96.0,
-                                    height / 2.0 - 52.0,
-                                    5.0,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                    })(
-world
-                            .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
-                            .add(bevy::image::Image {
-                                data: Some(
-                                    (0..3136u32)
-                                        .flat_map(|index: u32| {
-                                            (
-                                                                                        |x: f32, y: f32| {
-                                                                                            (|d: f32, lum: f32| {
-                                                                                                [
-                                                                                                    lum as u8,
-                                                                                                    lum as u8,
-                                                                                                    lum as u8,
-                                                                                                    ((f32::max(
-                                                                                                        f32::min(
-                                                                                                            f32::max(0.5 - d, 0.0),
-                                                                                                            1.0,
-                                                                                                        ),
-                                                                                                        0.30
-                                                                                                            * f32::max(
-                                                                                                                1.0 - (d - 0.5) / 3.5,
-                                                                                                                0.0,
-                                                                                                            )
-                                                                                                            .powf(1.4),
-                                                                                                    )) * 255.0)
-                                                                                                        as u8,
-                                                                                                ]
-                                                                                            })(
-                                                                                                f32::hypot(
-                                                                                                    f32::max(
-                                                                                                        f32::max(18.0 - x, x - 38.0),
-                                                                                                        0.0,
-                                                                                                    ),
-                                                                                                    f32::max(
-                                                                                                        f32::max(18.0 - y, y - 38.0),
-                                                                                                        0.0,
-                                                                                                    ),
-                                                                                                ) - 14.0,
-                                                                                                255.0
-                                                                                                    - 26.0
-                                                                                                        * f32::min(
-                                                                                                            f32::max(
-                                                                                                                (y - 4.0) / 48.0,
-                                                                                                                0.0,
-                                                                                                            ),
-                                                                                                            1.0,
-                                                                                                        )
-                                                                                                        .powi(2),
-                                                                                            )
-                                                                                        }
-                                                                                    )(
-                                                                                        (index % 56) as f32 + 0.5,
-                                                                                        (index / 56) as f32 + 0.5,
-                                                                                    )
-                                        })
-                                        .collect::<std::vec::Vec<u8>>(),
-                                ),
-                                data_order:
-                                    bevy::render::render_resource::TextureDataOrder::LayerMajor,
-                                texture_descriptor:
-                                    bevy::render::render_resource::TextureDescriptor {
-                                        label: Some("badge"),
-                                        size: bevy::render::render_resource::Extent3d {
-                                            width: 56,
-                                            height: 56,
-                                            depth_or_array_layers: 1,
-                                        },
-                                        mip_level_count: 1,
-                                        sample_count: 1,
-                                        dimension:
-                                            bevy::render::render_resource::TextureDimension::D2,
-                                        format: bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-                                        usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
-                                            | bevy::render::render_resource::TextureUsages::COPY_DST,
-                                        view_formats: &[],
-                                    },
-                                sampler: bevy::image::ImageSampler::Default,
-                                texture_view_descriptor: None,
-                                asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
-                                    | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-                                copy_on_resize: false,
-                            }),
-                        world,
-                    );
-                })(
-                    world
-                        .query::<&bevy::window::Monitor>()
-                        .iter(world)
-                        .fold(1920.0, |_, monitor| monitor.physical_width as f32),
-                    world
-                        .query::<&bevy::window::Monitor>()
-                        .iter(world)
-                        .fold(1080.0, |_, monitor| monitor.physical_height as f32),
-                    world,
-                );
-            },
+                                    ),
+                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                                },
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        action_icon: commands
+                            .spawn((
+                                bevy::sprite::Sprite {
+                                    image: server
+                                        .load::<bevy::image::Image>("icons/rocket.png"),
+                                    texture_atlas: None,
+                                    color: bevy::color::Color::srgb(0.38, 0.38, 0.38),
+                                    flip_x: false,
+                                    flip_y: false,
+                                    custom_size: Some(bevy::math::Vec2::new(26.0, 26.0)),
+                                    rect: None,
+                                    image_mode: bevy::sprite::SpriteImageMode::Auto,
+                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                                },
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                        action_label: commands
+                            .spawn((
+                                bevy::sprite::Text2d(std::string::String::from("Launch")),
+                                bevy::text::TextFont {
+                                    font: bevy::text::FontSource::Handle(
+                                        bevy::asset::Handle::Uuid(
+                                            bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
+                                            core::marker::PhantomData,
+                                        ),
+                                    ),
+                                    font_size: bevy::text::FontSize::Px(24.0),
+                                    weight: bevy::text::FontWeight::NORMAL,
+                                    width: bevy::text::FontWidth::NORMAL,
+                                    style: bevy::text::FontStyle::Normal,
+                                    font_smoothing: bevy::text::FontSmoothing::AntiAliased,
+                                    font_features: bevy::text::FontFeatures::builder().build(),
+                                    font_variations: bevy::text::FontVariations::builder().build(),
+                                },
+                                bevy::text::TextColor(bevy::color::Color::srgb(0.38, 0.38, 0.38)),
+                                bevy::text::TextBounds {
+                                    width: None,
+                                    height: None,
+                                },
+                                bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
+                                bevy::transform::components::Transform::IDENTITY,
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
+                    });
+                },
+            )),
         )
-
         .add_systems(
             bevy::app::Update,
-            |world: &mut bevy::ecs::world::World| {
-                (|f1: bool,
-                  escape: bool,
-                  delta: f32,
-                  pressed: bool,
-                  cursor: bevy::math::Vec2,
-                  width: f32,
-                  height: f32,
-                  world: &mut bevy::ecs::world::World| {
-                    (|state: (bool, bool, f32), world: &mut bevy::ecs::world::World| {
-                        (0..((f1 || escape || pressed || state.2 != 0.0) as u8)).for_each(|_| {
-                            (|hidden: bool,
-                              launched: bool,
-                              over: &mut [bool; 1],
-                              world: &mut bevy::ecs::world::World| {
-                                world
-                                    .query_filtered::<(&mut bevy::camera::visibility::Visibility,
-                                                       &mut bevy::transform::components::Transform,
-                                                       Option<&bevy::ecs::name::Name>,
-                                                       Option<&mut bevy::sprite::Sprite>),
-                                             bevy::ecs::query::Without<bevy::camera::Camera2d>>()
-                                    .iter_mut(world)
-                                    .for_each(|(visibility, transform, name, sprite)| {
-                                        (|slot: bool,
-                                          named: bool,
-                                          over: &mut [bool; 1],
-                                          visibility: &mut bevy::camera::visibility::Visibility,
-                                          transform: &mut bevy::transform::components::Transform,
-                                          sprite: Option<bevy::ecs::change_detection::Mut<bevy::sprite::Sprite>>| {
-                                            over[0] = over[0] || transform.scale.z >= 7.0;
-                                            transform.scale.z = (transform.scale.z
-                                                + delta * escape as u8 as f32)
-                                                * escape as u8 as f32;
-                                            *visibility = [
-                                                bevy::camera::visibility::Visibility::Hidden,
-                                                bevy::camera::visibility::Visibility::Visible,
-                                            ][(!hidden
-                                                && (!named || (launched == slot)))
-                                                as usize];
-                                            sprite.into_iter().for_each(|sprite| {
-                                                (|sprite: &mut bevy::sprite::Sprite| {
-                                                    sprite.color = [
-                                                        sprite.color,
-                                                        [
-                                                            bevy::color::Color::srgba(1.0, 1.0, 1.0, 0.0),
-                                                            bevy::color::Color::WHITE,
-                                                        ][launched as usize],
-                                                    ][slot as usize];
-                                                })(sprite.into_inner());
-                                            });
-                                        })(
-                                            name.into_iter().fold(
-                                                false,
-                                                |slot: bool, name: &bevy::ecs::name::Name| {
-                                                    slot || name.as_str() == "slot"
-                                                },
-                                            ),
-                                            name.is_some(),
-                                            &mut *over,
-                                            visibility.into_inner(),
-                                            transform.into_inner(),
-                                            sprite,
-                                        );
-                                    });
-                                (0..(over[0] as u8)).for_each(|_| {
-                                    world
-                                        .resource_mut::<bevy::ecs::message::Messages<bevy::app::AppExit>>()
-                                        .write(bevy::app::AppExit::Success);
-                                });
+            bevy::ecs::schedule::IntoScheduleConfigs::chain((
+                |mut state: ResMut<UiState>,
+                 keys: Res<ButtonInput<KeyCode>>,
+                 mouse: Res<ButtonInput<MouseButton>>,
+                 time: Res<Time>,
+                 mut commands: Commands,
+                 windows: Query<(Entity, &Window), With<PrimaryWindow>>| {
+                    windows.iter().next().into_iter().for_each(|(entity, window)| {
+                        if !window.focused {
+                            if state.hover.is_some() {
+                                state.hover = None;
+                            }
+                            if state.armed.is_some() {
+                                state.armed = None;
+                            }
+                            if state.focus.is_some() {
+                                state.focus = None;
+                                state.focus_from_keyboard = false;
+                            }
+                        }
+                        if keys.just_pressed(KeyCode::F1) {
+                            state.hud_visible = !state.hud_visible;
+                            state.hover = None;
+                            state.armed = None;
+                            state.focus = None;
+                            state.focus_from_keyboard = false;
+                        }
+                        (|hold: f32| {
+                            if state.escape_hold_secs != hold {
+                                state.escape_hold_secs = hold;
+                            }
+                            if hold >= 7.0 && !state.exit_requested {
+                                state.exit_requested = true;
+                                commands.entity(entity).despawn();
+                            }
+                        })(
+                            if keys.pressed(KeyCode::Escape) {
+                                state.escape_hold_secs + time.delta_secs()
+                            } else {
+                                0.0
+                            },
+                        );
+                        (|layout: LayoutFrame| {
+                            if state.layout != layout {
+                                state.layout = layout;
+                            }
+                        })(
+                            (|width: f32,
+                              height: f32,
+                              scale_factor: f32,
+                              margin: f32,
+                              sidebar_width: f32| {
+                                LayoutFrame {
+                                    width,
+                                    height,
+                                    scale_factor,
+                                    margin,
+                                    sidebar_width,
+                                    tab_width: sidebar_width - 2.0 * margin,
+                                    tab_icon_x: margin + 25.0,
+                                    tab_label_x: margin + 50.0,
+                                    tab_label_bounds: sidebar_width - 2.0 * margin - 62.0,
+                                    title_x: margin + 40.0,
+                                    title_y: height / 2.0 - margin - 14.0,
+                                    title_bounds: sidebar_width - margin - 52.0,
+                                    home_tab: TabFrame {
+                                        center_x: margin
+                                            + (sidebar_width - 2.0 * margin) / 2.0,
+                                        center_y: height / 2.0 - margin - 100.0,
+                                        half_width: (sidebar_width - 2.0 * margin) / 2.0,
+                                        half_height: 28.0,
+                                    },
+                                    registry_tab: TabFrame {
+                                        center_x: margin
+                                            + (sidebar_width - 2.0 * margin) / 2.0,
+                                        center_y: height / 2.0 - margin - 168.0,
+                                        half_width: (sidebar_width - 2.0 * margin) / 2.0,
+                                        half_height: 28.0,
+                                    },
+                                    content: CardFrame {
+                                        center_x: (sidebar_width + 14.0 + width - margin)
+                                            / 2.0,
+                                        center_y: height / 2.0,
+                                        half_width: (width - margin - sidebar_width - 14.0)
+                                            / 2.0,
+                                        half_height: height / 2.0 - margin,
+                                    },
+                                    laboratory: CardFrame {
+                                        center_x: (sidebar_width + 14.0 + width - margin)
+                                            / 2.0,
+                                        center_y: height / 2.0,
+                                        half_width: (width - margin - sidebar_width - 14.0)
+                                            / 2.0
+                                            - 24.0,
+                                        half_height: height / 2.0 - margin - 24.0,
+                                    },
+                                    header_x: sidebar_width + 90.0,
+                                    header_y: height - margin - 52.0,
+                                    laboratory_title_x: sidebar_width + 134.0,
+                                    laboratory_title_bounds: width
+                                        - margin
+                                        - sidebar_width
+                                        - 210.0,
+                                    separator_y: height - margin - 104.0,
+                                    caption_x: sidebar_width + 62.0,
+                                    caption_y: height - margin - 132.0,
+                                    caption_bounds: width - margin - sidebar_width - 62.0,
+                                    action: CardFrame {
+                                        center_x: sidebar_width
+                                            + 62.0
+                                            + (width - margin - sidebar_width - 62.0)
+                                                .min(420.0)
+                                            / 2.0,
+                                        center_y: margin + 80.0,
+                                        half_width: (width - margin - sidebar_width - 62.0)
+                                            .min(420.0)
+                                            / 2.0,
+                                        half_height: 32.0,
+                                    },
+                                    action_icon_x: sidebar_width + 99.0,
+                                    action_label_x: sidebar_width + 134.0,
+                                    action_label_bounds: (width
+                                        - margin
+                                        - sidebar_width
+                                        - 62.0)
+                                        .min(420.0)
+                                        - 96.0,
+                                }
                             })(
-                                state.0 != f1,
-                                state.1
-                                    || (pressed
-                                        && (state.0 == f1)
-                                        && cursor.x >= width / 3.0 + 81.0
-                                        && cursor.x <= width / 3.0 + 655.0
-                                        && cursor.y >= height / 2.0 - 192.0
-                                        && cursor.y <= height / 2.0 - 139.0),
-                                &mut [false],
-                                world,
+                                window.width(),
+                                window.height(),
+                                window.scale_factor(),
+                                (window.width() * 0.02).clamp(12.0, 24.0),
+                                (window.width() / 3.0).clamp(232.0, 560.0),
+                            ),
+                        );
+                        (|cursor: Option<bevy::math::Vec2>| {
+                            if state.cursor != cursor {
+                                state.cursor = cursor;
+                            }
+                        })(window.cursor_position());
+                        if window.focused && state.hud_visible {
+                            state.cursor.into_iter().for_each(|point| {
+                                (|hover: Option<Destination>| {
+                                    if state.hover != hover {
+                                        state.hover = hover;
+                                    }
+                                })(
+                                    (|point: bevy::math::Vec2| {
+                                        if f32::abs(
+                                            point.x - state.layout.home_tab.center_x,
+                                        ) <= state.layout.home_tab.half_width
+                                            && f32::abs(
+                                                point.y - state.layout.home_tab.center_y,
+                                            ) <= state.layout.home_tab.half_height
+                                        {
+                                            Some(Destination::Home)
+                                        } else if f32::abs(
+                                            point.x - state.layout.registry_tab.center_x,
+                                        ) <= state.layout.registry_tab.half_width
+                                            && f32::abs(
+                                                point.y - state.layout.registry_tab.center_y,
+                                            ) <= state.layout.registry_tab.half_height
+                                        {
+                                            Some(Destination::ExtensionRegistry)
+                                        } else {
+                                            None
+                                        }
+                                    })(point),
+                                );
+                                if mouse.just_pressed(MouseButton::Left) {
+                                    state.focus = None;
+                                    state.focus_from_keyboard = false;
+                                    state.armed = state.hover;
+                                }
+                                if mouse.just_released(MouseButton::Left) {
+                                    state.armed.into_iter().for_each(|armed| {
+                                        if state.hover == Some(armed) {
+                                            state.selected = armed;
+                                        }
+                                        state.armed = None;
+                                    });
+                                }
+                            });
+                            if state.cursor.is_none() {
+                                if state.hover.is_some() {
+                                    state.hover = None;
+                                }
+                                if state.armed.is_some() {
+                                    state.armed = None;
+                                }
+                            }
+                        }
+                        if keys.just_pressed(KeyCode::Tab) {
+                            state.focus_from_keyboard = true;
+                            state.focus = Some(match state.focus {
+                                Some(Destination::ExtensionRegistry) => Destination::Home,
+                                Some(Destination::Home) | None => {
+                                    Destination::ExtensionRegistry
+                                }
+                            });
+                        }
+                        if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::Space)
+                        {
+                            state.focus.into_iter().for_each(|destination| {
+                                state.selected = destination;
+                            });
+                        }
+                    });
+                },
+                |state: Res<UiState>,
+                 entities: Res<UiEntities>,
+                 mut commands: Commands,
+                 sprites: Query<(Entity, &Transform, &Visibility, &Sprite)>,
+                 texts: Query<
+                    (Entity, &Transform, &Visibility, &TextColor, &TextBounds),
+                    With<Text2d>,
+                >| {
+                    sprites
+                        .get(entities.sidebar_panel)
+                        .into_iter()
+                        .for_each(|(entity, transform, visibility, sprite)| {
+                            (|desired_visibility, desired_size, desired_translation| {
+                                if *visibility != desired_visibility {
+                                    commands.entity(entity).insert(desired_visibility);
+                                }
+                                if sprite.custom_size != Some(desired_size) {
+                                    commands.entity(entity).insert(bevy::sprite::Sprite {
+                                        custom_size: Some(desired_size),
+                                        ..sprite.clone()
+                                    });
+                                }
+                                if transform.translation != desired_translation
+                                    || transform.scale != bevy::math::Vec3::ONE
+                                {
+                                    commands.entity(entity).insert(
+                                        bevy::transform::components::Transform {
+                                            translation: desired_translation,
+                                            rotation: bevy::math::Quat::IDENTITY,
+                                            scale: bevy::math::Vec3::ONE,
+                                        },
+                                    );
+                                }
+                            })(
+                                if state.hud_visible {
+                                    bevy::camera::visibility::Visibility::Visible
+                                } else {
+                                    bevy::camera::visibility::Visibility::Hidden
+                                },
+                                bevy::math::Vec2::new(
+                                    state.layout.sidebar_width,
+                                    state.layout.height,
+                                ),
+                                bevy::math::Vec3::new(
+                                    state.layout.sidebar_width / 2.0,
+                                    0.0,
+                                    0.0,
+                                ),
                             );
                         });
-                    })(
-                        world
-                            .query_filtered::<(&bevy::camera::visibility::Visibility,
-                                               &bevy::transform::components::Transform,
-                                               Option<&bevy::sprite::Sprite>,
-                                               Option<&bevy::ecs::name::Name>),
-                                     bevy::ecs::query::Without<bevy::camera::Camera2d>>()
-                            .iter(world)
-                            .fold(
-                                (false, false, 0.0),
-                                |state: (bool, bool, f32),
-                                 (visibility, transform, sprite, name)| {
-                                    (|slot: bool| {
-                                        (
-                                            [state.0,
-                                             *visibility
-                                                 == bevy::camera::visibility::Visibility::Hidden]
-                                                [name.is_none() as usize],
-                                            sprite
-                                                .into_iter()
-                                                .fold(state.1, |value, sprite| {
-                                                    value
-                                                        || (slot
-                                                            && sprite.color.to_srgba().alpha > 0.5)
-                                                }),
-                                            transform.scale.z,
-                                        )
-                                    })(name.into_iter().fold(
-                                        false,
-                                        |slot: bool, name: &bevy::ecs::name::Name| {
-                                            slot || name.as_str() == "slot"
+                    sprites
+                        .get(entities.divider)
+                        .into_iter()
+                        .for_each(|(entity, transform, visibility, sprite)| {
+                            (|desired_visibility, desired_size, desired_translation| {
+                                if *visibility != desired_visibility {
+                                    commands.entity(entity).insert(desired_visibility);
+                                }
+                                if sprite.custom_size != Some(desired_size) {
+                                    commands.entity(entity).insert(bevy::sprite::Sprite {
+                                        custom_size: Some(desired_size),
+                                        ..sprite.clone()
+                                    });
+                                }
+                                if transform.translation != desired_translation
+                                    || transform.scale != bevy::math::Vec3::ONE
+                                {
+                                    commands.entity(entity).insert(
+                                        bevy::transform::components::Transform {
+                                            translation: desired_translation,
+                                            rotation: bevy::math::Quat::IDENTITY,
+                                            scale: bevy::math::Vec3::ONE,
                                         },
-                                    ))
+                                    );
+                                }
+                            })(
+                                if state.hud_visible {
+                                    bevy::camera::visibility::Visibility::Visible
+                                } else {
+                                    bevy::camera::visibility::Visibility::Hidden
                                 },
-                            ),
-                        world,
+                                bevy::math::Vec2::new(2.0, state.layout.height),
+                                bevy::math::Vec3::new(
+                                    state.layout.sidebar_width + 1.0,
+                                    0.0,
+                                    1.0,
+                                ),
+                            );
+                        });
+                    sprites
+                        .get(entities.app_icon)
+                        .into_iter()
+                        .for_each(|(entity, transform, visibility, sprite)| {
+                            (|desired_visibility, desired_translation| {
+                                if *visibility != desired_visibility {
+                                    commands.entity(entity).insert(desired_visibility);
+                                }
+                                if transform.translation != desired_translation
+                                    || transform.scale != bevy::math::Vec3::ONE
+                                {
+                                    commands.entity(entity).insert(
+                                        bevy::transform::components::Transform {
+                                            translation: desired_translation,
+                                            rotation: bevy::math::Quat::IDENTITY,
+                                            scale: bevy::math::Vec3::ONE,
+                                        },
+                                    );
+                                }
+                            })(
+                                if state.hud_visible {
+                                    bevy::camera::visibility::Visibility::Visible
+                                } else {
+                                    bevy::camera::visibility::Visibility::Hidden
+                                },
+                                bevy::math::Vec3::new(
+                                    state.layout.margin + 14.0,
+                                    state.layout.title_y,
+                                    1.0,
+                                ),
+                            );
+                        });
+                    texts
+                        .get(entities.title)
+                        .into_iter()
+                        .for_each(|(entity, transform, visibility, color, bounds)| {
+                            (|desired_visibility, desired_bounds, desired_translation| {
+                                if *visibility != desired_visibility {
+                                    commands.entity(entity).insert(desired_visibility);
+                                }
+                                if *bounds != desired_bounds {
+                                    commands.entity(entity).insert(desired_bounds);
+                                }
+                                if transform.translation != desired_translation
+                                    || transform.scale != bevy::math::Vec3::ONE
+                                {
+                                    commands.entity(entity).insert(
+                                        bevy::transform::components::Transform {
+                                            translation: desired_translation,
+                                            rotation: bevy::math::Quat::IDENTITY,
+                                            scale: bevy::math::Vec3::ONE,
+                                        },
+                                    );
+                                }
+                            })(
+                                if state.hud_visible {
+                                    bevy::camera::visibility::Visibility::Visible
+                                } else {
+                                    bevy::camera::visibility::Visibility::Hidden
+                                },
+                                bevy::text::TextBounds {
+                                    width: Some(state.layout.title_bounds),
+                                    height: None,
+                                },
+                                bevy::math::Vec3::new(
+                                    state.layout.title_x,
+                                    state.layout.title_y,
+                                    7.0,
+                                ),
+                            );
+                            if color.0 != bevy::color::Color::srgb(0.92, 0.92, 0.92) {
+                                commands
+                                    .entity(entity)
+                                    .insert(bevy::text::TextColor(bevy::color::Color::srgb(
+                                        0.92, 0.92, 0.92,
+                                    )));
+                            }
+                        });
+                    (|home_selected: bool, home_hovered: bool, home_pressed: bool| {
+                        sprites
+                            .get(entities.home_pill)
+                            .into_iter()
+                            .for_each(|(entity, transform, visibility, sprite)| {
+                                (|desired_visibility, desired_color, desired_size, desired_translation| {
+                                    if *visibility != desired_visibility {
+                                        commands.entity(entity).insert(desired_visibility);
+                                    }
+                                    if sprite.color != desired_color
+                                        || sprite.custom_size != Some(desired_size)
+                                    {
+                                        commands.entity(entity).insert(bevy::sprite::Sprite {
+                                            color: desired_color,
+                                            custom_size: Some(desired_size),
+                                            ..sprite.clone()
+                                        });
+                                    }
+                                    if transform.translation != desired_translation
+                                        || transform.scale != bevy::math::Vec3::ONE
+                                    {
+                                        commands.entity(entity).insert(
+                                            bevy::transform::components::Transform {
+                                                translation: desired_translation,
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: bevy::math::Vec3::ONE,
+                                            },
+                                        );
+                                    }
+                                })(
+                                    if state.hud_visible {
+                                        bevy::camera::visibility::Visibility::Visible
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                    bevy::color::Color::srgb(
+                                        if home_selected {
+                                            if home_pressed {
+                                                1.0
+                                            } else if home_hovered {
+                                                0.96
+                                            } else {
+                                                0.92
+                                            }
+                                        } else if home_pressed {
+                                            0.26
+                                        } else if home_hovered {
+                                            0.18
+                                        } else {
+                                            0.12
+                                        },
+                                        if home_selected {
+                                            if home_pressed {
+                                                1.0
+                                            } else if home_hovered {
+                                                0.96
+                                            } else {
+                                                0.92
+                                            }
+                                        } else if home_pressed {
+                                            0.26
+                                        } else if home_hovered {
+                                            0.18
+                                        } else {
+                                            0.12
+                                        },
+                                        if home_selected {
+                                            if home_pressed {
+                                                1.0
+                                            } else if home_hovered {
+                                                0.96
+                                            } else {
+                                                0.92
+                                            }
+                                        } else if home_pressed {
+                                            0.26
+                                        } else if home_hovered {
+                                            0.18
+                                        } else {
+                                            0.12
+                                        },
+                                    ),
+                                    bevy::math::Vec2::new(
+                                        state.layout.tab_width,
+                                        56.0,
+                                    ),
+                                    bevy::math::Vec3::new(
+                                        state.layout.home_tab.center_x,
+                                        state.layout.home_tab.center_y,
+                                        5.0,
+                                    ),
+                                );
+                            });
+                        sprites
+                            .get(entities.home_icon)
+                            .into_iter()
+                            .for_each(|(entity, transform, visibility, sprite)| {
+                                (|desired_visibility, desired_color, desired_translation| {
+                                    if *visibility != desired_visibility {
+                                        commands.entity(entity).insert(desired_visibility);
+                                    }
+                                    if sprite.color != desired_color {
+                                        commands.entity(entity).insert(bevy::sprite::Sprite {
+                                            color: desired_color,
+                                            ..sprite.clone()
+                                        });
+                                    }
+                                    if transform.translation != desired_translation
+                                        || transform.scale != bevy::math::Vec3::ONE
+                                    {
+                                        commands.entity(entity).insert(
+                                            bevy::transform::components::Transform {
+                                                translation: desired_translation,
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: bevy::math::Vec3::ONE,
+                                            },
+                                        );
+                                    }
+                                })(
+                                    if state.hud_visible {
+                                        bevy::camera::visibility::Visibility::Visible
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                    bevy::color::Color::srgb(
+                                        if home_selected {
+                                            0.05
+                                        } else if home_hovered {
+                                            0.98
+                                        } else {
+                                            0.88
+                                        },
+                                        if home_selected {
+                                            0.05
+                                        } else if home_hovered {
+                                            0.98
+                                        } else {
+                                            0.88
+                                        },
+                                        if home_selected {
+                                            0.05
+                                        } else if home_hovered {
+                                            0.98
+                                        } else {
+                                            0.88
+                                        },
+                                    ),
+                                    bevy::math::Vec3::new(
+                                        state.layout.tab_icon_x,
+                                        state.layout.home_tab.center_y,
+                                        6.0,
+                                    ),
+                                );
+                            });
+                        texts
+                            .get(entities.home_label)
+                            .into_iter()
+                            .for_each(|(entity, transform, visibility, color, bounds)| {
+                                (|desired_visibility, desired_color, desired_bounds, desired_translation| {
+                                    if *visibility != desired_visibility {
+                                        commands.entity(entity).insert(desired_visibility);
+                                    }
+                                    if color.0 != desired_color {
+                                        commands
+                                            .entity(entity)
+                                            .insert(bevy::text::TextColor(desired_color));
+                                    }
+                                    if *bounds != desired_bounds {
+                                        commands.entity(entity).insert(desired_bounds);
+                                    }
+                                    if transform.translation != desired_translation
+                                        || transform.scale != bevy::math::Vec3::ONE
+                                    {
+                                        commands.entity(entity).insert(
+                                            bevy::transform::components::Transform {
+                                                translation: desired_translation,
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: bevy::math::Vec3::ONE,
+                                            },
+                                        );
+                                    }
+                                })(
+                                    if state.hud_visible {
+                                        bevy::camera::visibility::Visibility::Visible
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                    bevy::color::Color::srgb(
+                                        if home_selected {
+                                            0.05
+                                        } else if home_hovered {
+                                            0.98
+                                        } else {
+                                            0.88
+                                        },
+                                        if home_selected {
+                                            0.05
+                                        } else if home_hovered {
+                                            0.98
+                                        } else {
+                                            0.88
+                                        },
+                                        if home_selected {
+                                            0.05
+                                        } else if home_hovered {
+                                            0.98
+                                        } else {
+                                            0.88
+                                        },
+                                    ),
+                                    bevy::text::TextBounds {
+                                        width: Some(state.layout.tab_label_bounds),
+                                        height: None,
+                                    },
+                                    bevy::math::Vec3::new(
+                                        state.layout.tab_label_x,
+                                        state.layout.home_tab.center_y,
+                                        7.0,
+                                    ),
+                                );
+                            });
+                    })(
+                        state.selected == Destination::Home,
+                        state.hover == Some(Destination::Home),
+                        state.armed == Some(Destination::Home),
                     );
-                })(
-                    world
-                        .resource::<bevy::input::ButtonInput<bevy::input::keyboard::KeyCode>>()
-                        .just_pressed(bevy::input::keyboard::KeyCode::F1),
-                    world
-                        .resource::<bevy::input::ButtonInput<bevy::input::keyboard::KeyCode>>()
-                        .pressed(bevy::input::keyboard::KeyCode::Escape),
-                    world.resource::<bevy::time::Time>().delta_secs(),
-                    world
-                        .resource::<bevy::input::ButtonInput<bevy::input::mouse::MouseButton>>()
-                        .just_pressed(bevy::input::mouse::MouseButton::Left),
-                    world
-                        .query::<&bevy::window::Window>()
-                        .iter(world)
-                        .fold(bevy::math::Vec2::ZERO, |_, window| {
-                            window
-                                .cursor_position()
-                                .into_iter()
-                                .fold(bevy::math::Vec2::ZERO, |_, point| point)
-                        }),
-                    world
-                        .query::<&bevy::window::Monitor>()
-                        .iter(world)
-                        .fold(1920.0, |_, monitor| monitor.physical_width as f32),
-                    world
-                        .query::<&bevy::window::Monitor>()
-                        .iter(world)
-                        .fold(1080.0, |_, monitor| monitor.physical_height as f32),
-                    world,
-                );
-            },
+                    (|registry_selected: bool,
+                      registry_hovered: bool,
+                      registry_pressed: bool| {
+                        sprites
+                            .get(entities.registry_pill)
+                            .into_iter()
+                            .for_each(|(entity, transform, visibility, sprite)| {
+                                (|desired_visibility, desired_color, desired_size, desired_translation| {
+                                    if *visibility != desired_visibility {
+                                        commands.entity(entity).insert(desired_visibility);
+                                    }
+                                    if sprite.color != desired_color
+                                        || sprite.custom_size != Some(desired_size)
+                                    {
+                                        commands.entity(entity).insert(bevy::sprite::Sprite {
+                                            color: desired_color,
+                                            custom_size: Some(desired_size),
+                                            ..sprite.clone()
+                                        });
+                                    }
+                                    if transform.translation != desired_translation
+                                        || transform.scale != bevy::math::Vec3::ONE
+                                    {
+                                        commands.entity(entity).insert(
+                                            bevy::transform::components::Transform {
+                                                translation: desired_translation,
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: bevy::math::Vec3::ONE,
+                                            },
+                                        );
+                                    }
+                                })(
+                                    if state.hud_visible {
+                                        bevy::camera::visibility::Visibility::Visible
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                    bevy::color::Color::srgb(
+                                        if registry_selected {
+                                            if registry_pressed {
+                                                1.0
+                                            } else if registry_hovered {
+                                                0.96
+                                            } else {
+                                                0.92
+                                            }
+                                        } else if registry_pressed {
+                                            0.26
+                                        } else if registry_hovered {
+                                            0.18
+                                        } else {
+                                            0.12
+                                        },
+                                        if registry_selected {
+                                            if registry_pressed {
+                                                1.0
+                                            } else if registry_hovered {
+                                                0.96
+                                            } else {
+                                                0.92
+                                            }
+                                        } else if registry_pressed {
+                                            0.26
+                                        } else if registry_hovered {
+                                            0.18
+                                        } else {
+                                            0.12
+                                        },
+                                        if registry_selected {
+                                            if registry_pressed {
+                                                1.0
+                                            } else if registry_hovered {
+                                                0.96
+                                            } else {
+                                                0.92
+                                            }
+                                        } else if registry_pressed {
+                                            0.26
+                                        } else if registry_hovered {
+                                            0.18
+                                        } else {
+                                            0.12
+                                        },
+                                    ),
+                                    bevy::math::Vec2::new(
+                                        state.layout.tab_width,
+                                        56.0,
+                                    ),
+                                    bevy::math::Vec3::new(
+                                        state.layout.registry_tab.center_x,
+                                        state.layout.registry_tab.center_y,
+                                        5.0,
+                                    ),
+                                );
+                            });
+                        sprites
+                            .get(entities.registry_icon)
+                            .into_iter()
+                            .for_each(|(entity, transform, visibility, sprite)| {
+                                (|desired_visibility, desired_color, desired_translation| {
+                                    if *visibility != desired_visibility {
+                                        commands.entity(entity).insert(desired_visibility);
+                                    }
+                                    if sprite.color != desired_color {
+                                        commands.entity(entity).insert(bevy::sprite::Sprite {
+                                            color: desired_color,
+                                            ..sprite.clone()
+                                        });
+                                    }
+                                    if transform.translation != desired_translation
+                                        || transform.scale != bevy::math::Vec3::ONE
+                                    {
+                                        commands.entity(entity).insert(
+                                            bevy::transform::components::Transform {
+                                                translation: desired_translation,
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: bevy::math::Vec3::ONE,
+                                            },
+                                        );
+                                    }
+                                })(
+                                    if state.hud_visible {
+                                        bevy::camera::visibility::Visibility::Visible
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                    bevy::color::Color::srgb(
+                                        if registry_selected {
+                                            0.05
+                                        } else if registry_hovered {
+                                            0.98
+                                        } else {
+                                            0.88
+                                        },
+                                        if registry_selected {
+                                            0.05
+                                        } else if registry_hovered {
+                                            0.98
+                                        } else {
+                                            0.88
+                                        },
+                                        if registry_selected {
+                                            0.05
+                                        } else if registry_hovered {
+                                            0.98
+                                        } else {
+                                            0.88
+                                        },
+                                    ),
+                                    bevy::math::Vec3::new(
+                                        state.layout.tab_icon_x,
+                                        state.layout.registry_tab.center_y,
+                                        6.0,
+                                    ),
+                                );
+                            });
+                        texts
+                            .get(entities.registry_label)
+                            .into_iter()
+                            .for_each(|(entity, transform, visibility, color, bounds)| {
+                                (|desired_visibility, desired_color, desired_bounds, desired_translation| {
+                                    if *visibility != desired_visibility {
+                                        commands.entity(entity).insert(desired_visibility);
+                                    }
+                                    if color.0 != desired_color {
+                                        commands
+                                            .entity(entity)
+                                            .insert(bevy::text::TextColor(desired_color));
+                                    }
+                                    if *bounds != desired_bounds {
+                                        commands.entity(entity).insert(desired_bounds);
+                                    }
+                                    if transform.translation != desired_translation
+                                        || transform.scale != bevy::math::Vec3::ONE
+                                    {
+                                        commands.entity(entity).insert(
+                                            bevy::transform::components::Transform {
+                                                translation: desired_translation,
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: bevy::math::Vec3::ONE,
+                                            },
+                                        );
+                                    }
+                                })(
+                                    if state.hud_visible {
+                                        bevy::camera::visibility::Visibility::Visible
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                    bevy::color::Color::srgb(
+                                        if registry_selected {
+                                            0.05
+                                        } else if registry_hovered {
+                                            0.98
+                                        } else {
+                                            0.88
+                                        },
+                                        if registry_selected {
+                                            0.05
+                                        } else if registry_hovered {
+                                            0.98
+                                        } else {
+                                            0.88
+                                        },
+                                        if registry_selected {
+                                            0.05
+                                        } else if registry_hovered {
+                                            0.98
+                                        } else {
+                                            0.88
+                                        },
+                                    ),
+                                    bevy::text::TextBounds {
+                                        width: Some(state.layout.tab_label_bounds),
+                                        height: None,
+                                    },
+                                    bevy::math::Vec3::new(
+                                        state.layout.tab_label_x,
+                                        state.layout.registry_tab.center_y,
+                                        7.0,
+                                    ),
+                                );
+                            });
+                    })(
+                        state.selected == Destination::ExtensionRegistry,
+                        state.hover == Some(Destination::ExtensionRegistry),
+                        state.armed == Some(Destination::ExtensionRegistry),
+                    );
+                    (|home_focused: bool| {
+                        sprites
+                            .get(entities.ring_home)
+                            .into_iter()
+                            .for_each(|(entity, transform, visibility, sprite)| {
+                                (|desired_visibility, desired_color, desired_size, desired_translation| {
+                                    if *visibility != desired_visibility {
+                                        commands.entity(entity).insert(desired_visibility);
+                                    }
+                                    if sprite.color != desired_color {
+                                        commands.entity(entity).insert(bevy::sprite::Sprite {
+                                            color: desired_color,
+                                            ..sprite.clone()
+                                        });
+                                    }
+                                    if sprite.custom_size != Some(desired_size) {
+                                        commands.entity(entity).insert(bevy::sprite::Sprite {
+                                            custom_size: Some(desired_size),
+                                            ..sprite.clone()
+                                        });
+                                    }
+                                    if transform.translation != desired_translation
+                                        || transform.scale != bevy::math::Vec3::ONE
+                                    {
+                                        commands.entity(entity).insert(
+                                            bevy::transform::components::Transform {
+                                                translation: desired_translation,
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: bevy::math::Vec3::ONE,
+                                            },
+                                        );
+                                    }
+                                })(
+                                    if home_focused && state.hud_visible {
+                                        bevy::camera::visibility::Visibility::Visible
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                    bevy::color::Color::srgb(
+                                        if state.selected == Destination::Home {
+                                            0.08
+                                        } else {
+                                            1.0
+                                        },
+                                        if state.selected == Destination::Home {
+                                            0.08
+                                        } else {
+                                            1.0
+                                        },
+                                        if state.selected == Destination::Home {
+                                            0.08
+                                        } else {
+                                            1.0
+                                        },
+                                    ),
+                                    bevy::math::Vec2::new(
+                                        state.layout.tab_width + 8.0,
+                                        64.0,
+                                    ),
+                                    bevy::math::Vec3::new(
+                                        state.layout.home_tab.center_x,
+                                        state.layout.home_tab.center_y,
+                                        9.0,
+                                    ),
+                                );
+                            });
+                    })(state.focus == Some(Destination::Home));
+                    (|registry_focused: bool| {
+                        sprites
+                            .get(entities.ring_registry)
+                            .into_iter()
+                            .for_each(|(entity, transform, visibility, sprite)| {
+                                (|desired_visibility, desired_color, desired_size, desired_translation| {
+                                    if *visibility != desired_visibility {
+                                        commands.entity(entity).insert(desired_visibility);
+                                    }
+                                    if sprite.color != desired_color {
+                                        commands.entity(entity).insert(bevy::sprite::Sprite {
+                                            color: desired_color,
+                                            ..sprite.clone()
+                                        });
+                                    }
+                                    if sprite.custom_size != Some(desired_size) {
+                                        commands.entity(entity).insert(bevy::sprite::Sprite {
+                                            custom_size: Some(desired_size),
+                                            ..sprite.clone()
+                                        });
+                                    }
+                                    if transform.translation != desired_translation
+                                        || transform.scale != bevy::math::Vec3::ONE
+                                    {
+                                        commands.entity(entity).insert(
+                                            bevy::transform::components::Transform {
+                                                translation: desired_translation,
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: bevy::math::Vec3::ONE,
+                                            },
+                                        );
+                                    }
+                                })(
+                                    if registry_focused && state.hud_visible {
+                                        bevy::camera::visibility::Visibility::Visible
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                    bevy::color::Color::srgb(
+                                        if state.selected == Destination::ExtensionRegistry {
+                                            0.08
+                                        } else {
+                                            1.0
+                                        },
+                                        if state.selected == Destination::ExtensionRegistry {
+                                            0.08
+                                        } else {
+                                            1.0
+                                        },
+                                        if state.selected == Destination::ExtensionRegistry {
+                                            0.08
+                                        } else {
+                                            1.0
+                                        },
+                                    ),
+                                    bevy::math::Vec2::new(
+                                        state.layout.tab_width + 8.0,
+                                        64.0,
+                                    ),
+                                    bevy::math::Vec3::new(
+                                        state.layout.registry_tab.center_x,
+                                        state.layout.registry_tab.center_y,
+                                        9.0,
+                                    ),
+                                );
+                            });
+                    })(state.focus == Some(Destination::ExtensionRegistry));
+                    (|registry_visible: bool| {
+                        sprites
+                            .get(entities.content_panel)
+                            .into_iter()
+                            .for_each(|(entity, transform, visibility, sprite)| {
+                                (|desired_visibility, desired_size, desired_translation| {
+                                    if *visibility != desired_visibility {
+                                        commands.entity(entity).insert(desired_visibility);
+                                    }
+                                    if sprite.custom_size != Some(desired_size) {
+                                        commands.entity(entity).insert(bevy::sprite::Sprite {
+                                            custom_size: Some(desired_size),
+                                            ..sprite.clone()
+                                        });
+                                    }
+                                    if transform.translation != desired_translation
+                                        || transform.scale != bevy::math::Vec3::ONE
+                                    {
+                                        commands.entity(entity).insert(
+                                            bevy::transform::components::Transform {
+                                                translation: desired_translation,
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: bevy::math::Vec3::ONE,
+                                            },
+                                        );
+                                    }
+                                })(
+                                    if registry_visible {
+                                        bevy::camera::visibility::Visibility::Visible
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                    bevy::math::Vec2::new(
+                                        state.layout.content.half_width * 2.0,
+                                        state.layout.content.half_height * 2.0,
+                                    ),
+                                    bevy::math::Vec3::new(
+                                        state.layout.content.center_x,
+                                        state.layout.content.center_y,
+                                        0.0,
+                                    ),
+                                );
+                            });
+                        sprites
+                            .get(entities.laboratory_card)
+                            .into_iter()
+                            .for_each(|(entity, transform, visibility, sprite)| {
+                                (|desired_visibility, desired_size, desired_translation| {
+                                    if *visibility != desired_visibility {
+                                        commands.entity(entity).insert(desired_visibility);
+                                    }
+                                    if sprite.custom_size != Some(desired_size) {
+                                        commands.entity(entity).insert(bevy::sprite::Sprite {
+                                            custom_size: Some(desired_size),
+                                            ..sprite.clone()
+                                        });
+                                    }
+                                    if transform.translation != desired_translation
+                                        || transform.scale != bevy::math::Vec3::ONE
+                                    {
+                                        commands.entity(entity).insert(
+                                            bevy::transform::components::Transform {
+                                                translation: desired_translation,
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: bevy::math::Vec3::ONE,
+                                            },
+                                        );
+                                    }
+                                })(
+                                    if registry_visible {
+                                        bevy::camera::visibility::Visibility::Visible
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                    bevy::math::Vec2::new(
+                                        state.layout.laboratory.half_width * 2.0,
+                                        state.layout.laboratory.half_height * 2.0,
+                                    ),
+                                    bevy::math::Vec3::new(
+                                        state.layout.laboratory.center_x,
+                                        state.layout.laboratory.center_y,
+                                        1.0,
+                                    ),
+                                );
+                            });
+                        sprites
+                            .get(entities.laboratory_well)
+                            .into_iter()
+                            .for_each(|(entity, transform, visibility, sprite)| {
+                                (|desired_visibility, desired_translation| {
+                                    if *visibility != desired_visibility {
+                                        commands.entity(entity).insert(desired_visibility);
+                                    }
+                                    if transform.translation != desired_translation
+                                        || transform.scale != bevy::math::Vec3::ONE
+                                    {
+                                        commands.entity(entity).insert(
+                                            bevy::transform::components::Transform {
+                                                translation: desired_translation,
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: bevy::math::Vec3::ONE,
+                                            },
+                                        );
+                                    }
+                                })(
+                                    if registry_visible {
+                                        bevy::camera::visibility::Visibility::Visible
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                    bevy::math::Vec3::new(
+                                        state.layout.header_x,
+                                        state.layout.header_y,
+                                        2.0,
+                                    ),
+                                );
+                            });
+                        sprites
+                            .get(entities.flask)
+                            .into_iter()
+                            .for_each(|(entity, transform, visibility, sprite)| {
+                                (|desired_visibility, desired_translation| {
+                                    if *visibility != desired_visibility {
+                                        commands.entity(entity).insert(desired_visibility);
+                                    }
+                                    if transform.translation != desired_translation
+                                        || transform.scale != bevy::math::Vec3::ONE
+                                    {
+                                        commands.entity(entity).insert(
+                                            bevy::transform::components::Transform {
+                                                translation: desired_translation,
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: bevy::math::Vec3::ONE,
+                                            },
+                                        );
+                                    }
+                                })(
+                                    if registry_visible {
+                                        bevy::camera::visibility::Visibility::Visible
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                    bevy::math::Vec3::new(
+                                        state.layout.header_x,
+                                        state.layout.header_y,
+                                        3.0,
+                                    ),
+                                );
+                            });
+                        texts
+                            .get(entities.laboratory_title)
+                            .into_iter()
+                            .for_each(|(entity, transform, visibility, _color, bounds)| {
+                                (|desired_visibility, desired_bounds, desired_translation| {
+                                    if *visibility != desired_visibility {
+                                        commands.entity(entity).insert(desired_visibility);
+                                    }
+                                    if *bounds != desired_bounds {
+                                        commands.entity(entity).insert(desired_bounds);
+                                    }
+                                    if transform.translation != desired_translation
+                                        || transform.scale != bevy::math::Vec3::ONE
+                                    {
+                                        commands.entity(entity).insert(
+                                            bevy::transform::components::Transform {
+                                                translation: desired_translation,
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: bevy::math::Vec3::ONE,
+                                            },
+                                        );
+                                    }
+                                })(
+                                    if registry_visible {
+                                        bevy::camera::visibility::Visibility::Visible
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                    bevy::text::TextBounds {
+                                        width: Some(
+                                            state.layout.laboratory_title_bounds,
+                                        ),
+                                        height: None,
+                                    },
+                                    bevy::math::Vec3::new(
+                                        state.layout.laboratory_title_x,
+                                        state.layout.header_y,
+                                        7.0,
+                                    ),
+                                );
+                            });
+                        sprites
+                            .get(entities.separator)
+                            .into_iter()
+                            .for_each(|(entity, transform, visibility, sprite)| {
+                                (|desired_visibility, desired_size, desired_translation| {
+                                    if *visibility != desired_visibility {
+                                        commands.entity(entity).insert(desired_visibility);
+                                    }
+                                    if sprite.custom_size != Some(desired_size) {
+                                        commands.entity(entity).insert(bevy::sprite::Sprite {
+                                            custom_size: Some(desired_size),
+                                            ..sprite.clone()
+                                        });
+                                    }
+                                    if transform.translation != desired_translation
+                                        || transform.scale != bevy::math::Vec3::ONE
+                                    {
+                                        commands.entity(entity).insert(
+                                            bevy::transform::components::Transform {
+                                                translation: desired_translation,
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: bevy::math::Vec3::ONE,
+                                            },
+                                        );
+                                    }
+                                })(
+                                    if registry_visible {
+                                        bevy::camera::visibility::Visibility::Visible
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                    bevy::math::Vec2::new(
+                                        state.layout.laboratory.half_width * 2.0 - 48.0,
+                                        2.0,
+                                    ),
+                                    bevy::math::Vec3::new(
+                                        state.layout.laboratory.center_x,
+                                        state.layout.separator_y,
+                                        8.0,
+                                    ),
+                                );
+                            });
+                        texts
+                            .get(entities.caption)
+                            .into_iter()
+                            .for_each(|(entity, transform, visibility, _color, bounds)| {
+                                (|desired_visibility, desired_bounds, desired_translation| {
+                                    if *visibility != desired_visibility {
+                                        commands.entity(entity).insert(desired_visibility);
+                                    }
+                                    if *bounds != desired_bounds {
+                                        commands.entity(entity).insert(desired_bounds);
+                                    }
+                                    if transform.translation != desired_translation
+                                        || transform.scale != bevy::math::Vec3::ONE
+                                    {
+                                        commands.entity(entity).insert(
+                                            bevy::transform::components::Transform {
+                                                translation: desired_translation,
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: bevy::math::Vec3::ONE,
+                                            },
+                                        );
+                                    }
+                                })(
+                                    if registry_visible {
+                                        bevy::camera::visibility::Visibility::Visible
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                    bevy::text::TextBounds {
+                                        width: Some(state.layout.caption_bounds),
+                                        height: None,
+                                    },
+                                    bevy::math::Vec3::new(
+                                        state.layout.caption_x,
+                                        state.layout.caption_y,
+                                        4.0,
+                                    ),
+                                );
+                            });
+                        sprites
+                            .get(entities.action_pill)
+                            .into_iter()
+                            .for_each(|(entity, transform, visibility, sprite)| {
+                                (|desired_visibility, desired_size, desired_translation| {
+                                    if *visibility != desired_visibility {
+                                        commands.entity(entity).insert(desired_visibility);
+                                    }
+                                    if sprite.custom_size != Some(desired_size) {
+                                        commands.entity(entity).insert(bevy::sprite::Sprite {
+                                            custom_size: Some(desired_size),
+                                            ..sprite.clone()
+                                        });
+                                    }
+                                    if transform.translation != desired_translation
+                                        || transform.scale != bevy::math::Vec3::ONE
+                                    {
+                                        commands.entity(entity).insert(
+                                            bevy::transform::components::Transform {
+                                                translation: desired_translation,
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: bevy::math::Vec3::ONE,
+                                            },
+                                        );
+                                    }
+                                })(
+                                    if registry_visible {
+                                        bevy::camera::visibility::Visibility::Visible
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                    bevy::math::Vec2::new(
+                                        state.layout.action.half_width * 2.0,
+                                        64.0,
+                                    ),
+                                    bevy::math::Vec3::new(
+                                        state.layout.action.center_x,
+                                        state.layout.action.center_y,
+                                        5.0,
+                                    ),
+                                );
+                            });
+                        sprites
+                            .get(entities.action_icon)
+                            .into_iter()
+                            .for_each(|(entity, transform, visibility, sprite)| {
+                                (|desired_visibility, desired_translation| {
+                                    if *visibility != desired_visibility {
+                                        commands.entity(entity).insert(desired_visibility);
+                                    }
+                                    if transform.translation != desired_translation
+                                        || transform.scale != bevy::math::Vec3::ONE
+                                    {
+                                        commands.entity(entity).insert(
+                                            bevy::transform::components::Transform {
+                                                translation: desired_translation,
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: bevy::math::Vec3::ONE,
+                                            },
+                                        );
+                                    }
+                                })(
+                                    if registry_visible {
+                                        bevy::camera::visibility::Visibility::Visible
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                    bevy::math::Vec3::new(
+                                        state.layout.action_icon_x,
+                                        state.layout.action.center_y,
+                                        6.0,
+                                    ),
+                                );
+                            });
+                        texts
+                            .get(entities.action_label)
+                            .into_iter()
+                            .for_each(|(entity, transform, visibility, _color, bounds)| {
+                                (|desired_visibility, desired_bounds, desired_translation| {
+                                    if *visibility != desired_visibility {
+                                        commands.entity(entity).insert(desired_visibility);
+                                    }
+                                    if *bounds != desired_bounds {
+                                        commands.entity(entity).insert(desired_bounds);
+                                    }
+                                    if transform.translation != desired_translation
+                                        || transform.scale != bevy::math::Vec3::ONE
+                                    {
+                                        commands.entity(entity).insert(
+                                            bevy::transform::components::Transform {
+                                                translation: desired_translation,
+                                                rotation: bevy::math::Quat::IDENTITY,
+                                                scale: bevy::math::Vec3::ONE,
+                                            },
+                                        );
+                                    }
+                                })(
+                                    if registry_visible {
+                                        bevy::camera::visibility::Visibility::Visible
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                    bevy::text::TextBounds {
+                                        width: Some(state.layout.action_label_bounds),
+                                        height: None,
+                                    },
+                                    bevy::math::Vec3::new(
+                                        state.layout.action_label_x,
+                                        state.layout.action.center_y,
+                                        7.0,
+                                    ),
+                                );
+                            });
+                    })(
+                        state.hud_visible
+                            && state.selected == Destination::ExtensionRegistry,
+                    );
+                },
+            )),
         )
 
-.run();
+        .run();
 }

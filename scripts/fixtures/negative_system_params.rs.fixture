@@ -1,0 +1,9 @@
+struct Commands;
+struct Query<T>(T);
+
+fn main() {
+    core::hint::black_box(|mut commands: Commands, mut query: Query<u32>| {
+        commands.spawn_empty();
+        core::hint::black_box(query);
+    });
+}

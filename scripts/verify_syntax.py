@@ -199,6 +199,8 @@ def check_rust_source(text, label):
     stripped = LIFETIME_PATTERN.sub(lambda m: " " * len(m.group(0)), strip_rust(text))
     for word in RUST_FORBIDDEN_WORDS:
         for match in re.finditer(r"\b%s\b" % word, stripped):
+            if word == "mut" and is_approved_parameter_mut(stripped, match):
+                continue
             line = stripped.count("\n", 0, match.start()) + 1
             findings.append((label, line, "forbidden construct: %s" % word))
     for pattern, reason in RUST_FORBIDDEN_PATTERNS:
@@ -211,6 +213,14 @@ def check_rust_source(text, label):
     elif not re.match(r"\bfn\s+main\s*\(", stripped[fn_matches[0].start() :][:12]):
         findings.append((label, 0, "the single fn item is not fn main"))
     return findings
+
+
+def is_approved_parameter_mut(stripped, match):
+    preceding = stripped[: match.start()]
+    preceding_token = re.search(r"([A-Za-z_0-9&*]+|\S)\s*$", preceding)
+    if preceding_token is not None and preceding_token.group(1) in ("let", "ref", "&", "*"):
+        return False
+    return re.match(r"\bmut\s+[a-z_][a-z_0-9]*\s*:", stripped[match.start() :]) is not None
 
 
 def check_hash_comments(text, label):
