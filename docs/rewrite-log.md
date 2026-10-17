@@ -33,6 +33,22 @@
   classification; a final whole-tree re-scan; and a ten-item final report.
   The checker moved out of the (now prohibited) Rust test module into a
   Python policy job embedded in CI, with fixtures.
+- Spec revision 4 (current): rev-3 plus the mandatory UI correction contract
+  (§§A–I) and four one-line amendments (core requirement #10, §12, the
+  completion criterion list, §28 item 6). Binding deltas implemented in this
+  pass: explicit `Destination` selection (Home initial, Registry on
+  activation); visible native ungrabbed cursor; optional cursor position
+  never fabricated; primary-`Window` metrics in logical pixels (no `Monitor`
+  fold); hit areas derived from the same layout model that renders;
+  press-arms / release-inside-activates / cancel-on-(outside, focus loss,
+  hide, removal); authoritative `UiState`/`Role` state with verified derives
+  now permitted; one scale-factor-aware layout model with real text
+  measurement; monochrome six-state styling with a visible keyboard focus
+  ring and Tab/Shift+Tab/Enter/Space semantics; committed Cargo-resolved
+  `Cargo.lock` validated with `--locked`; `x11` backend enabled to match the
+  Xvfb smoke environment; readiness/interaction signals replacing
+  timeout-survival proof; policy checker de-contradicted (attribute
+  allowlist, generalized lint rule, exact `&mut` inventory).
 
 ## Stage status
 
@@ -314,3 +330,85 @@ SHA↔version mapping lives here (verified via the GitHub refs API and
     that entry — any additional or blanket suppression fails CI. This is
     neither `allow(warnings)` nor clippy disabling: all other lints stay at
     `-D warnings`.
+19. (rev-4) `x11` Bevy feature added alongside `wayland`: the correction
+    contract §H forbids labeling an Xvfb probe as a passing application test
+    while the manifest selects only Wayland. `x11` resolves through
+    `bevy_internal/x11 → bevy_winit/x11 → winit x11` (x11-dl, dlopen-based:
+    no new build-time system dependency; runtime needs the standard
+    libX11/libxcb/libxkbcommon stack, pulled by the smoke step). Wayland is
+    kept so no platform support is removed. Production fullscreen behavior
+    is unchanged; the feature only adds a window-system backend.
+20. (rev-4) Typed `Update` system with seven annotated parameters instead of
+    the rev-3 exclusive `&mut World` update: state flows through
+    `ResMut<UiState>` snapshots, never through sprite scanning. Seven keeps
+    the closure at the previously remote-proven clippy `too_many_arguments`
+    boundary (the old 7-argument system closure and a 15-argument threading
+    IIFE both passed `-D warnings`). `FrameCount` was dropped as a parameter
+    in favor of `Time::elapsed_secs` for the one-shot readiness signal.
+21. (rev-4) Local types inside `fn main` (`Destination`, `Control`, `Role`,
+    `Layout`, `UiState`, `UiImages`): contract §8 prefers state type
+    declarations local to main; Rust permits item declarations in function
+    bodies, and Bevy's `Component`/`Resource` derives expand legally there
+    (local types are `'static`). No helper methods are attached.
+22. (rev-4) Layout model choice: explicit sprite/text layout (not Bevy UI
+    node layout). Rationale: the correction contract requires one model used
+    for both placement and hit testing; the rect-based model is that single
+    source by construction, needs no extra plugin/features, keeps the
+    frame-time cost to guarded writes on change, and its responsive
+    behavior is fully simulable (and was simulated at five viewports ×
+    five measurement variants). Bevy UI would add a second geometry
+    (node layout) that hit testing would have to read back per frame.
+23. (rev-4) Text measurement: `TextBounds` wrap widths from the model;
+    `TextLayoutInfo.size / scale_factor` read back for the title and
+    description heights until stable (`measured_settled`). Converges in
+    ~3 frames at startup while the HUD is hidden, so refinement is
+    invisible; no fixed character-width estimate is used anywhere.
+24. (rev-4) Cargo.lock delivery: a one-shot `lockfile.yml` workflow
+    (branch-scoped push trigger, `contents: write` only for that job,
+    `hashFiles` guard so it no-ops once the lock exists) ran
+    `cargo generate-lockfile` on the runner and committed the result
+    (`c2f43178`, `[skip ci]`). The lock is Cargo-resolved, never
+    hand-edited; ci.yml/release.yml now hard-fail when it is absent and
+    every dependency command runs `--locked`. The bootstrap workflow is
+    deleted once the final state is green, and the policy job's workflow
+    inventory returns to {ci, release}.
+25. (rev-4) Checker de-contradiction: attributes are validated against a
+    derive allowlist (verified spellings only; inner attributes and all
+    other forms still rejected, fixtures both directions); the lint rule
+    generalizes from one hardcoded equality to "named lints only, explicit
+    levels, never `all`/`warnings`"; the `&mut` audit keeps exact
+    per-spelling counts (8 now, re-requested in architecture.md §13 — the
+    prior approval explicitly does not carry over).
+26. (rev-4) Smoke redesign: readiness = parsed `ARXUMBRA-INTERACTIVE` line
+    (proves ≥2 s of Update frames with renderer up), interaction = xdotool
+    keyboard/pointer scenarios driven by the application-logged control
+    rects (no duplicated layout math in the harness), assertions = ImageMagick
+    AE thresholds between captured states (appearance >4000 px, ring >100 px,
+    hover >2000 px, cancelled-press <3000 px while ≠ Registry state >4000
+    px), termination = Escape-hold self-exit code 0. Lavapipe identity is
+    captured and reported as software-renderer evidence, separately from any
+    physical-GPU claim. `cargo fmt --check` and `clippy` diagnostics are
+    mirrored into the run summary because this environment cannot fetch job
+    logs (results-receiver host unreachable); the strict steps still fail
+    the job on any diff/warning.
+
+## Commands executed for revision 4 (this environment) and outcomes
+
+- Re-downloaded and inspected Bevy `v0.20.0` (`b3bdd75b`) source; API
+  verification greps recorded in docs/bevy-audit.md (x11 feature chain,
+  `CursorOptions`, `TextBounds`/`TextLayoutInfo`/`FontSize`,
+  `Rect::{new,from_corners,contains,size}`, `BorderRect`/`TextureSlicer`,
+  `ButtonInput::{press,just_released}` repeat semantics,
+  `Time::{delta_secs,elapsed_secs}`, `ChildOf`, owned-`Query`
+  `IntoIterator`, `LogPlugin::default`, text2d camera `scale_factor`).
+- `python3` policy-scan extraction of the updated ci.yml job: ALL CHECKS
+  PASSED (locally, before push).
+- `python3` verification suite (layout simulation, 12-scenario state
+  machine, contrast, structural invariants): ALL CHECKS PASSED; kept at
+  `/home/user/arc-parts/verify_rev4.py` (outside the maintained tree).
+- `bash -n` on every workflow `run:` block: OK (16/16).
+- git: rebased the session onto the true remote tip (`64e92baa`) after
+  discovering the sandbox had re-cloned from `main`; pushed `0ad59fe`
+  (rev-4 implementation), `c2f43178` (CI-generated Cargo.lock), `975152b`
+  (apt retry hardening). Remote results are recorded in the run ledger as
+  they land; nothing is claimed before observation.

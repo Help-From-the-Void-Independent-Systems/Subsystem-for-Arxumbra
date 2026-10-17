@@ -179,3 +179,36 @@ runtime test; a parse-level simulation is never counted as a GitHub run.
 | Performance measurements | docs/performance.md | none executable here | BLOCKED | every metric honestly `not measured`; claims classified STRUCTURAL/HYPOTHESIS per docs/performance.md; reproducible procedures recorded |
 | GPU/visual behavior | — | — | BLOCKED | no display/GPU in sandbox; scenario list in docs/performance.md |
 | Compile / fmt / clippy / test / build | whole crate (`cargo test` will honestly report 0 tests) | first remote run 2026-10-16 (run 38969211084, ubuntu-24.04): dependency graph + crate compiled and type/borrow-checked under the clippy driver | fmt --check: PASS (remote) · compile: PASS (remote) · clippy: FAIL→fixed (decision 18) · check/test/build/smoke: NOT RUN (re-run pending) | sandbox toolchain still BLOCKED; remote evidence recorded in docs/rewrite-log.md |
+
+## Revision-4 API verification (same pinned tree, `b3bdd75b`)
+
+| API | exact source location (v0.20.0) | verified contract | application decision |
+| --- | --- | --- | --- |
+| `x11` feature chain | `crates/bevy/Cargo.toml:566`, `crates/bevy_internal/Cargo.toml:153`, `bevy_winit` | `x11 = ["bevy_internal/x11"] → bevy_winit/x11 → winit x11` (x11-dl, dlopen; no new build deps) | feature added next to `wayland`; smoke environment (Xvfb) now matches an enabled backend |
+| `CursorOptions` | `crates/bevy_window/src/window.rs` (component, `#[require]`-ed on `Window`); `WindowPlugin.primary_cursor_options` | fields `visible/grab_mode/hit_test`; plugin-level default insertion | `visible: true, grab_mode: None, hit_test: true` — visible native ungrabbed cursor |
+| `Window` metrics | `crates/bevy_window/src/window.rs` | `width()/height()` logical px; `scale_factor()`; `cursor_position() → Option<Vec2>` logical, top-left origin; `focused: bool` | the single metric source for the layout model and hit tests; `None` cursor = no hit |
+| `PrimaryWindow` | `crates/bevy_window/src/window.rs:56` | marker for the primary window entity | `Query<&Window, With<PrimaryWindow>>` replaces the `Monitor` fold |
+| `Text2d` scaling | `crates/bevy_sprite/src/text2d.rs` (`target_scale_factors` from `Camera::target_scaling_factor` = `RenderTargetInfo.scale_factor`, `crates/bevy_camera/src/camera.rs:521`) | glyph rasterization applies the render-target scale factor; `TextBounds` widths are logical (multiplied by `scale_factor` internally); `TextLayoutInfo.size` is physical px and carries its own `scale_factor` (pipeline.rs:485-497) | text entities use transform scale `(1,1,1)`; measured heights convert via `size / scale_factor`; sprites scale `(s,s,1)` with logical `custom_size` |
+| `TextBounds` / `TextLayout` / `Justify` / `LineBreak` / `FontSize` | `crates/bevy_text/src/bounds.rs`, `text.rs:134,234,783` | `TextBounds { width, height: Option<f32> }` (logical, component); `TextLayout { justify, linebreak }`; `Justify::{Left,Center}`; `LineBreak::WordBoundary`; `FontSize::Px(f32)` logical | title/description/labels wrap inside sidebar/card bounds; badge label centered |
+| `Rect` | `crates/bevy_math/src/rects/rect.rs:28-249` | `pub min/max: Vec2`; `new(x0,y0,x1,y1)`; `from_corners`; `size()`; `contains(point)` | the layout model's rectangle type; hit tests use `contains` on logical cursor positions |
+| `BorderRect` / `TextureSlicer` / `SpriteImageMode` | `crates/bevy_sprite/src/texture_slice/{border_rect.rs,slicer.rs}`, `sprite.rs:202` | `min_inset`/`max_inset` are `Vec2` insets at the min/max corners; sliced mode keeps corner proportions | one 64×64 rounded-rect texture sliced with (16,14) borders serves tab bodies, card, badge, launch, and well with a consistent corner radius; a stroke variant serves the focus ring |
+| `Sprite` | `crates/bevy_sprite/src/sprite.rs:14-17` | derives `Clone` + `PartialEq`; `#[require(Transform, Visibility, VisibilityClass, Anchor)]` | struct-update writes (`..current`) with field-level change guards |
+| `Transform` | `crates/bevy_transform/src/components/transform.rs:69` | derives `Debug, PartialEq, Clone, Copy` | whole-value guarded writes; `translation.z` preserved as the per-role layer |
+| `TextColor` | `crates/bevy_text/src/text.rs:1403` | `pub struct TextColor(pub Color)`, `PartialEq` | guarded whole-value writes |
+| `ButtonInput` repeat semantics | `crates/bevy_input/src/button_input.rs:149-154,207` | `press()` sets `just_pressed` only on transition; `just_released` exists | Enter/Space activate once per physical press — auto-repeat cannot storm; release-inside activation uses `just_released` |
+| `Time` | `crates/bevy_time/src/time.rs:283,306` | `delta_secs()`, `elapsed_secs()` | hold accumulation; one-shot interactive-readiness signal at ≥2 s elapsed |
+| owned-`Query` iteration | `crates/bevy_ecs/src/system/query.rs:2874` | `impl IntoIterator for Query<'w,'s,D: IterQueryData,F>` | `for (…) in entities` consumes the parameter — no `iter_mut` call on a non-`mut` binding (which the syntax contract forbids) |
+| `ChildOf` / `EntityWorldMut::id` | `crates/bevy_ecs/src/hierarchy.rs:107` (`pub mod hierarchy` lib.rs:38), `world/entity_access/world_mut.rs:182` | hierarchy component; spawn-time entity id | Registry children parented to the root; root visibility gates the subtree |
+| `LogPlugin` | `crates/bevy_log/src/lib.rs:218-303` | fields include a `fn`-pointer `custom_layer`; `Default` = INFO + `wgpu=error,naga=warn` | `LogPlugin::default()` — no author `fn` item needed; readiness lines pass the default filter |
+| `Messages<AppExit>` | `crates/bevy_ecs/src/message/*` (rev-3 path re-verified) | `write(&mut self, T)` via `ResMut::into_inner()` | Escape-hold ≥7.0 s writes `AppExit::Success` (process exit code 0, asserted by the smoke check) |
+
+## Revision-4 `&mut` status
+
+The rev-3 approval (nine spellings) explicitly does not carry over to this
+design. The rev-4 inventory is eight spellings (3 × `&mut World` threading in
+`Startup`; `&mut Visibility`, `&mut Transform`, `Option<&mut Sprite>`,
+`Option<&mut TextColor>`, `Option<&mut TextBounds>` as `QueryData` in the
+typed `Update` query). Details and the fresh narrow exception request:
+docs/architecture.md §13. Status: PENDING requester approval; until granted
+the implementation is reported as noncompliant with the strict no-`&mut`
+rule.

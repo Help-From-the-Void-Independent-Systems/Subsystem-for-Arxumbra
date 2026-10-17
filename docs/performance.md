@@ -129,3 +129,31 @@ warmup ≥ 5 s, sample ≥ 60 s, ≥ 3 repetitions; report median/p95/p99.
    idle, black clear color, hidden cursor, OS title string per platform,
    icon loading from an extracted package launched **outside** the repository
    directory (cwd = package root).
+
+## Revision-4 honest workload comparison (§I)
+
+No runtime measurements exist in this environment (no toolchain, no GPU, no
+display); every row below is classified STRUCTURAL (verifiable by source
+inspection) or NOT MEASURED. The rev-3 rows above compared a hidden-HUD idle
+scene against active frames; per §I that comparison is superseded by the
+like-for-like table below (before = rev-4 base `64e92baa`, after = rev-4
+implementation):
+
+| workload | before (rev-3, structural) | after (rev-4, structural) | classification |
+| --- | --- | --- | --- |
+| Home idle (HUD visible, no input) | gate closed on most frames; when open: world-wide query re-creation + full traversal with unconditional `into_inner()` on changed ticks | gate closed: 16 scalar comparisons, zero writes, zero iteration | STRUCTURAL; frame timings NOT MEASURED |
+| Registry idle (no input) | same as Home idle plus a larger visible set | identical to Home idle (gate closed; visibility state static) | STRUCTURAL |
+| hover change (pointer moves across one control) | no hover concept existed | gate opens (cursor delta): one layout-model hit fold (≤3 rect contains), guarded color writes on ≤2 entities (tab body + previous hover), no texture work, no text work, no geometry writes (layout branch skipped) | STRUCTURAL |
+| keyboard focus change (Tab) | no keyboard focus existed | gate opens: one ≤3-step cycle fold, guarded visibility write on 2 ring entities + guarded color writes, no layout writes | STRUCTURAL |
+| tab switch (activation) | fixed-rect press check; state re-derived from sprite alpha/`Name` strings each gated frame; geometry constants re-applied | one state-layer evaluation; guarded visibility write on the Registry root (subtree propagation by the engine) + guarded color writes on 2 tab bodies; zero spawns, zero asset work, zero layout writes | STRUCTURAL |
+| launch transition | alpha threshold read-back from slot sprites | `launched` flag flip; guarded visibility writes on 8 card entities; well/rocket appear via hierarchy propagation | STRUCTURAL |
+| resize / DPI change | not handled (fixed world constants; `Monitor` fold at startup only) | gate opens: layout recompute (one pass of rect arithmetic), guarded transform/`custom_size`/`TextBounds` writes on all placed entities, text re-wrap by the engine, measurement refinement ≤3 frames | STRUCTURAL; NOT MEASURED |
+| startup | 8 procedural textures incl. a monitor-height-dependent card texture; 26 spawns | 3 procedural textures (4×4, 64×64, 64×64) + 6 PNG loads; 26 spawns; layout performed once on the first Update frame (no duplicated layout math anywhere in the tree, including CI — the harness parses application-logged rects) | STRUCTURAL |
+| per-frame state reconstruction | state read back from `Visibility`/alpha/`scale.z` on gated frames | eliminated: authoritative `UiState` snapshot; presentation is write-only downstream | STRUCTURAL |
+
+Assets are built once (`UiImages` + spawn-time handles) and never
+regenerated; hover/focus changes touch only color/visibility; a settled
+focus ring performs zero allocations and zero geometry updates per frame.
+Optional interaction transitions were deliberately not implemented
+(immediate state changes), so no persistent animation loop exists (§F
+permits but does not require transitions).

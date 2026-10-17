@@ -1412,8 +1412,7 @@ fn main() {
                                                                             bevy::camera::visibility::Visibility::Hidden,
                                                                             bevy::camera::visibility::Visibility::Visible,
                                                                         ][shown as usize]);
-                                                                        match rect {
-                                                                            Some(rect) => {
+                                                                        for rect in rect {
                                                                                 if layout_dirty {
                                                                                     (|kept_z: f32, transform: bevy::ecs::change_detection::Mut<bevy::transform::components::Transform>| {
                                                                                     (|next: bevy::transform::components::Transform| {
@@ -1518,8 +1517,6 @@ fn main() {
                                                                                         })(wrap);
                                                                                     }
                                                                                 });
-                                                                            },
-                                                                            None => {}
                                                                         }
                                                                     })(
                                                                         match role {
@@ -2114,7 +2111,7 @@ fn main() {
                                 desc_measured.unwrap_or(current.desc_h),
                             )
                         })(
-                            state.clone(),
+                            *state,
                             entities.iter().fold(
                                 None,
                                 |acc: Option<f32>,
