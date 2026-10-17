@@ -74,31 +74,86 @@ fn main() {
         ring: bevy::asset::Handle<bevy::image::Image>,
     }
 
-    #[derive(bevy::ecs::resource::Resource)]
-    struct UiEntities {
-        sidebar_panel: bevy::ecs::entity::Entity,
-        divider: bevy::ecs::entity::Entity,
-        app_icon: bevy::ecs::entity::Entity,
-        title: bevy::ecs::entity::Entity,
-        home_pill: bevy::ecs::entity::Entity,
-        home_icon: bevy::ecs::entity::Entity,
-        home_label: bevy::ecs::entity::Entity,
-        registry_pill: bevy::ecs::entity::Entity,
-        registry_icon: bevy::ecs::entity::Entity,
-        registry_label: bevy::ecs::entity::Entity,
-        ring_home: bevy::ecs::entity::Entity,
-        ring_registry: bevy::ecs::entity::Entity,
-        content_panel: bevy::ecs::entity::Entity,
-        laboratory_card: bevy::ecs::entity::Entity,
-        laboratory_well: bevy::ecs::entity::Entity,
-        flask: bevy::ecs::entity::Entity,
-        laboratory_title: bevy::ecs::entity::Entity,
-        separator: bevy::ecs::entity::Entity,
-        caption: bevy::ecs::entity::Entity,
-        action_pill: bevy::ecs::entity::Entity,
-        action_icon: bevy::ecs::entity::Entity,
-        action_label: bevy::ecs::entity::Entity,
-    }
+    #[derive(bevy::ecs::component::Component)]
+    struct SidebarPanel;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct Divider;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct AppIcon;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct Title;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct HomePill;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct HomeIcon;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct HomeLabel;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct RegistryPill;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct RegistryIcon;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct RegistryLabel;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct RingHome;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct RingRegistry;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct ContentPanel;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct LaboratoryCard;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct LaboratoryWell;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct Flask;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct LaboratoryTitle;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct Separator;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct Caption;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct ActionPill;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct ActionIcon;
+
+    #[derive(bevy::ecs::component::Component)]
+    struct ActionLabel;
+
+    type SpriteSlot<M> = bevy::ecs::system::Query<(
+        bevy::ecs::entity::Entity,
+        &bevy::transform::components::Transform,
+        &bevy::camera::visibility::Visibility,
+        &bevy::sprite::Sprite,
+    ), bevy::ecs::query::With<M>>;
+
+    type TextSlot<M> = bevy::ecs::system::Query<(
+        bevy::ecs::entity::Entity,
+        &bevy::transform::components::Transform,
+        &bevy::camera::visibility::Visibility,
+        &bevy::text::TextColor,
+        &bevy::text::TextBounds,
+    ), bevy::ecs::query::With<M>>;
 
     bevy::app::App::new()
         .insert_resource(UiState {
@@ -400,558 +455,534 @@ fn main() {
                 },
                 bevy::ecs::schedule::ApplyDeferred,
                 |mut commands: bevy::ecs::system::Commands, images: bevy::ecs::system::Res<UiImages>, server: bevy::ecs::system::Res<bevy::asset::AssetServer>| {
-                    commands.insert_resource(UiEntities {
-                        sidebar_panel: commands
-                            .spawn((
-                                bevy::sprite::Sprite {
-                                    image: images.panel.clone(),
-                                    texture_atlas: None,
-                                    color: bevy::color::Color::srgb(0.07, 0.07, 0.07),
-                                    flip_x: false,
-                                    flip_y: false,
-                                    custom_size: Some(bevy::math::Vec2::ZERO),
-                                    rect: None,
-                                    image_mode: bevy::sprite::SpriteImageMode::Sliced(
-                                        bevy::sprite::TextureSlicer {
-                                            border: bevy::sprite::BorderRect {
-                                                min_inset: bevy::math::Vec2::new(34.0, 34.0),
-                                                max_inset: bevy::math::Vec2::new(34.0, 34.0),
-                                            },
-                                            center_scale_mode:
-                                                bevy::sprite::SliceScaleMode::Stretch,
-                                            sides_scale_mode:
-                                                bevy::sprite::SliceScaleMode::Stretch,
-                                            max_corner_scale: 1.0,
+                    commands.spawn((
+                        SidebarPanel,
+                            bevy::sprite::Sprite {
+                                image: images.panel.clone(),
+                                texture_atlas: None,
+                                color: bevy::color::Color::srgb(0.07, 0.07, 0.07),
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::ZERO),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                    bevy::sprite::TextureSlicer {
+                                        border: bevy::sprite::BorderRect {
+                                            min_inset: bevy::math::Vec2::new(34.0, 34.0),
+                                            max_inset: bevy::math::Vec2::new(34.0, 34.0),
                                         },
-                                    ),
-                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                                },
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        divider: commands
-                            .spawn((
-                                bevy::sprite::Sprite {
-                                    image: bevy::asset::Handle::Uuid(
-                                        bevy::asset::AssetId::<bevy::image::Image>::DEFAULT_UUID,
+                                        center_scale_mode:
+                                            bevy::sprite::SliceScaleMode::Stretch,
+                                        sides_scale_mode:
+                                            bevy::sprite::SliceScaleMode::Stretch,
+                                        max_corner_scale: 1.0,
+                                    },
+                                ),
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                            },
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        Divider,
+                            bevy::sprite::Sprite {
+                                image: bevy::asset::Handle::Uuid(
+                                    bevy::asset::AssetId::<bevy::image::Image>::DEFAULT_UUID,
+                                    core::marker::PhantomData,
+                                ),
+                                texture_atlas: None,
+                                color: bevy::color::Color::srgb(0.16, 0.16, 0.16),
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::ZERO),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Auto,
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Opaque,
+                            },
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        AppIcon,
+                            bevy::sprite::Sprite {
+                                image: server
+                                    .load::<bevy::image::Image>("app-icon.png"),
+                                texture_atlas: None,
+                                color: bevy::color::Color::srgb(0.92, 0.92, 0.92),
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::new(28.0, 28.0)),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Auto,
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                            },
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        Title,
+                            bevy::sprite::Text2d(std::string::String::from(
+                                [
+                                    "Linux-Subsystem-for-Arxumbra",
+                                    "macOS-Subsystem-for-Arxumbra",
+                                    "Windows-Subsystem-for-Arxumbra",
+                                ][(cfg!(target_os = "windows") as usize) * 2
+                                    + (cfg!(target_os = "macos") as usize)],
+                            )),
+                            bevy::text::TextFont {
+                                font: bevy::text::FontSource::Handle(
+                                    bevy::asset::Handle::Uuid(
+                                        bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
                                         core::marker::PhantomData,
                                     ),
-                                    texture_atlas: None,
-                                    color: bevy::color::Color::srgb(0.16, 0.16, 0.16),
-                                    flip_x: false,
-                                    flip_y: false,
-                                    custom_size: Some(bevy::math::Vec2::ZERO),
-                                    rect: None,
-                                    image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Opaque,
-                                },
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        app_icon: commands
-                            .spawn((
-                                bevy::sprite::Sprite {
-                                    image: server
-                                        .load::<bevy::image::Image>("app-icon.png"),
-                                    texture_atlas: None,
-                                    color: bevy::color::Color::srgb(0.92, 0.92, 0.92),
-                                    flip_x: false,
-                                    flip_y: false,
-                                    custom_size: Some(bevy::math::Vec2::new(28.0, 28.0)),
-                                    rect: None,
-                                    image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                                },
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        title: commands
-                            .spawn((
-                                bevy::sprite::Text2d(std::string::String::from(
-                                    [
-                                        "Linux-Subsystem-for-Arxumbra",
-                                        "macOS-Subsystem-for-Arxumbra",
-                                        "Windows-Subsystem-for-Arxumbra",
-                                    ][(cfg!(target_os = "windows") as usize) * 2
-                                        + (cfg!(target_os = "macos") as usize)],
-                                )),
-                                bevy::text::TextFont {
-                                    font: bevy::text::FontSource::Handle(
-                                        bevy::asset::Handle::Uuid(
-                                            bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
-                                            core::marker::PhantomData,
-                                        ),
-                                    ),
-                                    font_size: bevy::text::FontSize::Px(24.0),
-                                    weight: bevy::text::FontWeight::NORMAL,
-                                    width: bevy::text::FontWidth::NORMAL,
-                                    style: bevy::text::FontStyle::Normal,
-                                    font_smoothing: bevy::text::FontSmoothing::AntiAliased,
-                                    font_features: bevy::text::FontFeatures::builder().build(),
-                                    font_variations: bevy::text::FontVariations::builder().build(),
-                                },
-                                bevy::text::TextColor(bevy::color::Color::srgb(0.92, 0.92, 0.92)),
-                                bevy::text::TextBounds::default(),
-                                bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        home_pill: commands
-                            .spawn((
-                                bevy::sprite::Sprite {
-                                    image: images.pill.clone(),
-                                    texture_atlas: None,
-                                    color: bevy::color::Color::srgb(0.12, 0.12, 0.12),
-                                    flip_x: false,
-                                    flip_y: false,
-                                    custom_size: Some(bevy::math::Vec2::ZERO),
-                                    rect: None,
-                                    image_mode: bevy::sprite::SpriteImageMode::Sliced(
-                                        bevy::sprite::TextureSlicer {
-                                            border: bevy::sprite::BorderRect {
-                                                min_inset: bevy::math::Vec2::new(32.0, 32.0),
-                                                max_inset: bevy::math::Vec2::new(32.0, 32.0),
-                                            },
-                                            center_scale_mode:
-                                                bevy::sprite::SliceScaleMode::Stretch,
-                                            sides_scale_mode:
-                                                bevy::sprite::SliceScaleMode::Stretch,
-                                            max_corner_scale: 1.0,
+                                ),
+                                font_size: bevy::text::FontSize::Px(24.0),
+                                weight: bevy::text::FontWeight::NORMAL,
+                                width: bevy::text::FontWidth::NORMAL,
+                                style: bevy::text::FontStyle::Normal,
+                                font_smoothing: bevy::text::FontSmoothing::AntiAliased,
+                                font_features: bevy::text::FontFeatures::builder().build(),
+                                font_variations: bevy::text::FontVariations::builder().build(),
+                            },
+                            bevy::text::TextColor(bevy::color::Color::srgb(0.92, 0.92, 0.92)),
+                            bevy::text::TextBounds::default(),
+                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        HomePill,
+                            bevy::sprite::Sprite {
+                                image: images.pill.clone(),
+                                texture_atlas: None,
+                                color: bevy::color::Color::srgb(0.12, 0.12, 0.12),
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::ZERO),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                    bevy::sprite::TextureSlicer {
+                                        border: bevy::sprite::BorderRect {
+                                            min_inset: bevy::math::Vec2::new(32.0, 32.0),
+                                            max_inset: bevy::math::Vec2::new(32.0, 32.0),
                                         },
-                                    ),
-                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                                },
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        home_icon: commands
-                            .spawn((
-                                bevy::sprite::Sprite {
-                                    image: server
-                                        .load::<bevy::image::Image>("icons/house.png"),
-                                    texture_atlas: None,
-                                    color: bevy::color::Color::srgb(0.88, 0.88, 0.88),
-                                    flip_x: false,
-                                    flip_y: false,
-                                    custom_size: Some(bevy::math::Vec2::new(26.0, 22.0)),
-                                    rect: None,
-                                    image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                                },
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        home_label: commands
-                            .spawn((
-                                bevy::sprite::Text2d(std::string::String::from("Home")),
-                                bevy::text::TextFont {
-                                    font: bevy::text::FontSource::Handle(
-                                        bevy::asset::Handle::Uuid(
-                                            bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
-                                            core::marker::PhantomData,
-                                        ),
-                                    ),
-                                    font_size: bevy::text::FontSize::Px(24.0),
-                                    weight: bevy::text::FontWeight::NORMAL,
-                                    width: bevy::text::FontWidth::NORMAL,
-                                    style: bevy::text::FontStyle::Normal,
-                                    font_smoothing: bevy::text::FontSmoothing::AntiAliased,
-                                    font_features: bevy::text::FontFeatures::builder().build(),
-                                    font_variations: bevy::text::FontVariations::builder().build(),
-                                },
-                                bevy::text::TextColor(bevy::color::Color::srgb(0.88, 0.88, 0.88)),
-                                bevy::text::TextBounds::default(),
-                                bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        registry_pill: commands
-                            .spawn((
-                                bevy::sprite::Sprite {
-                                    image: images.pill.clone(),
-                                    texture_atlas: None,
-                                    color: bevy::color::Color::srgb(0.12, 0.12, 0.12),
-                                    flip_x: false,
-                                    flip_y: false,
-                                    custom_size: Some(bevy::math::Vec2::ZERO),
-                                    rect: None,
-                                    image_mode: bevy::sprite::SpriteImageMode::Sliced(
-                                        bevy::sprite::TextureSlicer {
-                                            border: bevy::sprite::BorderRect {
-                                                min_inset: bevy::math::Vec2::new(32.0, 32.0),
-                                                max_inset: bevy::math::Vec2::new(32.0, 32.0),
-                                            },
-                                            center_scale_mode:
-                                                bevy::sprite::SliceScaleMode::Stretch,
-                                            sides_scale_mode:
-                                                bevy::sprite::SliceScaleMode::Stretch,
-                                            max_corner_scale: 1.0,
-                                        },
-                                    ),
-                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                                },
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        registry_icon: commands
-                            .spawn((
-                                bevy::sprite::Sprite {
-                                    image: server
-                                        .load::<bevy::image::Image>("icons/registry.png"),
-                                    texture_atlas: None,
-                                    color: bevy::color::Color::srgb(0.88, 0.88, 0.88),
-                                    flip_x: false,
-                                    flip_y: false,
-                                    custom_size: Some(bevy::math::Vec2::new(26.0, 22.0)),
-                                    rect: None,
-                                    image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                                },
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        registry_label: commands
-                            .spawn((
-                                bevy::sprite::Text2d(std::string::String::from(
-                                    "Extension Registry",
-                                )),
-                                bevy::text::TextFont {
-                                    font: bevy::text::FontSource::Handle(
-                                        bevy::asset::Handle::Uuid(
-                                            bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
-                                            core::marker::PhantomData,
-                                        ),
-                                    ),
-                                    font_size: bevy::text::FontSize::Px(24.0),
-                                    weight: bevy::text::FontWeight::NORMAL,
-                                    width: bevy::text::FontWidth::NORMAL,
-                                    style: bevy::text::FontStyle::Normal,
-                                    font_smoothing: bevy::text::FontSmoothing::AntiAliased,
-                                    font_features: bevy::text::FontFeatures::builder().build(),
-                                    font_variations: bevy::text::FontVariations::builder().build(),
-                                },
-                                bevy::text::TextColor(bevy::color::Color::srgb(0.88, 0.88, 0.88)),
-                                bevy::text::TextBounds::default(),
-                                bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        ring_home: commands
-                            .spawn((
-                                bevy::sprite::Sprite {
-                                    image: images.ring.clone(),
-                                    texture_atlas: None,
-                                    color: bevy::color::Color::srgb(1.0, 1.0, 1.0),
-                                    flip_x: false,
-                                    flip_y: false,
-                                    custom_size: Some(bevy::math::Vec2::ZERO),
-                                    rect: None,
-                                    image_mode: bevy::sprite::SpriteImageMode::Sliced(
-                                        bevy::sprite::TextureSlicer {
-                                            border: bevy::sprite::BorderRect {
-                                                min_inset: bevy::math::Vec2::new(26.0, 26.0),
-                                                max_inset: bevy::math::Vec2::new(26.0, 26.0),
-                                            },
-                                            center_scale_mode:
-                                                bevy::sprite::SliceScaleMode::Stretch,
-                                            sides_scale_mode:
-                                                bevy::sprite::SliceScaleMode::Stretch,
-                                            max_corner_scale: 1.0,
-                                        },
-                                    ),
-                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                                },
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        ring_registry: commands
-                            .spawn((
-                                bevy::sprite::Sprite {
-                                    image: images.ring.clone(),
-                                    texture_atlas: None,
-                                    color: bevy::color::Color::srgb(1.0, 1.0, 1.0),
-                                    flip_x: false,
-                                    flip_y: false,
-                                    custom_size: Some(bevy::math::Vec2::ZERO),
-                                    rect: None,
-                                    image_mode: bevy::sprite::SpriteImageMode::Sliced(
-                                        bevy::sprite::TextureSlicer {
-                                            border: bevy::sprite::BorderRect {
-                                                min_inset: bevy::math::Vec2::new(26.0, 26.0),
-                                                max_inset: bevy::math::Vec2::new(26.0, 26.0),
-                                            },
-                                            center_scale_mode:
-                                                bevy::sprite::SliceScaleMode::Stretch,
-                                            sides_scale_mode:
-                                                bevy::sprite::SliceScaleMode::Stretch,
-                                            max_corner_scale: 1.0,
-                                        },
-                                    ),
-                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                                },
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        content_panel: commands
-                            .spawn((
-                                bevy::sprite::Sprite {
-                                    image: images.panel.clone(),
-                                    texture_atlas: None,
-                                    color: bevy::color::Color::srgb(0.09, 0.09, 0.09),
-                                    flip_x: false,
-                                    flip_y: false,
-                                    custom_size: Some(bevy::math::Vec2::ZERO),
-                                    rect: None,
-                                    image_mode: bevy::sprite::SpriteImageMode::Sliced(
-                                        bevy::sprite::TextureSlicer {
-                                            border: bevy::sprite::BorderRect {
-                                                min_inset: bevy::math::Vec2::new(34.0, 34.0),
-                                                max_inset: bevy::math::Vec2::new(34.0, 34.0),
-                                            },
-                                            center_scale_mode:
-                                                bevy::sprite::SliceScaleMode::Stretch,
-                                            sides_scale_mode:
-                                                bevy::sprite::SliceScaleMode::Stretch,
-                                            max_corner_scale: 1.0,
-                                        },
-                                    ),
-                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                                },
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        laboratory_card: commands
-                            .spawn((
-                                bevy::sprite::Sprite {
-                                    image: images.panel.clone(),
-                                    texture_atlas: None,
-                                    color: bevy::color::Color::srgb(0.13, 0.13, 0.13),
-                                    flip_x: false,
-                                    flip_y: false,
-                                    custom_size: Some(bevy::math::Vec2::ZERO),
-                                    rect: None,
-                                    image_mode: bevy::sprite::SpriteImageMode::Sliced(
-                                        bevy::sprite::TextureSlicer {
-                                            border: bevy::sprite::BorderRect {
-                                                min_inset: bevy::math::Vec2::new(34.0, 34.0),
-                                                max_inset: bevy::math::Vec2::new(34.0, 34.0),
-                                            },
-                                            center_scale_mode:
-                                                bevy::sprite::SliceScaleMode::Stretch,
-                                            sides_scale_mode:
-                                                bevy::sprite::SliceScaleMode::Stretch,
-                                            max_corner_scale: 1.0,
-                                        },
-                                    ),
-                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                                },
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        laboratory_well: commands
-                            .spawn((
-                                bevy::sprite::Sprite {
-                                    image: images.panel.clone(),
-                                    texture_atlas: None,
-                                    color: bevy::color::Color::srgb(0.18, 0.18, 0.18),
-                                    flip_x: false,
-                                    flip_y: false,
-                                    custom_size: Some(bevy::math::Vec2::new(56.0, 56.0)),
-                                    rect: None,
-                                    image_mode: bevy::sprite::SpriteImageMode::Sliced(
-                                        bevy::sprite::TextureSlicer {
-                                            border: bevy::sprite::BorderRect {
-                                                min_inset: bevy::math::Vec2::new(34.0, 34.0),
-                                                max_inset: bevy::math::Vec2::new(34.0, 34.0),
-                                            },
-                                            center_scale_mode:
-                                                bevy::sprite::SliceScaleMode::Stretch,
-                                            sides_scale_mode:
-                                                bevy::sprite::SliceScaleMode::Stretch,
-                                            max_corner_scale: 1.0,
-                                        },
-                                    ),
-                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                                },
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        flask: commands
-                            .spawn((
-                                bevy::sprite::Sprite {
-                                    image: server
-                                        .load::<bevy::image::Image>("icons/flask.png"),
-                                    texture_atlas: None,
-                                    color: bevy::color::Color::srgb(0.92, 0.92, 0.92),
-                                    flip_x: false,
-                                    flip_y: false,
-                                    custom_size: Some(bevy::math::Vec2::new(48.0, 40.0)),
-                                    rect: None,
-                                    image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                                },
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        laboratory_title: commands
-                            .spawn((
-                                bevy::sprite::Text2d(std::string::String::from("Laboratory")),
-                                bevy::text::TextFont {
-                                    font: bevy::text::FontSource::Handle(
-                                        bevy::asset::Handle::Uuid(
-                                            bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
-                                            core::marker::PhantomData,
-                                        ),
-                                    ),
-                                    font_size: bevy::text::FontSize::Px(30.0),
-                                    weight: bevy::text::FontWeight::NORMAL,
-                                    width: bevy::text::FontWidth::NORMAL,
-                                    style: bevy::text::FontStyle::Normal,
-                                    font_smoothing: bevy::text::FontSmoothing::AntiAliased,
-                                    font_features: bevy::text::FontFeatures::builder().build(),
-                                    font_variations: bevy::text::FontVariations::builder().build(),
-                                },
-                                bevy::text::TextColor(bevy::color::Color::srgb(0.92, 0.92, 0.92)),
-                                bevy::text::TextBounds::default(),
-                                bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        separator: commands
-                            .spawn((
-                                bevy::sprite::Sprite {
-                                    image: bevy::asset::Handle::Uuid(
-                                        bevy::asset::AssetId::<bevy::image::Image>::DEFAULT_UUID,
+                                        center_scale_mode:
+                                            bevy::sprite::SliceScaleMode::Stretch,
+                                        sides_scale_mode:
+                                            bevy::sprite::SliceScaleMode::Stretch,
+                                        max_corner_scale: 1.0,
+                                    },
+                                ),
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                            },
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        HomeIcon,
+                            bevy::sprite::Sprite {
+                                image: server
+                                    .load::<bevy::image::Image>("icons/house.png"),
+                                texture_atlas: None,
+                                color: bevy::color::Color::srgb(0.88, 0.88, 0.88),
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::new(26.0, 22.0)),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Auto,
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                            },
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        HomeLabel,
+                            bevy::sprite::Text2d(std::string::String::from("Home")),
+                            bevy::text::TextFont {
+                                font: bevy::text::FontSource::Handle(
+                                    bevy::asset::Handle::Uuid(
+                                        bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
                                         core::marker::PhantomData,
                                     ),
-                                    texture_atlas: None,
-                                    color: bevy::color::Color::srgb(0.22, 0.22, 0.22),
-                                    flip_x: false,
-                                    flip_y: false,
-                                    custom_size: Some(bevy::math::Vec2::ZERO),
-                                    rect: None,
-                                    image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Opaque,
-                                },
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        caption: commands
-                            .spawn((
-                                bevy::sprite::Text2d(std::string::String::from("Coming Soon")),
-                                bevy::text::TextFont {
-                                    font: bevy::text::FontSource::Handle(
-                                        bevy::asset::Handle::Uuid(
-                                            bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
-                                            core::marker::PhantomData,
-                                        ),
-                                    ),
-                                    font_size: bevy::text::FontSize::Px(20.0),
-                                    weight: bevy::text::FontWeight::NORMAL,
-                                    width: bevy::text::FontWidth::NORMAL,
-                                    style: bevy::text::FontStyle::Normal,
-                                    font_smoothing: bevy::text::FontSmoothing::AntiAliased,
-                                    font_features: bevy::text::FontFeatures::builder().build(),
-                                    font_variations: bevy::text::FontVariations::builder().build(),
-                                },
-                                bevy::text::TextColor(bevy::color::Color::srgb(0.58, 0.58, 0.58)),
-                                bevy::text::TextBounds::default(),
-                                bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        action_pill: commands
-                            .spawn((
-                                bevy::sprite::Sprite {
-                                    image: images.pill.clone(),
-                                    texture_atlas: None,
-                                    color: bevy::color::Color::srgb(0.10, 0.10, 0.10),
-                                    flip_x: false,
-                                    flip_y: false,
-                                    custom_size: Some(bevy::math::Vec2::ZERO),
-                                    rect: None,
-                                    image_mode: bevy::sprite::SpriteImageMode::Sliced(
-                                        bevy::sprite::TextureSlicer {
-                                            border: bevy::sprite::BorderRect {
-                                                min_inset: bevy::math::Vec2::new(32.0, 32.0),
-                                                max_inset: bevy::math::Vec2::new(32.0, 32.0),
-                                            },
-                                            center_scale_mode:
-                                                bevy::sprite::SliceScaleMode::Stretch,
-                                            sides_scale_mode:
-                                                bevy::sprite::SliceScaleMode::Stretch,
-                                            max_corner_scale: 1.0,
+                                ),
+                                font_size: bevy::text::FontSize::Px(24.0),
+                                weight: bevy::text::FontWeight::NORMAL,
+                                width: bevy::text::FontWidth::NORMAL,
+                                style: bevy::text::FontStyle::Normal,
+                                font_smoothing: bevy::text::FontSmoothing::AntiAliased,
+                                font_features: bevy::text::FontFeatures::builder().build(),
+                                font_variations: bevy::text::FontVariations::builder().build(),
+                            },
+                            bevy::text::TextColor(bevy::color::Color::srgb(0.88, 0.88, 0.88)),
+                            bevy::text::TextBounds::default(),
+                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        RegistryPill,
+                            bevy::sprite::Sprite {
+                                image: images.pill.clone(),
+                                texture_atlas: None,
+                                color: bevy::color::Color::srgb(0.12, 0.12, 0.12),
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::ZERO),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                    bevy::sprite::TextureSlicer {
+                                        border: bevy::sprite::BorderRect {
+                                            min_inset: bevy::math::Vec2::new(32.0, 32.0),
+                                            max_inset: bevy::math::Vec2::new(32.0, 32.0),
                                         },
+                                        center_scale_mode:
+                                            bevy::sprite::SliceScaleMode::Stretch,
+                                        sides_scale_mode:
+                                            bevy::sprite::SliceScaleMode::Stretch,
+                                        max_corner_scale: 1.0,
+                                    },
+                                ),
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                            },
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        RegistryIcon,
+                            bevy::sprite::Sprite {
+                                image: server
+                                    .load::<bevy::image::Image>("icons/registry.png"),
+                                texture_atlas: None,
+                                color: bevy::color::Color::srgb(0.88, 0.88, 0.88),
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::new(26.0, 22.0)),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Auto,
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                            },
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        RegistryLabel,
+                            bevy::sprite::Text2d(std::string::String::from(
+                                "Extension Registry",
+                            )),
+                            bevy::text::TextFont {
+                                font: bevy::text::FontSource::Handle(
+                                    bevy::asset::Handle::Uuid(
+                                        bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
+                                        core::marker::PhantomData,
                                     ),
-                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                                },
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        action_icon: commands
-                            .spawn((
-                                bevy::sprite::Sprite {
-                                    image: server
-                                        .load::<bevy::image::Image>("icons/rocket.png"),
-                                    texture_atlas: None,
-                                    color: bevy::color::Color::srgb(0.38, 0.38, 0.38),
-                                    flip_x: false,
-                                    flip_y: false,
-                                    custom_size: Some(bevy::math::Vec2::new(26.0, 26.0)),
-                                    rect: None,
-                                    image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                    alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                                },
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                        action_label: commands
-                            .spawn((
-                                bevy::sprite::Text2d(std::string::String::from("Launch")),
-                                bevy::text::TextFont {
-                                    font: bevy::text::FontSource::Handle(
-                                        bevy::asset::Handle::Uuid(
-                                            bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
-                                            core::marker::PhantomData,
-                                        ),
+                                ),
+                                font_size: bevy::text::FontSize::Px(24.0),
+                                weight: bevy::text::FontWeight::NORMAL,
+                                width: bevy::text::FontWidth::NORMAL,
+                                style: bevy::text::FontStyle::Normal,
+                                font_smoothing: bevy::text::FontSmoothing::AntiAliased,
+                                font_features: bevy::text::FontFeatures::builder().build(),
+                                font_variations: bevy::text::FontVariations::builder().build(),
+                            },
+                            bevy::text::TextColor(bevy::color::Color::srgb(0.88, 0.88, 0.88)),
+                            bevy::text::TextBounds::default(),
+                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        RingHome,
+                            bevy::sprite::Sprite {
+                                image: images.ring.clone(),
+                                texture_atlas: None,
+                                color: bevy::color::Color::srgb(1.0, 1.0, 1.0),
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::ZERO),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                    bevy::sprite::TextureSlicer {
+                                        border: bevy::sprite::BorderRect {
+                                            min_inset: bevy::math::Vec2::new(26.0, 26.0),
+                                            max_inset: bevy::math::Vec2::new(26.0, 26.0),
+                                        },
+                                        center_scale_mode:
+                                            bevy::sprite::SliceScaleMode::Stretch,
+                                        sides_scale_mode:
+                                            bevy::sprite::SliceScaleMode::Stretch,
+                                        max_corner_scale: 1.0,
+                                    },
+                                ),
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                            },
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        RingRegistry,
+                            bevy::sprite::Sprite {
+                                image: images.ring.clone(),
+                                texture_atlas: None,
+                                color: bevy::color::Color::srgb(1.0, 1.0, 1.0),
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::ZERO),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                    bevy::sprite::TextureSlicer {
+                                        border: bevy::sprite::BorderRect {
+                                            min_inset: bevy::math::Vec2::new(26.0, 26.0),
+                                            max_inset: bevy::math::Vec2::new(26.0, 26.0),
+                                        },
+                                        center_scale_mode:
+                                            bevy::sprite::SliceScaleMode::Stretch,
+                                        sides_scale_mode:
+                                            bevy::sprite::SliceScaleMode::Stretch,
+                                        max_corner_scale: 1.0,
+                                    },
+                                ),
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                            },
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        ContentPanel,
+                            bevy::sprite::Sprite {
+                                image: images.panel.clone(),
+                                texture_atlas: None,
+                                color: bevy::color::Color::srgb(0.09, 0.09, 0.09),
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::ZERO),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                    bevy::sprite::TextureSlicer {
+                                        border: bevy::sprite::BorderRect {
+                                            min_inset: bevy::math::Vec2::new(34.0, 34.0),
+                                            max_inset: bevy::math::Vec2::new(34.0, 34.0),
+                                        },
+                                        center_scale_mode:
+                                            bevy::sprite::SliceScaleMode::Stretch,
+                                        sides_scale_mode:
+                                            bevy::sprite::SliceScaleMode::Stretch,
+                                        max_corner_scale: 1.0,
+                                    },
+                                ),
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                            },
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        LaboratoryCard,
+                            bevy::sprite::Sprite {
+                                image: images.panel.clone(),
+                                texture_atlas: None,
+                                color: bevy::color::Color::srgb(0.13, 0.13, 0.13),
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::ZERO),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                    bevy::sprite::TextureSlicer {
+                                        border: bevy::sprite::BorderRect {
+                                            min_inset: bevy::math::Vec2::new(34.0, 34.0),
+                                            max_inset: bevy::math::Vec2::new(34.0, 34.0),
+                                        },
+                                        center_scale_mode:
+                                            bevy::sprite::SliceScaleMode::Stretch,
+                                        sides_scale_mode:
+                                            bevy::sprite::SliceScaleMode::Stretch,
+                                        max_corner_scale: 1.0,
+                                    },
+                                ),
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                            },
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        LaboratoryWell,
+                            bevy::sprite::Sprite {
+                                image: images.panel.clone(),
+                                texture_atlas: None,
+                                color: bevy::color::Color::srgb(0.18, 0.18, 0.18),
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::new(56.0, 56.0)),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                    bevy::sprite::TextureSlicer {
+                                        border: bevy::sprite::BorderRect {
+                                            min_inset: bevy::math::Vec2::new(34.0, 34.0),
+                                            max_inset: bevy::math::Vec2::new(34.0, 34.0),
+                                        },
+                                        center_scale_mode:
+                                            bevy::sprite::SliceScaleMode::Stretch,
+                                        sides_scale_mode:
+                                            bevy::sprite::SliceScaleMode::Stretch,
+                                        max_corner_scale: 1.0,
+                                    },
+                                ),
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                            },
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        Flask,
+                            bevy::sprite::Sprite {
+                                image: server
+                                    .load::<bevy::image::Image>("icons/flask.png"),
+                                texture_atlas: None,
+                                color: bevy::color::Color::srgb(0.92, 0.92, 0.92),
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::new(48.0, 40.0)),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Auto,
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                            },
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        LaboratoryTitle,
+                            bevy::sprite::Text2d(std::string::String::from("Laboratory")),
+                            bevy::text::TextFont {
+                                font: bevy::text::FontSource::Handle(
+                                    bevy::asset::Handle::Uuid(
+                                        bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
+                                        core::marker::PhantomData,
                                     ),
-                                    font_size: bevy::text::FontSize::Px(24.0),
-                                    weight: bevy::text::FontWeight::NORMAL,
-                                    width: bevy::text::FontWidth::NORMAL,
-                                    style: bevy::text::FontStyle::Normal,
-                                    font_smoothing: bevy::text::FontSmoothing::AntiAliased,
-                                    font_features: bevy::text::FontFeatures::builder().build(),
-                                    font_variations: bevy::text::FontVariations::builder().build(),
-                                },
-                                bevy::text::TextColor(bevy::color::Color::srgb(0.38, 0.38, 0.38)),
-                                bevy::text::TextBounds::default(),
-                                bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
-                                bevy::transform::components::Transform::IDENTITY,
-                                bevy::camera::visibility::Visibility::Hidden,
-                            ))
-                            .id(),
-                    });
+                                ),
+                                font_size: bevy::text::FontSize::Px(30.0),
+                                weight: bevy::text::FontWeight::NORMAL,
+                                width: bevy::text::FontWidth::NORMAL,
+                                style: bevy::text::FontStyle::Normal,
+                                font_smoothing: bevy::text::FontSmoothing::AntiAliased,
+                                font_features: bevy::text::FontFeatures::builder().build(),
+                                font_variations: bevy::text::FontVariations::builder().build(),
+                            },
+                            bevy::text::TextColor(bevy::color::Color::srgb(0.92, 0.92, 0.92)),
+                            bevy::text::TextBounds::default(),
+                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        Separator,
+                            bevy::sprite::Sprite {
+                                image: bevy::asset::Handle::Uuid(
+                                    bevy::asset::AssetId::<bevy::image::Image>::DEFAULT_UUID,
+                                    core::marker::PhantomData,
+                                ),
+                                texture_atlas: None,
+                                color: bevy::color::Color::srgb(0.22, 0.22, 0.22),
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::ZERO),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Auto,
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Opaque,
+                            },
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        Caption,
+                            bevy::sprite::Text2d(std::string::String::from("Coming Soon")),
+                            bevy::text::TextFont {
+                                font: bevy::text::FontSource::Handle(
+                                    bevy::asset::Handle::Uuid(
+                                        bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
+                                        core::marker::PhantomData,
+                                    ),
+                                ),
+                                font_size: bevy::text::FontSize::Px(20.0),
+                                weight: bevy::text::FontWeight::NORMAL,
+                                width: bevy::text::FontWidth::NORMAL,
+                                style: bevy::text::FontStyle::Normal,
+                                font_smoothing: bevy::text::FontSmoothing::AntiAliased,
+                                font_features: bevy::text::FontFeatures::builder().build(),
+                                font_variations: bevy::text::FontVariations::builder().build(),
+                            },
+                            bevy::text::TextColor(bevy::color::Color::srgb(0.58, 0.58, 0.58)),
+                            bevy::text::TextBounds::default(),
+                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        ActionPill,
+                            bevy::sprite::Sprite {
+                                image: images.pill.clone(),
+                                texture_atlas: None,
+                                color: bevy::color::Color::srgb(0.10, 0.10, 0.10),
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::ZERO),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                    bevy::sprite::TextureSlicer {
+                                        border: bevy::sprite::BorderRect {
+                                            min_inset: bevy::math::Vec2::new(32.0, 32.0),
+                                            max_inset: bevy::math::Vec2::new(32.0, 32.0),
+                                        },
+                                        center_scale_mode:
+                                            bevy::sprite::SliceScaleMode::Stretch,
+                                        sides_scale_mode:
+                                            bevy::sprite::SliceScaleMode::Stretch,
+                                        max_corner_scale: 1.0,
+                                    },
+                                ),
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                            },
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        ActionIcon,
+                            bevy::sprite::Sprite {
+                                image: server
+                                    .load::<bevy::image::Image>("icons/rocket.png"),
+                                texture_atlas: None,
+                                color: bevy::color::Color::srgb(0.38, 0.38, 0.38),
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::new(26.0, 26.0)),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Auto,
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                            },
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    commands.spawn((
+                        ActionLabel,
+                            bevy::sprite::Text2d(std::string::String::from("Launch")),
+                            bevy::text::TextFont {
+                                font: bevy::text::FontSource::Handle(
+                                    bevy::asset::Handle::Uuid(
+                                        bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
+                                        core::marker::PhantomData,
+                                    ),
+                                ),
+                                font_size: bevy::text::FontSize::Px(24.0),
+                                weight: bevy::text::FontWeight::NORMAL,
+                                width: bevy::text::FontWidth::NORMAL,
+                                style: bevy::text::FontStyle::Normal,
+                                font_smoothing: bevy::text::FontSmoothing::AntiAliased,
+                                font_features: bevy::text::FontFeatures::builder().build(),
+                                font_variations: bevy::text::FontVariations::builder().build(),
+                            },
+                            bevy::text::TextColor(bevy::color::Color::srgb(0.38, 0.38, 0.38)),
+                            bevy::text::TextBounds::default(),
+                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
+                            bevy::transform::components::Transform::IDENTITY,
+                            bevy::camera::visibility::Visibility::Hidden,
+                    ));
                 },
             )),
         )
@@ -1168,16 +1199,20 @@ fn main() {
                     });
                 },
                 |state: bevy::ecs::system::Res<UiState>,
-                 entities: bevy::ecs::system::Res<UiEntities>,
                  mut commands: bevy::ecs::system::Commands,
-                 sprites: bevy::ecs::system::Query<(bevy::ecs::entity::Entity, &bevy::transform::components::Transform, &bevy::camera::visibility::Visibility, &bevy::sprite::Sprite)>,
-                 texts: bevy::ecs::system::Query<
-                    (bevy::ecs::entity::Entity, &bevy::transform::components::Transform, &bevy::camera::visibility::Visibility, &bevy::text::TextColor, &bevy::text::TextBounds),
-                    bevy::ecs::query::With<bevy::sprite::Text2d>,
-                >| {
-                    sprites
-                        .get(entities.sidebar_panel)
-                        .into_iter()
+                 sidebar_panel_sprites: SpriteSlot<SidebarPanel>,
+                 divider_sprites: SpriteSlot<Divider>,
+                 app_icon_sprites: SpriteSlot<AppIcon>,
+                 title_texts: TextSlot<Title>,
+                 home_pill_sprites: SpriteSlot<HomePill>,
+                 home_icon_sprites: SpriteSlot<HomeIcon>,
+                 home_label_texts: TextSlot<HomeLabel>,
+                 registry_pill_sprites: SpriteSlot<RegistryPill>,
+                 registry_icon_sprites: SpriteSlot<RegistryIcon>,
+                 registry_label_texts: TextSlot<RegistryLabel>,
+                 ring_home_sprites: SpriteSlot<RingHome>| {
+                    sidebar_panel_sprites
+                        .iter()
                         .for_each(|(entity, transform, visibility, sprite)| {
                             (|desired_visibility, desired_size, desired_translation| {
                                 if *visibility != desired_visibility {
@@ -1217,9 +1252,8 @@ fn main() {
                                 ),
                             );
                         });
-                    sprites
-                        .get(entities.divider)
-                        .into_iter()
+                    divider_sprites
+                        .iter()
                         .for_each(|(entity, transform, visibility, sprite)| {
                             (|desired_visibility, desired_size, desired_translation| {
                                 if *visibility != desired_visibility {
@@ -1256,9 +1290,8 @@ fn main() {
                                 ),
                             );
                         });
-                    sprites
-                        .get(entities.app_icon)
-                        .into_iter()
+                    app_icon_sprites
+                        .iter()
                         .for_each(|(entity, transform, visibility, sprite)| {
                             (|desired_visibility, desired_translation| {
                                 if *visibility != desired_visibility {
@@ -1288,9 +1321,8 @@ fn main() {
                                 ),
                             );
                         });
-                    texts
-                        .get(entities.title)
-                        .into_iter()
+                    title_texts
+                        .iter()
                         .for_each(|(entity, transform, visibility, color, bounds)| {
                             (|desired_visibility: bevy::camera::visibility::Visibility,
   desired_bounds: bevy::text::TextBounds,
@@ -1334,9 +1366,8 @@ fn main() {
                             }
                         });
                     (|home_selected: bool, home_hovered: bool, home_pressed: bool| {
-                        sprites
-                            .get(entities.home_pill)
-                            .into_iter()
+                        home_pill_sprites
+                            .iter()
                             .for_each(|(entity, transform, visibility, sprite)| {
                                 (|desired_visibility, desired_color, desired_size, desired_translation| {
                                     if *visibility != desired_visibility {
@@ -1426,9 +1457,8 @@ fn main() {
                                     ),
                                 );
                             });
-                        sprites
-                            .get(entities.home_icon)
-                            .into_iter()
+                        home_icon_sprites
+                            .iter()
                             .for_each(|(entity, transform, visibility, sprite)| {
                                 (|desired_visibility, desired_color, desired_translation| {
                                     if *visibility != desired_visibility {
@@ -1487,9 +1517,8 @@ fn main() {
                                     ),
                                 );
                             });
-                        texts
-                            .get(entities.home_label)
-                            .into_iter()
+                        home_label_texts
+                            .iter()
                             .for_each(|(entity, transform, visibility, color, bounds)| {
                                 (|desired_visibility: bevy::camera::visibility::Visibility,
   desired_color: bevy::color::Color,
@@ -1562,9 +1591,8 @@ fn main() {
                     (|registry_selected: bool,
                       registry_hovered: bool,
                       registry_pressed: bool| {
-                        sprites
-                            .get(entities.registry_pill)
-                            .into_iter()
+                        registry_pill_sprites
+                            .iter()
                             .for_each(|(entity, transform, visibility, sprite)| {
                                 (|desired_visibility, desired_color, desired_size, desired_translation| {
                                     if *visibility != desired_visibility {
@@ -1654,9 +1682,8 @@ fn main() {
                                     ),
                                 );
                             });
-                        sprites
-                            .get(entities.registry_icon)
-                            .into_iter()
+                        registry_icon_sprites
+                            .iter()
                             .for_each(|(entity, transform, visibility, sprite)| {
                                 (|desired_visibility, desired_color, desired_translation| {
                                     if *visibility != desired_visibility {
@@ -1715,9 +1742,8 @@ fn main() {
                                     ),
                                 );
                             });
-                        texts
-                            .get(entities.registry_label)
-                            .into_iter()
+                        registry_label_texts
+                            .iter()
                             .for_each(|(entity, transform, visibility, color, bounds)| {
                                 (|desired_visibility: bevy::camera::visibility::Visibility,
   desired_color: bevy::color::Color,
@@ -1788,9 +1814,8 @@ fn main() {
                         state.armed == Some(Destination::ExtensionRegistry),
                     );
                     (|home_focused: bool| {
-                        sprites
-                            .get(entities.ring_home)
-                            .into_iter()
+                        ring_home_sprites
+                            .iter()
                             .for_each(|(entity, transform, visibility, sprite)| {
                                 (|desired_visibility, desired_color, desired_size, desired_translation| {
                                     if *visibility != desired_visibility {
@@ -1854,10 +1879,24 @@ fn main() {
                                 );
                             });
                     })(state.focus == Some(Destination::Home));
+
+                },
+                |state: bevy::ecs::system::Res<UiState>,
+                 mut commands: bevy::ecs::system::Commands,
+                 ring_registry_sprites: SpriteSlot<RingRegistry>,
+                 content_panel_sprites: SpriteSlot<ContentPanel>,
+                 laboratory_card_sprites: SpriteSlot<LaboratoryCard>,
+                 laboratory_well_sprites: SpriteSlot<LaboratoryWell>,
+                 flask_sprites: SpriteSlot<Flask>,
+                 laboratory_title_texts: TextSlot<LaboratoryTitle>,
+                 separator_sprites: SpriteSlot<Separator>,
+                 caption_texts: TextSlot<Caption>,
+                 action_pill_sprites: SpriteSlot<ActionPill>,
+                 action_icon_sprites: SpriteSlot<ActionIcon>,
+                 action_label_texts: TextSlot<ActionLabel>| {
                     (|registry_focused: bool| {
-                        sprites
-                            .get(entities.ring_registry)
-                            .into_iter()
+                        ring_registry_sprites
+                            .iter()
                             .for_each(|(entity, transform, visibility, sprite)| {
                                 (|desired_visibility, desired_color, desired_size, desired_translation| {
                                     if *visibility != desired_visibility {
@@ -1922,9 +1961,8 @@ fn main() {
                             });
                     })(state.focus == Some(Destination::ExtensionRegistry));
                     (|registry_visible: bool| {
-                        sprites
-                            .get(entities.content_panel)
-                            .into_iter()
+                        content_panel_sprites
+                            .iter()
                             .for_each(|(entity, transform, visibility, sprite)| {
                                 (|desired_visibility, desired_size, desired_translation| {
                                     if *visibility != desired_visibility {
@@ -1964,9 +2002,8 @@ fn main() {
                                     ),
                                 );
                             });
-                        sprites
-                            .get(entities.laboratory_card)
-                            .into_iter()
+                        laboratory_card_sprites
+                            .iter()
                             .for_each(|(entity, transform, visibility, sprite)| {
                                 (|desired_visibility, desired_size, desired_translation| {
                                     if *visibility != desired_visibility {
@@ -2006,9 +2043,8 @@ fn main() {
                                     ),
                                 );
                             });
-                        sprites
-                            .get(entities.laboratory_well)
-                            .into_iter()
+                        laboratory_well_sprites
+                            .iter()
                             .for_each(|(entity, transform, visibility, sprite)| {
                                 (|desired_visibility, desired_translation| {
                                     if *visibility != desired_visibility {
@@ -2038,9 +2074,8 @@ fn main() {
                                     ),
                                 );
                             });
-                        sprites
-                            .get(entities.flask)
-                            .into_iter()
+                        flask_sprites
+                            .iter()
                             .for_each(|(entity, transform, visibility, sprite)| {
                                 (|desired_visibility, desired_translation| {
                                     if *visibility != desired_visibility {
@@ -2070,9 +2105,8 @@ fn main() {
                                     ),
                                 );
                             });
-                        texts
-                            .get(entities.laboratory_title)
-                            .into_iter()
+                        laboratory_title_texts
+                            .iter()
                             .for_each(|(entity, transform, visibility, _color, bounds)| {
                                 (|desired_visibility: bevy::camera::visibility::Visibility,
   desired_bounds: bevy::text::TextBounds,
@@ -2113,9 +2147,8 @@ fn main() {
                                     ),
                                 );
                             });
-                        sprites
-                            .get(entities.separator)
-                            .into_iter()
+                        separator_sprites
+                            .iter()
                             .for_each(|(entity, transform, visibility, sprite)| {
                                 (|desired_visibility, desired_size, desired_translation| {
                                     if *visibility != desired_visibility {
@@ -2155,9 +2188,8 @@ fn main() {
                                     ),
                                 );
                             });
-                        texts
-                            .get(entities.caption)
-                            .into_iter()
+                        caption_texts
+                            .iter()
                             .for_each(|(entity, transform, visibility, _color, bounds)| {
                                 (|desired_visibility: bevy::camera::visibility::Visibility,
   desired_bounds: bevy::text::TextBounds,
@@ -2193,9 +2225,8 @@ fn main() {
                                     ),
                                 );
                             });
-                        sprites
-                            .get(entities.action_pill)
-                            .into_iter()
+                        action_pill_sprites
+                            .iter()
                             .for_each(|(entity, transform, visibility, sprite)| {
                                 (|desired_visibility, desired_size, desired_translation| {
                                     if *visibility != desired_visibility {
@@ -2235,9 +2266,8 @@ fn main() {
                                     ),
                                 );
                             });
-                        sprites
-                            .get(entities.action_icon)
-                            .into_iter()
+                        action_icon_sprites
+                            .iter()
                             .for_each(|(entity, transform, visibility, sprite)| {
                                 (|desired_visibility, desired_translation| {
                                     if *visibility != desired_visibility {
@@ -2267,9 +2297,8 @@ fn main() {
                                     ),
                                 );
                             });
-                        texts
-                            .get(entities.action_label)
-                            .into_iter()
+                        action_label_texts
+                            .iter()
                             .for_each(|(entity, transform, visibility, _color, bounds)| {
                                 (|desired_visibility: bevy::camera::visibility::Visibility,
   desired_bounds: bevy::text::TextBounds,
