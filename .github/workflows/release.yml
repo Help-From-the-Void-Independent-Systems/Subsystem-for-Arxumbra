@@ -115,6 +115,7 @@ jobs:
             for package in x11 x11rb x11-dl arboard; do
               if cargo tree --locked --target "$target" --invert "$package" > /dev/null 2>&1; then
                 echo "::error::unexpected $package inside the $target dependency graph"
+                cargo tree --locked --target "$target" --invert "$package" 2>&1 | head -n 24 | sed 's/^/::error::/'
                 exit 1
               fi
               echo "$target: $package absent" | tee -a "$EVIDENCE_DIR/x11-absence.log"
