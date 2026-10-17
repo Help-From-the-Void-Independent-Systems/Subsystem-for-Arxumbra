@@ -179,6 +179,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo metadata --locked --format-version 1 > "$EVIDENCE_DIR/metadata.json"
+          python3 -c "import json,sys; metadata=json.load(open(sys.argv[1])); root=[p for p in metadata['packages'] if p['name']=='subsystem-for-arxumbra']; assert root, 'root package missing'; assert any(t['kind']==['bin'] for t in root[0]['targets']), 'no bin target'; print('bin target present')" "$EVIDENCE_DIR/metadata.json"
 
       - name: Summarize
         if: always()
