@@ -154,7 +154,7 @@ fn main() {
                     mode: bevy::window::WindowMode::BorderlessFullscreen(
                         bevy::window::MonitorSelection::Primary,
                     ),
-                    resolution: bevy::window::WindowResolution::new(1920.0, 1080.0),
+                    resolution: bevy::window::WindowResolution::new(1920, 1080),
                     title: std::string::String::from("Arxumbra"),
                     resizable: false,
                     decorations: false,
