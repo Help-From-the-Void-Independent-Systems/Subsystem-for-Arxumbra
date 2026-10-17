@@ -140,7 +140,9 @@ fn main() {
     #[derive(bevy::ecs::component::Component)]
     struct ActionLabel;
 
-    type SpriteSlot<'a, 'w, 's, M> = bevy::ecs::system::Query<'w, 's,
+    type SpriteSlot<'a, 'w, 's, M> = bevy::ecs::system::Query<
+        'w,
+        's,
         (
             bevy::ecs::entity::Entity,
             &'a bevy::transform::components::Transform,
@@ -150,7 +152,9 @@ fn main() {
         bevy::ecs::query::With<M>,
     >;
 
-    type TextSlot<'a, 'w, 's, M> = bevy::ecs::system::Query<'w, 's,
+    type TextSlot<'a, 'w, 's, M> = bevy::ecs::system::Query<
+        'w,
+        's,
         (
             bevy::ecs::entity::Entity,
             &'a bevy::transform::components::Transform,
