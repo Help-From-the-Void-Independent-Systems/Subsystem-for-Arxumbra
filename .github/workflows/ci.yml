@@ -364,8 +364,8 @@ jobs:
           assert code.count("&mut bevy::text::TextColor") == 1
           assert code.count("&mut bevy::text::TextBounds") == 1
           assert re.findall(r"\benum (\w+)", code) == ["Destination", "Control", "Role"], re.findall(r"\benum (\w+)", code)
-          assert re.findall(r"\bstruct (\w+)", code) == ["Layout", "UiState", "UiImages"], re.findall(r"\bstruct (\w+)", code)
-          print("rust source policy: PASS (1 fn, 0 comments, 0 keyword violations, 6 verified derives, 8 audited &mut)")
+          assert re.findall(r"\bstruct (\w+)", code) == ["Layout", "UiState"], re.findall(r"\bstruct (\w+)", code)
+          print("rust source policy: PASS (1 fn, 0 comments, 0 keyword violations, 5 verified derives, 8 audited &mut)")
 
           manifests = []
           for root, dirs, files in os.walk("."):
@@ -665,7 +665,8 @@ jobs:
         run: |
           set -uo pipefail
           sudo apt-get update || sudo apt-get update
-          sudo apt-get install -y xvfb xauth xdotool imagemagick x11-utils mesa-vulkan-drivers libvulkan1 vulkan-tools libxkbcommon-x11-0
+          PACKAGES="xvfb xauth xdotool imagemagick x11-utils mesa-vulkan-drivers libvulkan1 vulkan-tools libx11-6 libxcursor1 libxrandr1 libxi6 libxkbcommon0 libxkbcommon-x11-0"
+          sudo apt-get install -y $PACKAGES || (sleep 10 && sudo apt-get update && sudo apt-get install -y $PACKAGES)
           ICD=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
           if [ -f "$ICD" ]; then
             export VK_ICD_FILENAMES="$ICD"
@@ -805,6 +806,16 @@ jobs:
             tail -c 40000 "$LOG"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$FAIL" != 0 ] || [ "$READY" != 1 ]; then
+            esc=$(printf '\033')
+            sed -e "s/${esc}\[[0-9;]*m//g" "$LOG" > /tmp/smoke.plain.log
+            head -n 10 /tmp/smoke.plain.log | while IFS= read -r line; do
+              echo "::warning title=smoke-log-head::${line}"
+            done
+            tail -n 25 /tmp/smoke.plain.log | while IFS= read -r line; do
+              echo "::error title=smoke-log-tail::${line}"
+            done
+          fi
           if [ "$FAIL" != 0 ]; then
             exit 1
           fi

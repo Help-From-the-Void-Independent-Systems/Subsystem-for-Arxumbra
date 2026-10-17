@@ -40,7 +40,6 @@ fn main() {
         height: f32,
         scale: f32,
         sidebar_w: f32,
-        pad: f32,
         icon: bevy::math::Rect,
         title: bevy::math::Rect,
         home_tab: bevy::math::Rect,
@@ -71,18 +70,6 @@ fn main() {
         desc_h: f32,
         measured_settled: bool,
         interactive_logged: bool,
-    }
-    #[derive(bevy::ecs::resource::Resource, Clone)]
-    struct UiImages {
-        solid: bevy::asset::Handle<bevy::image::Image>,
-        pill: bevy::asset::Handle<bevy::image::Image>,
-        ring: bevy::asset::Handle<bevy::image::Image>,
-        house: bevy::asset::Handle<bevy::image::Image>,
-        registry: bevy::asset::Handle<bevy::image::Image>,
-        app_icon: bevy::asset::Handle<bevy::image::Image>,
-        flask: bevy::asset::Handle<bevy::image::Image>,
-        rocket_pill: bevy::asset::Handle<bevy::image::Image>,
-        rocket: bevy::asset::Handle<bevy::image::Image>,
     }
     bevy::app::App::new()
         .add_plugins((
@@ -245,17 +232,6 @@ fn main() {
                   rocket_pill: bevy::asset::Handle<bevy::image::Image>,
                   rocket: bevy::asset::Handle<bevy::image::Image>,
                   world: &mut bevy::ecs::world::World| {
-                    world.insert_resource(UiImages {
-                        solid: solid.clone(),
-                        pill: pill.clone(),
-                        ring: ring.clone(),
-                        house: house.clone(),
-                        registry: registry.clone(),
-                        app_icon: app_icon.clone(),
-                        flask: flask.clone(),
-                        rocket_pill: rocket_pill.clone(),
-                        rocket: rocket.clone(),
-                    });
                     world.insert_resource(UiState {
                         selected: Destination::Home,
                         hud_visible: false,
@@ -272,7 +248,6 @@ fn main() {
                             height: 0.0,
                             scale: 0.0,
                             sidebar_w: 0.0,
-                            pad: 0.0,
                             icon: bevy::math::Rect::new(0.0, 0.0, 0.0, 0.0),
                             title: bevy::math::Rect::new(0.0, 0.0, 0.0, 0.0),
                             home_tab: bevy::math::Rect::new(0.0, 0.0, 0.0, 0.0),
@@ -1447,7 +1422,7 @@ fn main() {
                                                                                     }
                                                                                 })(
                                                                                     if focused_mid
-                                                                                        == None
+                                                                                        .is_none()
                                                                                     {
                                                                                         step - 1
                                                                                     } else if shift_held
@@ -1654,7 +1629,6 @@ fn main() {
                                                 height: height_now,
                                                 scale: scale_now,
                                                 sidebar_w,
-                                                pad: 16.0,
                                                 icon: bevy::math::Rect::new(16.0, 16.0, 48.0, 48.0),
                                                 title: bevy::math::Rect::new(58.0, 16.0, 58.0 + title_w, 16.0 + title_h_next),
                                                 home_tab: bevy::math::Rect::new(16.0, tabs_top, sidebar_w - 16.0, tabs_top + 56.0),
@@ -1691,8 +1665,7 @@ fn main() {
                                     (width_now - (width_now * 0.26).clamp(180.0, 340.0) - 48.0)
                                         .max(240.0),
                                     (width_now - (width_now * 0.26).clamp(180.0, 340.0) - 48.0)
-                                        .max(240.0)
-                                        .min(560.0),
+                                        .clamp(240.0, 560.0),
                                     title_h_next.max(32.0) + 32.0,
                                     ((width_now * 0.26).clamp(180.0, 340.0) - 74.0).max(60.0),
                                 )
@@ -1940,7 +1913,7 @@ fn main() {
                                             })(wrap);
                                         }
                                     });
-                                });
+                                })
                             })(
                                 match role {
                                     Role::SidebarPanel => (
