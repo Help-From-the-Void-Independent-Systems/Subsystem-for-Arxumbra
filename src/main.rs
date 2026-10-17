@@ -981,7 +981,7 @@ fn main() {
                  mouse: bevy::ecs::system::Res<bevy::input::ButtonInput<bevy::input::mouse::MouseButton>>,
                  time: bevy::ecs::system::Res<bevy::time::Time>,
                  mut commands: bevy::ecs::system::Commands,
-                 windows: bevy::ecs::system::Query<(bevy::ecs::entity::Entity, &bevy::window::Window), bevy::ecs::system::With<bevy::window::PrimaryWindow>>| {
+                 windows: bevy::ecs::system::Query<(bevy::ecs::entity::Entity, &bevy::window::Window), bevy::ecs::query::With<bevy::window::PrimaryWindow>>| {
                     windows.iter().next().into_iter().for_each(|(entity, window)| {
                         if !window.focused {
                             if state.hover.is_some() {
@@ -1191,7 +1191,7 @@ fn main() {
                  sprites: bevy::ecs::system::Query<(bevy::ecs::entity::Entity, &bevy::transform::components::Transform, &bevy::camera::visibility::Visibility, &bevy::sprite::Sprite)>,
                  texts: bevy::ecs::system::Query<
                     (bevy::ecs::entity::Entity, &bevy::transform::components::Transform, &bevy::camera::visibility::Visibility, &bevy::text::TextColor, &bevy::text::TextBounds),
-                    bevy::ecs::system::With<bevy::sprite::Text2d>,
+                    bevy::ecs::query::With<bevy::sprite::Text2d>,
                 >| {
                     sprites
                         .get(entities.sidebar_panel)

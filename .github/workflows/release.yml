@@ -199,38 +199,38 @@ jobs:
         shell: bash
         run: |
           set +e
-          grep -E '^error' "$EVIDENCE_DIR/check.log" | cut -c 1-90 > .check-errors
+          grep -E '^error|^\s+-->' "$EVIDENCE_DIR/check.log" | cut -c 1-100 > .check-errors
           for index in 0 1 2 3 4 5; do
             line=$(sed -n "$((index + 1))p" .check-errors)
             echo "e$index=$line" >> "$GITHUB_OUTPUT"
           done
 
-      - name: "Check e0: ${{ steps.check_reflect.outputs.e0 }}"
+      - name: "Check e00: ${{ steps.check_reflect.outputs.e0 }} (loc) e01: ${{ steps.check_reflect.outputs.e1 }}"
         if: always()
         shell: bash
         run: echo recorded
 
-      - name: "Check e1: ${{ steps.check_reflect.outputs.e1 }}"
+      - name: "Check e02: ${{ steps.check_reflect.outputs.e02 }} (loc) e03: ${{ steps.check_reflect.outputs.e03 }}"
         if: always()
         shell: bash
         run: echo recorded
 
-      - name: "Check e2: ${{ steps.check_reflect.outputs.e2 }}"
+      - name: "Check e04: ${{ steps.check_reflect.outputs.e04 }} (loc) e05: ${{ steps.check_reflect.outputs.e05 }}"
         if: always()
         shell: bash
         run: echo recorded
 
-      - name: "Check e3: ${{ steps.check_reflect.outputs.e3 }}"
+      - name: "Check e06: ${{ steps.check_reflect.outputs.e06 }} (loc) e07: ${{ steps.check_reflect.outputs.e07 }}"
         if: always()
         shell: bash
         run: echo recorded
 
-      - name: "Check e4: ${{ steps.check_reflect.outputs.e4 }}"
+      - name: "Check e08: ${{ steps.check_reflect.outputs.e08 }} (loc) e09: ${{ steps.check_reflect.outputs.e09 }}"
         if: always()
         shell: bash
         run: echo recorded
 
-      - name: "Check e5: ${{ steps.check_reflect.outputs.e5 }}"
+      - name: "Check e10: ${{ steps.check_reflect.outputs.e10 }} (loc) e11: ${{ steps.check_reflect.outputs.e11 }}"
         if: always()
         shell: bash
         run: echo recorded
