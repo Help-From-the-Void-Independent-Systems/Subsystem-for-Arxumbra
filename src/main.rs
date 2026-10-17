@@ -1835,112 +1835,112 @@ fn main() {
                                     bevy::camera::visibility::Visibility::Hidden,
                                     bevy::camera::visibility::Visibility::Visible,
                                 ][shown as usize]);
-                                for rect in rect {
-                                        if layout_dirty_now {
-                                            (|kept_z: f32, transform: bevy::ecs::change_detection::Mut<bevy::transform::components::Transform>| {
-                                            (|next: bevy::transform::components::Transform| {
-                                                if *transform
-                                                    != next
-                                                {
-                                                    *transform
-                                                        .into_inner(
-                                                        ) = next;
-                                                }
-                                            })(bevy::transform::components::Transform {
-                                                translation: bevy::math::Vec3::new(
-                                                    [
-                                                        (rect.min.x
+                                rect.map_or((), |rect: bevy::math::Rect| {
+                                    if layout_dirty_now {
+                                        (|kept_z: f32, transform: bevy::ecs::change_detection::Mut<bevy::transform::components::Transform>| {
+                                        (|next: bevy::transform::components::Transform| {
+                                            if *transform
+                                                != next
+                                            {
+                                                *transform
+                                                    .into_inner(
+                                                    ) = next;
+                                            }
+                                        })(bevy::transform::components::Transform {
+                                            translation: bevy::math::Vec3::new(
+                                                [
+                                                    (rect.min.x
+                                                        + rect
+                                                            .size(
+                                                            )
+                                                            .x
+                                                            / 2.0
+                                                        - next_state.layout
+                                                            .width
+                                                            / 2.0)
+                                                        * next_state.layout
+                                                            .scale,
+                                                    (rect.min.x
+                                                        - next_state.layout
+                                                            .width
+                                                            / 2.0)
+                                                        * next_state.layout
+                                                            .scale,
+                                                ][is_text
+                                                    as usize],
+                                                [
+                                                    (next_state.layout
+                                                        .height
+                                                        / 2.0
+                                                        - (rect.min.y
                                                             + rect
                                                                 .size(
                                                                 )
-                                                                .x
-                                                                / 2.0
-                                                            - next_state.layout
-                                                                .width
-                                                                / 2.0)
-                                                            * next_state.layout
-                                                                .scale,
-                                                        (rect.min.x
-                                                            - next_state.layout
-                                                                .width
-                                                                / 2.0)
-                                                            * next_state.layout
-                                                                .scale,
-                                                    ][is_text
-                                                        as usize],
-                                                    [
-                                                        (next_state.layout
-                                                            .height
-                                                            / 2.0
-                                                            - (rect.min.y
-                                                                + rect
-                                                                    .size(
-                                                                    )
-                                                                    .y
-                                                                    / 2.0))
-                                                            * next_state.layout
-                                                                .scale,
-                                                        (next_state.layout
-                                                            .height
-                                                            / 2.0
-                                                            - rect.min.y)
-                                                            * next_state.layout
-                                                                .scale,
-                                                    ][is_text
-                                                        as usize],
-                                                    kept_z,
-                                                ),
-                                                rotation: bevy::math::Quat::IDENTITY,
-                                                scale: [
-                                                    bevy::math::Vec3::new(
-                                                        next_state.layout
+                                                                .y
+                                                                / 2.0))
+                                                        * next_state.layout
                                                             .scale,
-                                                        next_state.layout
+                                                    (next_state.layout
+                                                        .height
+                                                        / 2.0
+                                                        - rect.min.y)
+                                                        * next_state.layout
                                                             .scale,
-                                                        1.0,
-                                                    ),
-                                                    bevy::math::Vec3::new(
-                                                        1.0,
-                                                        1.0,
-                                                        1.0,
-                                                    ),
                                                 ][is_text
                                                     as usize],
+                                                kept_z,
+                                            ),
+                                            rotation: bevy::math::Quat::IDENTITY,
+                                            scale: [
+                                                bevy::math::Vec3::new(
+                                                    next_state.layout
+                                                        .scale,
+                                                    next_state.layout
+                                                        .scale,
+                                                    1.0,
+                                                ),
+                                                bevy::math::Vec3::new(
+                                                    1.0,
+                                                    1.0,
+                                                    1.0,
+                                                ),
+                                            ][is_text
+                                                as usize],
+                                        });
+                                        })(transform.translation.z, transform);
+                                    }
+                                    sprite.into_iter().for_each(|sprite: bevy::ecs::change_detection::Mut<bevy::sprite::Sprite>| {
+                                        (|current_sprite: bevy::sprite::Sprite, sprite: bevy::ecs::change_detection::Mut<bevy::sprite::Sprite>| {
+                                            (|next: bevy::sprite::Sprite| {
+                                                if current_sprite.color != next.color || current_sprite.custom_size != next.custom_size {
+                                                    *sprite.into_inner() = next;
+                                                }
+                                            })(bevy::sprite::Sprite {
+                                                color: tint.unwrap_or(current_sprite.color),
+                                                custom_size: [current_sprite.custom_size, Some(rect.size())][layout_dirty_now as usize],
+                                                ..current_sprite
                                             });
-                                            })(transform.translation.z, transform);
+                                        })(sprite.clone(), sprite);
+                                    });
+                                    text_color.into_iter().for_each(|text_color: bevy::ecs::change_detection::Mut<bevy::text::TextColor>| {
+                                        (|current_ink: bevy::color::Color, text_color: bevy::ecs::change_detection::Mut<bevy::text::TextColor>| {
+                                            (|next: bevy::text::TextColor| {
+                                                if current_ink != next.0 {
+                                                    *text_color.into_inner() = next;
+                                                }
+                                            })(bevy::text::TextColor(ink.unwrap_or(current_ink)));
+                                        })(text_color.0, text_color);
+                                    });
+                                    text_bounds.into_iter().for_each(|text_bounds: bevy::ecs::change_detection::Mut<bevy::text::TextBounds>| {
+                                        if layout_dirty_now {
+                                            (|next: Option<f32>| {
+                                                if text_bounds.width != next {
+                                                    text_bounds.into_inner().width = next;
+                                                }
+                                            })(wrap);
                                         }
-                                        sprite.into_iter().for_each(|sprite: bevy::ecs::change_detection::Mut<bevy::sprite::Sprite>| {
-                                            (|current_sprite: bevy::sprite::Sprite, sprite: bevy::ecs::change_detection::Mut<bevy::sprite::Sprite>| {
-                                                (|next: bevy::sprite::Sprite| {
-                                                    if current_sprite.color != next.color || current_sprite.custom_size != next.custom_size {
-                                                        *sprite.into_inner() = next;
-                                                    }
-                                                })(bevy::sprite::Sprite {
-                                                    color: tint.unwrap_or(current_sprite.color),
-                                                    custom_size: [current_sprite.custom_size, Some(rect.size())][layout_dirty_now as usize],
-                                                    ..current_sprite
-                                                });
-                                            })(sprite.clone(), sprite);
-                                        });
-                                        text_color.into_iter().for_each(|text_color: bevy::ecs::change_detection::Mut<bevy::text::TextColor>| {
-                                            (|current_ink: bevy::color::Color, text_color: bevy::ecs::change_detection::Mut<bevy::text::TextColor>| {
-                                                (|next: bevy::text::TextColor| {
-                                                    if current_ink != next.0 {
-                                                        *text_color.into_inner() = next;
-                                                    }
-                                                })(bevy::text::TextColor(ink.unwrap_or(current_ink)));
-                                            })(text_color.0, text_color);
-                                        });
-                                        text_bounds.into_iter().for_each(|text_bounds: bevy::ecs::change_detection::Mut<bevy::text::TextBounds>| {
-                                            if layout_dirty_now {
-                                                (|next: Option<f32>| {
-                                                    if text_bounds.width != next {
-                                                        text_bounds.into_inner().width = next;
-                                                    }
-                                                })(wrap);
-                                            }
-                                        });
-                                }
+                                    });
+                                });
                             })(
                                 match role {
                                     Role::SidebarPanel => (
