@@ -1292,7 +1292,9 @@ fn main() {
                         .get(entities.title)
                         .into_iter()
                         .for_each(|(entity, transform, visibility, color, bounds)| {
-                            (|desired_visibility, desired_bounds, desired_translation| {
+                            (|desired_visibility: bevy::camera::visibility::Visibility,
+  desired_bounds: bevy::text::TextBounds,
+  desired_translation: bevy::math::Vec3| {
                                 if *visibility != desired_visibility {
                                     commands.entity(entity).insert(desired_visibility);
                                 }
@@ -1489,7 +1491,10 @@ fn main() {
                             .get(entities.home_label)
                             .into_iter()
                             .for_each(|(entity, transform, visibility, color, bounds)| {
-                                (|desired_visibility, desired_color, desired_bounds, desired_translation| {
+                                (|desired_visibility: bevy::camera::visibility::Visibility,
+  desired_color: bevy::color::Color,
+  desired_bounds: bevy::text::TextBounds,
+  desired_translation: bevy::math::Vec3| {
                                     if *visibility != desired_visibility {
                                         commands.entity(entity).insert(desired_visibility);
                                     }
@@ -1714,7 +1719,10 @@ fn main() {
                             .get(entities.registry_label)
                             .into_iter()
                             .for_each(|(entity, transform, visibility, color, bounds)| {
-                                (|desired_visibility, desired_color, desired_bounds, desired_translation| {
+                                (|desired_visibility: bevy::camera::visibility::Visibility,
+  desired_color: bevy::color::Color,
+  desired_bounds: bevy::text::TextBounds,
+  desired_translation: bevy::math::Vec3| {
                                     if *visibility != desired_visibility {
                                         commands.entity(entity).insert(desired_visibility);
                                     }
@@ -2066,7 +2074,9 @@ fn main() {
                             .get(entities.laboratory_title)
                             .into_iter()
                             .for_each(|(entity, transform, visibility, _color, bounds)| {
-                                (|desired_visibility, desired_bounds, desired_translation| {
+                                (|desired_visibility: bevy::camera::visibility::Visibility,
+  desired_bounds: bevy::text::TextBounds,
+  desired_translation: bevy::math::Vec3| {
                                     if *visibility != desired_visibility {
                                         commands.entity(entity).insert(desired_visibility);
                                     }
@@ -2149,7 +2159,9 @@ fn main() {
                             .get(entities.caption)
                             .into_iter()
                             .for_each(|(entity, transform, visibility, _color, bounds)| {
-                                (|desired_visibility, desired_bounds, desired_translation| {
+                                (|desired_visibility: bevy::camera::visibility::Visibility,
+  desired_bounds: bevy::text::TextBounds,
+  desired_translation: bevy::math::Vec3| {
                                     if *visibility != desired_visibility {
                                         commands.entity(entity).insert(desired_visibility);
                                     }
@@ -2259,7 +2271,9 @@ fn main() {
                             .get(entities.action_label)
                             .into_iter()
                             .for_each(|(entity, transform, visibility, _color, bounds)| {
-                                (|desired_visibility, desired_bounds, desired_translation| {
+                                (|desired_visibility: bevy::camera::visibility::Visibility,
+  desired_bounds: bevy::text::TextBounds,
+  desired_translation: bevy::math::Vec3| {
                                     if *visibility != desired_visibility {
                                         commands.entity(entity).insert(desired_visibility);
                                     }
