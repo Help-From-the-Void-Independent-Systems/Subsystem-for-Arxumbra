@@ -294,11 +294,14 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
-          if ! cargo build --locked --release --target ${{ matrix.target }} 2>&1 | tee "$EVIDENCE_DIR/build.log"; then
+          if ! cargo build --locked --release --target ${{ matrix.target }} --bin subsystem-for-arxumbra 2>&1 | tee "$EVIDENCE_DIR/build.log"; then
             status=$?
             tail -n 120 "$EVIDENCE_DIR/build.log" | sed 's/^/::error::/'
             exit "$status"
           fi
+          echo "::notice::release artifacts:"
+          find "target/${{ matrix.target }}/release" -maxdepth 1 -type f 2>&1 | head -n 12 | sed 's/^/::notice::/'
+          tail -n 8 "$EVIDENCE_DIR/build.log" | sed 's/^/::notice::/'
 
       - name: Stage distribution directory
         shell: bash
