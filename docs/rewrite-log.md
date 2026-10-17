@@ -500,6 +500,39 @@ SHA↔version mapping lives here (verified via the GitHub refs API and
     added (the `xdpyinfo` dimensions and the application's own `w=/h=/s=`
     metrics) so that a geometry mismatch appears in the annotations instead
     of only in unreadable stdout.
+37. (rev-4) The smoke AE thresholds were dead code; the first green run
+    exposed it. The scenario loop parsed each entry as
+    `name1 name2 THRESHOLD DIRECTION description` but then tested
+    `[ "$3" = gt ]` — field 3 is the threshold, field 4 is the direction —
+    so the direction test was never true and **no AE threshold was ever
+    enforced**; only the separately coded `home2n`/`cancel1` upper bound
+    ran. Remote run `39037415773` (the first fully green run of this crate)
+    reported the metrics as notices, which is how the defect surfaced:
+    `home1~focus1=64` against an intended floor of 100 would have failed
+    the step had the check been live. Fixed by naming the fields (`A`, `B`,
+    `DIRECTION`, `THRESHOLD`) and handling both directions in one loop. The
+    two ring pairs now assert a floor of 500 px: a 3 px stroke around a
+    308x56 tab is roughly 2.2 kpx, and the observed `focus1~focus2=2352` is
+    consistent with one ring appearing while another disappears, so 500 is
+    a floor a real ring clears several times over and a no-op does not.
+    Two additions make the next run self-diagnosing instead of ambiguous:
+    every capture is repeated until two consecutive captures are
+    pixel-identical (`smoke-shots` notice reports the probe count per
+    capture), so a screenshot can no longer be taken mid-frame under
+    lavapipe, which is the most likely explanation for a 64 px residue on a
+    transition that should have moved ~2 kpx; and the focus-ring region is
+    cropped using the rect the application itself logged and compared
+    separately (`smoke-ring` notice), which distinguishes "the ring did not
+    appear" from "something elsewhere on screen changed".
+    One negative result is worth keeping: `home2n~cancel1=0` with the
+    pointer at (1880, 1040) and (5, 5) respectively proves
+    `import -window root` does **not** capture the X cursor, so cursor
+    evidence in this harness is behavioral (the hover restyle,
+    `registry1~hover1=16798`, is driven by `Window::cursor_position()`) and
+    not pixel-level. No screenshot from the run could be retrieved in this
+    environment either: the artifact
+    `smoke-evidence-linux-x11-lavapipe` (50,081 bytes) exists, but its
+    download URL redirects to a blob host outside this sandbox's allowlist.
 35. (rev-4) Equality-guarded snapshot write. `ResMut::into_inner` consumes
     the parameter and unconditionally calls `set_changed()`
     (`bevy_ecs/src/change_detection/traits.rs`, `impl_methods!`), so an
@@ -592,3 +625,29 @@ SHA↔version mapping lives here (verified via the GitHub refs API and
   /tmp/shots /tmp/smoke.log` because the step aborted before launching the
   application, so no screenshot or application-log evidence exists yet for
   this crate under Xvfb.
+- Remote CI iteration `878a3b9` (run `39037415773`, job `117409937279`,
+  event `pull_request`, 13:38:49Z → 13:53:09Z): **conclusion `success` —
+  every step green**, policy ✓, format diff report ✓, `cargo fmt --check`
+  ✓, lockfile requirement ✓, dependency metadata ✓, clippy `-D warnings`
+  ✓, `cargo check --all-targets` ✓, `cargo test` ✓ (zero tests), release
+  build ✓, X11 smoke check ✓, artifact upload ✓, `Post Cache` ✓ (the
+  `target` cache is warm again). Annotation evidence from the smoke step:
+  `smoke-vulkan` deviceName/driverName = `llvmpipe (LLVM 20.1.2, 256 bits)`
+  / `llvmpipe`; `smoke-screen` dimensions `1920x1080 pixels`, root depth 24;
+  `smoke-app-window` `w=1920 h=1080 s=1` (the application's own metrics
+  equal the X screen, so logical coordinates are root-screen coordinates);
+  `smoke-rects` `home=16,80,308,56 registry=16,144,308,56
+  launch=870,165,240,56` (which also proves text measurement settled:
+  `tabs_top = 80` implies a measured `title_h` of 48, and the launch pill at
+  `y = 165` implies a measured `desc_h` of 44, both below their 104/72
+  defaults); `smoke-adapter` `AdapterInfo { name: "llvmpipe (LLVM 20.1.2,
+  256 bits)", vendor: 65541, device: 0, device_type: Cpu, driver:
+  "llvmpipe", driver_info: "Mesa 25.2.8-0ubuntu0.24.04.4 (LLVM 20.1.2)",
+  backend: Vulkan, subgroup_min_size: 8, subgroup_max_size: 8 }` — software
+  rendering, reported separately from any physical-GPU claim;
+  `smoke-ae` `home0~home1=204000 home1~focus1=64 focus1~focus2=2352
+  home1~registry1=34333 registry1~hover1=16798 hover1~home2=34333
+  cancel1~registry1=34333 home2n~cancel1=0`; `smoke-exit` exit code 0 after
+  the Escape hold. The single anomalous value (`home1~focus1=64`) is
+  analysed in decision 37, together with the dead threshold check it
+  exposed.

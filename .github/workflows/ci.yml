@@ -769,30 +769,50 @@ jobs:
           CENTER_RY=$(echo "$REG_RECT" | awk -F, '{printf "%d", $2 + $4 / 2}')
           xdotool search --name "Arxumbra" windowfocus || echo "note: windowfocus reported failure"
           sleep 1
-          import -window root "$SHOTS/home0.png"
+          shot() {
+            NAME="$1"
+            import -window root "${SHOTS}/${NAME}.png"
+            PROBES=0
+            for _ in 1 2 3 4 5 6 7 8; do
+              sleep 0.5
+              import -window root "${SHOTS}/probe.png"
+              compare -metric AE -fuzz 0% "${SHOTS}/${NAME}.png" "${SHOTS}/probe.png" null: 2>/tmp/probe_ae.txt
+              STABLE=$(tr -dc "0-9" < /tmp/probe_ae.txt)
+              PROBES=$((PROBES + 1))
+              if [ "${STABLE:-1}" = 0 ]; then
+                break
+              fi
+              cp "${SHOTS}/probe.png" "${SHOTS}/${NAME}.png"
+            done
+            rm -f "${SHOTS}/probe.png"
+            SHOT_REPORT="${SHOT_REPORT}${NAME}=${PROBES} "
+            echo "shot ${NAME} quiescent after ${PROBES} probe(s)"
+          }
+          SHOT_REPORT=""
+          shot home0
           xdotool key F1
           sleep 1.5
-          import -window root "$SHOTS/home1.png"
+          shot home1
           xdotool key Tab
-          sleep 1
-          import -window root "$SHOTS/focus1.png"
+          sleep 1.5
+          shot focus1
           xdotool key Tab
-          sleep 1
-          import -window root "$SHOTS/focus2.png"
+          sleep 1.5
+          shot focus2
           xdotool key Return
           sleep 1.5
-          import -window root "$SHOTS/registry1.png"
+          shot registry1
           xdotool mousemove "$CENTER_HX" "$CENTER_HY"
-          sleep 1
-          import -window root "$SHOTS/hover1.png"
+          sleep 1.5
+          shot hover1
           xdotool mousedown 1
-          sleep 0.5
+          sleep 0.7
           xdotool mouseup 1
           sleep 1.5
-          import -window root "$SHOTS/home2.png"
+          shot home2
           xdotool mousemove 1880 1040
-          sleep 1
-          import -window root "$SHOTS/home2n.png"
+          sleep 1.5
+          shot home2n
           xdotool mousemove "$CENTER_RX" "$CENTER_RY"
           sleep 0.7
           xdotool mousedown 1
@@ -801,30 +821,48 @@ jobs:
           sleep 0.7
           xdotool mouseup 1
           sleep 1.5
-          import -window root "$SHOTS/cancel1.png"
-          for PAIR in "home0 home1 4000 gt F1 reveals the HUD" "home1 focus1 100 gt Tab shows the focus ring" "focus1 focus2 100 gt the focus ring moves" "home1 registry1 4000 gt Enter opens the Registry panel" "registry1 hover1 2000 gt hovering the Home tab restyles it" "hover1 home2 4000 gt clicking Home removes the Registry panel" "cancel1 registry1 4000 gt the cancelled press did not select Registry"; do
+          shot cancel1
+          echo "::notice title=smoke-shots::quiescence probes per capture: ${SHOT_REPORT}"
+          RING_HOME_X=$(( $(echo "$HOME_RECT" | cut -d, -f1) - 3 ))
+          RING_HOME_Y=$(( $(echo "$HOME_RECT" | cut -d, -f2) - 3 ))
+          RING_HOME_W=$(( $(echo "$HOME_RECT" | cut -d, -f3) + 6 ))
+          RING_HOME_H=$(( $(echo "$HOME_RECT" | cut -d, -f4) + 6 ))
+          RING_REG_X=$(( $(echo "$REG_RECT" | cut -d, -f1) - 3 ))
+          RING_REG_Y=$(( $(echo "$REG_RECT" | cut -d, -f2) - 3 ))
+          RING_REG_W=$(( $(echo "$REG_RECT" | cut -d, -f3) + 6 ))
+          RING_REG_H=$(( $(echo "$REG_RECT" | cut -d, -f4) + 6 ))
+          compare -metric AE -fuzz 2% \( "$SHOTS/home1.png" -crop "${RING_HOME_W}x${RING_HOME_H}+${RING_HOME_X}+${RING_HOME_Y}" \) \( "$SHOTS/focus1.png" -crop "${RING_HOME_W}x${RING_HOME_H}+${RING_HOME_X}+${RING_HOME_Y}" \) null: 2>/tmp/ae_ring_home.txt
+          RING_HOME_AE=$(tr -dc "0-9" < /tmp/ae_ring_home.txt)
+          compare -metric AE -fuzz 2% \( "$SHOTS/focus1.png" -crop "${RING_REG_W}x${RING_REG_H}+${RING_REG_X}+${RING_REG_Y}" \) \( "$SHOTS/focus2.png" -crop "${RING_REG_W}x${RING_REG_H}+${RING_REG_X}+${RING_REG_Y}" \) null: 2>/tmp/ae_ring_reg.txt
+          RING_REG_AE=$(tr -dc "0-9" < /tmp/ae_ring_reg.txt)
+          echo "focus ring region AE: home-tab=${RING_HOME_AE:-none} registry-tab=${RING_REG_AE:-none}"
+          echo "::notice title=smoke-ring::ring-region AE home1~focus1=${RING_HOME_AE:-none} focus1~focus2=${RING_REG_AE:-none}"
+          if [ "${RING_HOME_AE:-0}" -lt 500 ]; then
+            FAIL=1
+            REASONS="${REASONS}the focus ring region around the Home tab changed by only ${RING_HOME_AE:-0} pixels on the first Tab; "
+          fi
+          for PAIR in "home0 home1 gt 4000 F1 reveals the HUD" "home1 focus1 gt 500 the first Tab shows the keyboard focus ring" "focus1 focus2 gt 500 the second Tab moves the focus ring" "home1 registry1 gt 4000 Enter opens the Registry panel" "registry1 hover1 gt 2000 hovering the Home tab restyles it" "hover1 home2 gt 4000 clicking Home removes the Registry panel" "cancel1 registry1 gt 4000 the cancelled press did not select Registry" "home2n cancel1 lt 3000 releasing outside changed nothing but the pointer position"; do
             set -- $PAIR
-            compare -metric AE -fuzz 2% "$SHOTS/$1.png" "$SHOTS/$2.png" null: 2>"/tmp/ae_$1_$2.txt"
-            AE=$(tr -dc "0-9" < "/tmp/ae_$1_$2.txt")
-            echo "AE($1,$2)=$AE (expect $3 $4: $5)"
-            AE_REPORT="${AE_REPORT}$1~$2=${AE:-none} "
+            A="$1"
+            B="$2"
+            DIRECTION="$3"
+            THRESHOLD="$4"
+            compare -metric AE -fuzz 2% "$SHOTS/$A.png" "$SHOTS/$B.png" null: 2>"/tmp/ae_${A}_${B}.txt"
+            AE=$(tr -dc "0-9" < "/tmp/ae_${A}_${B}.txt")
+            echo "AE($A,$B)=$AE (expect $DIRECTION $THRESHOLD: ${*:5})"
+            AE_REPORT="${AE_REPORT}$A~$B=${AE:-none} "
             if [ -z "$AE" ]; then
               FAIL=1
-              REASONS="${REASONS}comparison $1 vs $2 produced no metric; "
-            elif [ "$3" = gt ] && [ "$AE" -le "$4" ]; then
+              REASONS="${REASONS}comparison $A vs $B produced no metric; "
+            elif [ "$DIRECTION" = gt ] && [ "$AE" -le "$THRESHOLD" ]; then
               FAIL=1
-              REASONS="${REASONS}$1 vs $2 changed by only $AE pixels, expected more than $4; "
+              REASONS="${REASONS}$A vs $B changed by only $AE pixels, expected more than $THRESHOLD; "
+            elif [ "$DIRECTION" = lt ] && [ "$AE" -ge "$THRESHOLD" ]; then
+              FAIL=1
+              REASONS="${REASONS}$A vs $B changed by $AE pixels, expected fewer than $THRESHOLD; "
             fi
           done
-          compare -metric AE -fuzz 2% "$SHOTS/home2n.png" "$SHOTS/cancel1.png" null: 2>/tmp/ae_same.txt
-          AE_SAME=$(tr -dc "0-9" < /tmp/ae_same.txt)
-          echo "AE(home2n,cancel1)=$AE_SAME (expect lt 3000: release outside changed nothing but the cursor)"
-          AE_REPORT="${AE_REPORT}home2n~cancel1=${AE_SAME:-none}"
           echo "::notice title=smoke-ae::${AE_REPORT}"
-          if [ -n "$AE_SAME" ] && [ "$AE_SAME" -ge 3000 ]; then
-            FAIL=1
-            REASONS="${REASONS}release outside altered the scene by $AE_SAME pixels; "
-          fi
           xdotool keydown Escape || true
           EXITED=0
           for _ in $(seq 1 20); do
