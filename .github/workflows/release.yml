@@ -94,16 +94,26 @@ jobs:
           fi
 
       - name: Source policy
+        id: policy
         shell: bash
         run: |
           set -uo pipefail
           python3 -m pip install --quiet pyyaml
           python3 scripts/verify_policy.py --mode source 2>&1 | tee "$EVIDENCE_DIR/policy.log"
-            status=$?
-            if [ "$status" -ne 0 ]; then
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            message=$(head -n 1 "$EVIDENCE_DIR/policy.log" | cut -c 1-120 | tr '\n' ' ')
+            echo "message=$message" >> "$GITHUB_OUTPUT"
             sed 's/^/::error::/' "$EVIDENCE_DIR/policy.log"
             exit "$status"
           fi
+
+      - name: Policy outcome reflector
+        if: always()
+        shell: bash
+        env:
+          MESSAGE: ${{ steps.policy.outputs.message }}
+        run: echo "policy outcome recorded"
 
       - name: Dependency graph evidence and X11 absence
         shell: bash
@@ -150,26 +160,42 @@ jobs:
           fi
 
       - name: Check
+        id: check
         shell: bash
         run: |
           set -uo pipefail
           cargo check --locked --all-targets 2>&1 | tee "$EVIDENCE_DIR/check.log"
-            status=$?
-            if [ "$status" -ne 0 ]; then
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            message=$(grep -m 2 -E '^error' "$EVIDENCE_DIR/check.log" | cut -c 1-110 | tr '\n' ' ')
+            echo "message=$message" >> "$GITHUB_OUTPUT"
             tail -n 120 "$EVIDENCE_DIR/check.log" | sed 's/^/::error::/'
             exit "$status"
           fi
 
+      - name: Check reflector ${{ steps.check.outputs.message }}
+        if: always()
+        shell: bash
+        run: echo recorded
+
       - name: Clippy
+        id: clippy
         shell: bash
         run: |
           set -uo pipefail
           cargo clippy --locked --all-targets -- -D warnings 2>&1 | tee "$EVIDENCE_DIR/clippy.log"
-            status=$?
-            if [ "$status" -ne 0 ]; then
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            message=$(grep -m 2 -E '^error' "$EVIDENCE_DIR/clippy.log" | cut -c 1-110 | tr '\n' ' ')
+            echo "message=$message" >> "$GITHUB_OUTPUT"
             tail -n 120 "$EVIDENCE_DIR/clippy.log" | sed 's/^/::error::/'
             exit "$status"
           fi
+
+      - name: Clippy reflector ${{ steps.clippy.outputs.message }}
+        if: always()
+        shell: bash
+        run: echo recorded
 
       - name: Tests
         shell: bash
