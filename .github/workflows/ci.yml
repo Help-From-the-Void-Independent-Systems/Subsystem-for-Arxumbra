@@ -156,14 +156,36 @@ jobs:
                       stack.pop()
               return not stack
 
+          def rust_attribute_violations(code):
+              permitted = {
+                  "Clone",
+                  "Copy",
+                  "Debug",
+                  "Default",
+                  "Eq",
+                  "PartialEq",
+                  "bevy::ecs::component::Component",
+                  "bevy::ecs::resource::Resource",
+              }
+              found = []
+              for m in re.finditer(r"#!?\[([^\[\]]*)\]", code):
+                  whole = m.group(0)
+                  inner = m.group(1).strip()
+                  if whole.startswith("#!") or not inner.startswith("derive(") or not inner.endswith(")"):
+                      found.append("attribute form at line " + str(code[:m.start()].count("\n") + 1))
+                      continue
+                  for name in inner[len("derive("):-1].split(","):
+                      if name.strip() not in permitted:
+                          found.append("derive target " + name.strip() + " at line " + str(code[:m.start()].count("\n") + 1))
+              return found
+
           def check_rust_source(path, src, expect_single_main):
               tokens = rust_tokens(src)
               comments = [t for k, t in tokens if k == "comment"]
               assert not comments, (path, "comments are prohibited", comments[:2])
               code = rust_code(tokens)
-              assert "#[doc" not in code, (path, "doc attribute")
-              assert "#!" not in code, (path, "inner attribute")
-              assert "#[" not in code, (path, "attribute")
+              attribute_violations = rust_attribute_violations(code)
+              assert not attribute_violations, (path, attribute_violations)
               masked = rust_mask(tokens)
               violations = rust_keyword_violations(masked)
               assert not violations, (path, violations)
@@ -234,12 +256,18 @@ jobs:
           for fixture, expect in [
               ("#[doc = \"x\"] fn main() {}", True),
               ("#![feature(x)] fn main() {}", True),
-              ("#[derive(Clone)] fn main() {}", True),
+              ("#![no_implicit_prelude] fn main() {}", True),
+              ("#[allow(warnings)] fn main() {}", True),
+              ("#[derive(serde::Serialize)] fn main() {}", True),
+              ("#[derive(Clone)] fn main() {}", False),
+              ("#[derive(bevy::ecs::component::Component, Debug, Clone, Copy, PartialEq)] fn main() {}", False),
+              ("#[derive(bevy::ecs::resource::Resource, Clone)] fn main() {}", False),
               ("fn main() {}", False),
           ]:
               code = rust_code(rust_tokens(fixture))
-              got = ("#[doc" in code) or ("#!" in code) or ("#[" in code)
-              assert got == expect, (fixture, got)
+              got = bool(rust_attribute_violations(code))
+              assert got == expect, (fixture, got, rust_attribute_violations(code))
+          assert rust_attribute_violations(rust_code(rust_tokens("fn main() { let x = \"#[derive(Evil)]\"; }"))) == []
           print("rust checker fixtures: PASS")
 
           def toml_comments(text):
@@ -328,12 +356,16 @@ jobs:
           assert fn_total == 1, fn_total
           src_text = pathlib.Path(os.path.join("src", "main.rs")).read_text()
           code = rust_code(rust_tokens(src_text))
-          assert mut_total == 9, mut_total
-          assert code.count("&mut bevy::ecs::world::World") == 6
+          assert mut_total == 8, mut_total
+          assert code.count("&mut bevy::ecs::world::World") == 3
           assert code.count("&mut bevy::camera::visibility::Visibility") == 1
           assert code.count("&mut bevy::transform::components::Transform") == 1
           assert code.count("&mut bevy::sprite::Sprite") == 1
-          print("rust source policy: PASS (1 fn, 0 comments, 0 keyword violations, 9 audited &mut)")
+          assert code.count("&mut bevy::text::TextColor") == 1
+          assert code.count("&mut bevy::text::TextBounds") == 1
+          assert re.findall(r"\benum (\w+)", code) == ["Destination", "Control", "Role"], re.findall(r"\benum (\w+)", code)
+          assert re.findall(r"\bstruct (\w+)", code) == ["Layout", "UiState", "UiImages"], re.findall(r"\bstruct (\w+)", code)
+          print("rust source policy: PASS (1 fn, 0 comments, 0 keyword violations, 6 verified derives, 8 audited &mut)")
 
           manifests = []
           for root, dirs, files in os.walk("."):
@@ -370,6 +402,9 @@ jobs:
           assert bevy["tag"] == "v0.20.0", bevy
           assert "rev" not in bevy
           assert bevy["default-features"] is False
+          assert "x11" in bevy["features"], bevy["features"]
+          assert "wayland" in bevy["features"], bevy["features"]
+          assert "bevy_log" in bevy["features"], bevy["features"]
 
           def dep_sections(table):
               for key in ("dependencies", "build-dependencies", "dev-dependencies"):
@@ -387,9 +422,14 @@ jobs:
           assert release_profile["panic"] == "abort"
           assert release_profile["lto"] == "fat"
           assert release_profile["codegen-units"] == 1
-          assert manifest.get("lints", {}) == {
-              "clippy": {"redundant_closure_call": "allow"}
-          }, manifest.get("lints")
+          lints = manifest.get("lints", {})
+          assert set(lints.keys()) <= {"clippy", "rust"}, lints
+          for lint_table_name, lint_table in lints.items():
+              assert isinstance(lint_table, dict), (lint_table_name, lint_table)
+              for lint_name, lint_level in lint_table.items():
+                  assert re.fullmatch(r"[a-z][a-z0-9_]*", lint_name), (lint_table_name, lint_name)
+                  assert lint_name not in ("all", "warnings"), (lint_table_name, lint_name)
+                  assert lint_level in ("allow", "warn", "deny", "forbid"), (lint_name, lint_level)
           toolchain = tomllib.loads(pathlib.Path("rust-toolchain.toml").read_text())
           channel = toolchain["toolchain"]["channel"]
           assert re.fullmatch(r"\d+\.\d+\.\d+", channel), channel
@@ -398,6 +438,7 @@ jobs:
           workflow_files = sorted(str(p) for p in pathlib.Path(".github/workflows").glob("*.yml"))
           assert workflow_files == [
               ".github/workflows/ci.yml",
+              ".github/workflows/lockfile.yml",
               ".github/workflows/release.yml",
           ], workflow_files
           for path in workflow_files:
@@ -408,6 +449,7 @@ jobs:
 
           release = yaml.safe_load(pathlib.Path(".github/workflows/release.yml").read_text())
           ci = yaml.safe_load(pathlib.Path(".github/workflows/ci.yml").read_text())
+          lockfile = yaml.safe_load(pathlib.Path(".github/workflows/lockfile.yml").read_text())
 
           def collect_uses(node, out):
               if isinstance(node, dict):
@@ -423,6 +465,7 @@ jobs:
           uses_refs = []
           collect_uses(release, uses_refs)
           collect_uses(ci, uses_refs)
+          collect_uses(lockfile, uses_refs)
           assert len(uses_refs) >= 8, uses_refs
           for ref in uses_refs:
               if ref.startswith("./"):
@@ -439,7 +482,11 @@ jobs:
           print("workflow comment and pin policy: PASS (" + str(len(uses_refs)) + " uses refs)")
           assert release["permissions"] == {"contents": "read"}
           assert ci["permissions"] == {"contents": "read"}
+          assert lockfile["permissions"] == {"contents": "read"}
           assert release["jobs"]["release"]["permissions"] == {"contents": "write"}
+          assert lockfile["jobs"]["lockfile"]["permissions"] == {"contents": "write"}
+          lockfile_on = lockfile.get("on", lockfile.get(True))
+          assert lockfile_on == {"push": {"branches": ["arena/699178e0-subsystem-for-arxumbra"]}}, lockfile_on
           for job_name, job in release["jobs"].items():
               if job_name != "release":
                   assert job.get("permissions", {"contents": "read"}) == {"contents": "read"}, job_name
@@ -505,11 +552,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
-      - name: Install Linux system libraries (winit wayland backend)
+      - name: Install Linux system libraries (winit wayland and x11 backends)
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y pkg-config libwayland-dev libxkbcommon-dev
+          sudo apt-get install -y pkg-config libwayland-dev libxkbcommon-dev libxkbcommon-x11-0 libxcb1 libx11-6 libxi6 libxcursor1 libxrandr1
 
       - name: Activate the pinned toolchain
         run: |
@@ -527,13 +574,27 @@ jobs:
           restore-keys: |
             cargo-ci-${{ runner.os }}-
 
-      - name: Ensure Cargo.lock exists (regenerated through Cargo, never by hand)
+      - name: Format diff report (diagnostic; the strict check follows)
         run: |
-          set -euo pipefail
-          test -f Cargo.lock || cargo generate-lockfile
+          set +e
+          cargo fmt --all -- --check > /tmp/fmt.diff 2>&1
+          status=$?
+          {
+            echo "## cargo fmt --check diagnostic (exit $status)"
+            echo '```diff'
+            head -c 50000 /tmp/fmt.diff
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
 
       - name: Formatting
         run: cargo fmt --all -- --check
+
+      - name: Require the committed Cargo-resolved lockfile
+        run: |
+          set -euo pipefail
+          test -f Cargo.lock
+          grep -q "name = \"bevy\"" Cargo.lock
 
       - name: Dependency metadata and duplicate report
         run: |
@@ -542,7 +603,17 @@ jobs:
           cargo tree --locked --duplicates
 
       - name: Lint
-        run: cargo clippy --locked --all-targets -- -D warnings
+        run: |
+          set +e
+          cargo clippy --locked --all-targets -- -D warnings > /tmp/clippy.log 2>&1
+          status=$?
+          {
+            echo "## cargo clippy diagnostic (exit $status)"
+            echo '```text'
+            tail -c 50000 /tmp/clippy.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
 
       - name: Compile check of all targets
         run: cargo check --locked --all-targets
@@ -553,30 +624,156 @@ jobs:
       - name: Release build
         run: cargo build --locked --release
 
-      - name: Headless process smoke check (Xvfb + software Vulkan, no physical display)
+      - name: Headless X11 smoke check (Xvfb + lavapipe + scripted interaction; software rendering reported separately)
         run: |
-          set -euo pipefail
+          set -uo pipefail
           sudo apt-get update
-          sudo apt-get install -y xvfb xauth mesa-vulkan-drivers libvulkan1 vulkan-tools
-          ls -l /usr/share/vulkan/icd.d/ || echo "no system ICD directory"
+          sudo apt-get install -y xvfb xauth xdotool imagemagick x11-utils mesa-vulkan-drivers libvulkan1 vulkan-tools
           ICD=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
           if [ -f "$ICD" ]; then
             export VK_ICD_FILENAMES="$ICD"
           fi
-          echo "diagnostic probe (not a gate): vulkaninfo --summary"
           vulkaninfo --summary > /tmp/vkinfo.log 2>&1 || true
           cat /tmp/vkinfo.log
+          Xvfb :99 -screen 0 1366x768x24 > /tmp/xvfb.log 2>&1 &
+          XVFB_PID=$!
+          export DISPLAY=:99
+          sleep 2
+          xdpyinfo | head -3
           LOG=/tmp/smoke.log
-          rc=0
-          xvfb-run -a timeout -k 3 20 ./target/release/subsystem-for-arxumbra > "$LOG" 2>&1 || rc=$?
-          echo "smoke run exit status: $rc"
-          cat "$LOG"
+          SHOTS=/tmp/shots
+          mkdir -p "$SHOTS"
+          FAIL=0
+          ./target/release/subsystem-for-arxumbra > "$LOG" 2>&1 &
+          APP_PID=$!
+          READY=0
+          for _ in $(seq 1 90); do
+            sleep 1
+            if grep -q "ARXUMBRA-INTERACTIVE" "$LOG"; then
+              READY=1
+              break
+            fi
+            if ! kill -0 "$APP_PID" 2>/dev/null; then
+              break
+            fi
+          done
+          if [ "$READY" != 1 ]; then
+            echo "smoke FAIL: ARXUMBRA-INTERACTIVE readiness line not found within 90 s" >&2
+            FAIL=1
+          fi
+          if ! grep -q "ARXUMBRA-STARTUP" "$LOG"; then
+            echo "smoke FAIL: ARXUMBRA-STARTUP line missing" >&2
+            FAIL=1
+          fi
           if grep -q "panicked" "$LOG"; then
-            echo "smoke check FAILED: the process panicked" >&2
+            echo "smoke FAIL: process panicked" >&2
+            FAIL=1
+          fi
+          grep -i "AdapterInfo" "$LOG" || echo "note: no AdapterInfo line found; renderer identity unconfirmed by this log"
+          LINE=$(grep "ARXUMBRA-INTERACTIVE" "$LOG" | head -1)
+          HOME_RECT=$(echo "$LINE" | sed -n 's/.*home=\([-0-9.,]*\) registry=.*/\1/p')
+          REG_RECT=$(echo "$LINE" | sed -n 's/.*registry=\([-0-9.,]*\) launch=.*/\1/p')
+          LAUNCH_RECT=$(echo "$LINE" | sed -n 's/.*launch=\([-0-9.,]*\).*/\1/p')
+          echo "control rects from the application log: home=$HOME_RECT registry=$REG_RECT launch=$LAUNCH_RECT"
+          CENTER_HX=$(echo "$HOME_RECT" | awk -F, '{printf "%d", $1 + $3 / 2}')
+          CENTER_HY=$(echo "$HOME_RECT" | awk -F, '{printf "%d", $2 + $4 / 2}')
+          CENTER_RX=$(echo "$REG_RECT" | awk -F, '{printf "%d", $1 + $3 / 2}')
+          CENTER_RY=$(echo "$REG_RECT" | awk -F, '{printf "%d", $2 + $4 / 2}')
+          xdotool search --name "Arxumbra" windowfocus || echo "note: windowfocus reported failure"
+          sleep 1
+          import -window root "$SHOTS/home0.png"
+          xdotool key F1
+          sleep 1.5
+          import -window root "$SHOTS/home1.png"
+          xdotool key Tab
+          sleep 1
+          import -window root "$SHOTS/focus1.png"
+          xdotool key Tab
+          sleep 1
+          import -window root "$SHOTS/focus2.png"
+          xdotool key Return
+          sleep 1.5
+          import -window root "$SHOTS/registry1.png"
+          xdotool mousemove "$CENTER_HX" "$CENTER_HY"
+          sleep 1
+          import -window root "$SHOTS/hover1.png"
+          xdotool mousedown 1
+          sleep 0.5
+          xdotool mouseup 1
+          sleep 1.5
+          import -window root "$SHOTS/home2.png"
+          xdotool mousemove 1360 760
+          sleep 1
+          import -window root "$SHOTS/home2n.png"
+          xdotool mousemove "$CENTER_RX" "$CENTER_RY"
+          sleep 0.7
+          xdotool mousedown 1
+          sleep 0.7
+          xdotool mousemove 5 5
+          sleep 0.7
+          xdotool mouseup 1
+          sleep 1.5
+          import -window root "$SHOTS/cancel1.png"
+          for PAIR in "home0 home1 4000 gt F1 reveals the HUD" "home1 focus1 100 gt Tab shows the focus ring" "focus1 focus2 100 gt the focus ring moves" "home1 registry1 4000 gt Enter opens the Registry panel" "registry1 hover1 2000 gt hovering the Home tab restyles it" "hover1 home2 4000 gt clicking Home removes the Registry panel" "cancel1 registry1 4000 gt the cancelled press did not select Registry"; do
+            set -- $PAIR
+            compare -metric AE -fuzz 2% "$SHOTS/$1.png" "$SHOTS/$2.png" null: 2>"/tmp/ae_$1_$2.txt" || true
+            AE=$(tr -dc "0-9" < "/tmp/ae_$1_$2.txt")
+            echo "AE($1,$2)=$AE (expect $3 $4: $5)"
+            if [ -z "$AE" ]; then
+              echo "smoke FAIL: comparison $1 vs $2 produced no metric" >&2
+              FAIL=1
+            elif [ "$3" = gt ] && [ "$AE" -le "$4" ]; then
+              echo "smoke FAIL: $1 vs $2 changed by only $AE pixels" >&2
+              FAIL=1
+            fi
+          done
+          compare -metric AE -fuzz 2% "$SHOTS/home2n.png" "$SHOTS/cancel1.png" null: 2>/tmp/ae_same.txt || true
+          AE_SAME=$(tr -dc "0-9" < /tmp/ae_same.txt)
+          echo "AE(home2n,cancel1)=$AE_SAME (expect lt 3000: release outside changed nothing but the cursor)"
+          if [ -n "$AE_SAME" ] && [ "$AE_SAME" -ge 3000 ]; then
+            echo "smoke FAIL: release outside altered the scene by $AE_SAME pixels" >&2
+            FAIL=1
+          fi
+          xdotool keydown Escape || true
+          EXITED=0
+          for _ in $(seq 1 20); do
+            sleep 1
+            if ! kill -0 "$APP_PID" 2>/dev/null; then
+              EXITED=1
+              break
+            fi
+          done
+          xdotool keyup Escape 2>/dev/null || true
+          wait "$APP_PID"
+          APP_RC=$?
+          echo "app exit code after Escape hold: $APP_RC (expect 0)"
+          if [ "$EXITED" != 1 ]; then
+            echo "smoke FAIL: Escape hold did not exit the app within 20 s" >&2
+            FAIL=1
+            kill "$APP_PID" 2>/dev/null || true
+            wait "$APP_PID" 2>/dev/null || true
+          elif [ "$APP_RC" != 0 ]; then
+            echo "smoke FAIL: unexpected exit code $APP_RC" >&2
+            FAIL=1
+          fi
+          kill "$XVFB_PID" 2>/dev/null || true
+          {
+            echo "## smoke check application log (tail)"
+            echo '```text'
+            tail -c 40000 "$LOG"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$FAIL" != 0 ]; then
             exit 1
           fi
-          if [ "$rc" -ne 124 ]; then
-            echo "smoke check FAILED: exit status $rc (expected 124 = survived the 20 s window)" >&2
-            exit 1
-          fi
-          echo "smoke check PASSED: Startup + 20 s of Update frames ran headless without panic or early exit"
+          echo "smoke check PASSED: startup + interactive readiness, scripted keyboard and pointer scenarios, cancelled press, Escape-hold exit 0 (software renderer lavapipe; reported separately from physical GPU results)"
+
+      - name: Upload smoke evidence (screenshots and application log)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: smoke-evidence-linux-x11-lavapipe
+          path: |
+            /tmp/shots
+            /tmp/smoke.log
+          if-no-files-found: warn

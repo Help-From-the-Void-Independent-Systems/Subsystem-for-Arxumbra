@@ -1,4 +1,89 @@
 fn main() {
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    enum Destination {
+        Home,
+        Registry,
+    }
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    enum Control {
+        HomeTab,
+        RegistryTab,
+        Launch,
+    }
+    #[derive(bevy::ecs::component::Component, Debug, Clone, Copy, PartialEq)]
+    enum Role {
+        SidebarPanel,
+        Divider,
+        AppIcon,
+        AppTitle,
+        TabBody(Control),
+        TabIcon(Control),
+        TabLabel(Control),
+        TabRing(Control),
+        RegistryRoot,
+        CardBackground,
+        CardIcon,
+        CardTitle,
+        CardDescription,
+        CardSeparator,
+        LaunchBody,
+        LaunchIcon,
+        LaunchLabel,
+        Badge,
+        BadgeLabel,
+        Well,
+        Rocket,
+    }
+    #[derive(Clone, Copy, PartialEq)]
+    struct Layout {
+        width: f32,
+        height: f32,
+        scale: f32,
+        sidebar_w: f32,
+        pad: f32,
+        icon: bevy::math::Rect,
+        title: bevy::math::Rect,
+        home_tab: bevy::math::Rect,
+        registry_tab: bevy::math::Rect,
+        card: bevy::math::Rect,
+        card_icon: bevy::math::Rect,
+        card_title: bevy::math::Rect,
+        desc: bevy::math::Rect,
+        sep: bevy::math::Rect,
+        launch: bevy::math::Rect,
+        badge: bevy::math::Rect,
+        well: bevy::math::Rect,
+    }
+    #[derive(bevy::ecs::resource::Resource, Clone, Copy, PartialEq)]
+    struct UiState {
+        selected: Destination,
+        hud_visible: bool,
+        hovered: Option<Control>,
+        focused: Option<Control>,
+        focus_keyboard: bool,
+        armed: Option<Control>,
+        launched: bool,
+        hold: f32,
+        window_focused: bool,
+        last_cursor: Option<bevy::math::Vec2>,
+        layout: Layout,
+        title_h: f32,
+        desc_h: f32,
+        measured_settled: bool,
+        interactive_logged: bool,
+    }
+    #[derive(bevy::ecs::resource::Resource, Clone)]
+    struct UiImages {
+        solid: bevy::asset::Handle<bevy::image::Image>,
+        pill: bevy::asset::Handle<bevy::image::Image>,
+        ring: bevy::asset::Handle<bevy::image::Image>,
+        house: bevy::asset::Handle<bevy::image::Image>,
+        registry: bevy::asset::Handle<bevy::image::Image>,
+        app_icon: bevy::asset::Handle<bevy::image::Image>,
+        flask: bevy::asset::Handle<bevy::image::Image>,
+        rocket_pill: bevy::asset::Handle<bevy::image::Image>,
+        rocket: bevy::asset::Handle<bevy::image::Image>,
+    }
     bevy::app::App::new()
         .add_plugins((
             bevy::app::TaskPoolPlugin {
@@ -28,6 +113,7 @@ fn main() {
                     },
                 },
             },
+            bevy::log::LogPlugin::default(),
             bevy::diagnostic::FrameCountPlugin,
             bevy::time::TimePlugin,
             bevy::transform::TransformPlugin,
@@ -45,8 +131,8 @@ fn main() {
                     name: None,
                     composite_alpha_mode: bevy::window::CompositeAlphaMode::Auto,
                     resize_constraints: bevy::window::WindowResizeConstraints {
-                        min_width: 180.0,
-                        min_height: 120.0,
+                        min_width: 640.0,
+                        min_height: 480.0,
                         max_width: f32::INFINITY,
                         max_height: f32::INFINITY,
                     },
@@ -89,7 +175,7 @@ fn main() {
                         bevy::window::ScreenEdge::None,
                 }),
                 primary_cursor_options: Some(bevy::window::CursorOptions {
-                    visible: false,
+                    visible: true,
                     grab_mode: bevy::window::CursorGrabMode::None,
                     hit_test: true,
                 }),
@@ -148,101 +234,447 @@ fn main() {
             |world: &mut bevy::ecs::world::World| {
                 world.insert_resource(bevy::camera::ClearColor(bevy::color::Color::BLACK));
                 world.spawn((bevy::camera::Camera2d, bevy::render::view::Msaa::Off));
-                (|(width, height): (f32, f32), world: &mut bevy::ecs::world::World| {
-                    (|glow: bevy::asset::Handle<bevy::image::Image>,
-                      core: bevy::asset::Handle<bevy::image::Image>,
-                      separator: bevy::asset::Handle<bevy::image::Image>,
-                      pill: bevy::asset::Handle<bevy::image::Image>,
-                      house: bevy::asset::Handle<bevy::image::Image>,
-                      registry: bevy::asset::Handle<bevy::image::Image>,
-                      app_icon: bevy::asset::Handle<bevy::image::Image>,
-                      menu_card: bevy::asset::Handle<bevy::image::Image>,
-                      lab: bevy::asset::Handle<bevy::image::Image>,
-                      well: bevy::asset::Handle<bevy::image::Image>,
-                      flask: bevy::asset::Handle<bevy::image::Image>,
-                      rocket: bevy::asset::Handle<bevy::image::Image>,
-                      rocket_pill: bevy::asset::Handle<bevy::image::Image>,
-                      badge: bevy::asset::Handle<bevy::image::Image>,
+                bevy::log::info!("ARXUMBRA-STARTUP images=9 entities=26");
+                (|solid: bevy::asset::Handle<bevy::image::Image>,
+                  pill: bevy::asset::Handle<bevy::image::Image>,
+                  ring: bevy::asset::Handle<bevy::image::Image>,
+                  house: bevy::asset::Handle<bevy::image::Image>,
+                  registry: bevy::asset::Handle<bevy::image::Image>,
+                  app_icon: bevy::asset::Handle<bevy::image::Image>,
+                  flask: bevy::asset::Handle<bevy::image::Image>,
+                  rocket_pill: bevy::asset::Handle<bevy::image::Image>,
+                  rocket: bevy::asset::Handle<bevy::image::Image>,
+                  world: &mut bevy::ecs::world::World| {
+                    world.insert_resource(UiImages {
+                        solid: solid.clone(),
+                        pill: pill.clone(),
+                        ring: ring.clone(),
+                        house: house.clone(),
+                        registry: registry.clone(),
+                        app_icon: app_icon.clone(),
+                        flask: flask.clone(),
+                        rocket_pill: rocket_pill.clone(),
+                        rocket: rocket.clone(),
+                    });
+                    world.insert_resource(UiState {
+                        selected: Destination::Home,
+                        hud_visible: false,
+                        hovered: None,
+                        focused: None,
+                        focus_keyboard: false,
+                        armed: None,
+                        launched: false,
+                        hold: 0.0,
+                        window_focused: true,
+                        last_cursor: None,
+                        layout: Layout {
+                            width: 0.0,
+                            height: 0.0,
+                            scale: 0.0,
+                            sidebar_w: 0.0,
+                            pad: 0.0,
+                            icon: bevy::math::Rect::new(0.0, 0.0, 0.0, 0.0),
+                            title: bevy::math::Rect::new(0.0, 0.0, 0.0, 0.0),
+                            home_tab: bevy::math::Rect::new(0.0, 0.0, 0.0, 0.0),
+                            registry_tab: bevy::math::Rect::new(0.0, 0.0, 0.0, 0.0),
+                            card: bevy::math::Rect::new(0.0, 0.0, 0.0, 0.0),
+                            card_icon: bevy::math::Rect::new(0.0, 0.0, 0.0, 0.0),
+                            card_title: bevy::math::Rect::new(0.0, 0.0, 0.0, 0.0),
+                            desc: bevy::math::Rect::new(0.0, 0.0, 0.0, 0.0),
+                            sep: bevy::math::Rect::new(0.0, 0.0, 0.0, 0.0),
+                            launch: bevy::math::Rect::new(0.0, 0.0, 0.0, 0.0),
+                            badge: bevy::math::Rect::new(0.0, 0.0, 0.0, 0.0),
+                            well: bevy::math::Rect::new(0.0, 0.0, 0.0, 0.0),
+                        },
+                        title_h: 104.0,
+                        desc_h: 72.0,
+                        measured_settled: false,
+                        interactive_logged: false,
+                    });
+                    world.spawn((
+                        Role::SidebarPanel,
+                        bevy::sprite::Sprite {
+                            image: solid.clone(),
+                            texture_atlas: None,
+                            color: bevy::color::Color::srgb(
+                                12.0 / 255.0,
+                                12.0 / 255.0,
+                                12.0 / 255.0,
+                            ),
+                            flip_x: false,
+                            flip_y: false,
+                            custom_size: Some(bevy::math::Vec2::new(1.0, 1.0)),
+                            rect: None,
+                            image_mode: bevy::sprite::SpriteImageMode::Auto,
+                            alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                        },
+                        bevy::transform::components::Transform {
+                            translation: bevy::math::Vec3::new(0.0, 0.0, 0.0),
+                            rotation: bevy::math::Quat::IDENTITY,
+                            scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
+                        },
+                        bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    world.spawn((
+                        Role::Divider,
+                        bevy::sprite::Sprite {
+                            image: solid.clone(),
+                            texture_atlas: None,
+                            color: bevy::color::Color::srgb(
+                                56.0 / 255.0,
+                                56.0 / 255.0,
+                                56.0 / 255.0,
+                            ),
+                            flip_x: false,
+                            flip_y: false,
+                            custom_size: Some(bevy::math::Vec2::new(1.0, 1.0)),
+                            rect: None,
+                            image_mode: bevy::sprite::SpriteImageMode::Auto,
+                            alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                        },
+                        bevy::transform::components::Transform {
+                            translation: bevy::math::Vec3::new(0.0, 0.0, 1.0),
+                            rotation: bevy::math::Quat::IDENTITY,
+                            scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
+                        },
+                        bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    world.spawn((
+                        Role::AppIcon,
+                        bevy::sprite::Sprite {
+                            image: app_icon.clone(),
+                            texture_atlas: None,
+                            color: bevy::color::Color::WHITE,
+                            flip_x: false,
+                            flip_y: false,
+                            custom_size: Some(bevy::math::Vec2::new(32.0, 32.0)),
+                            rect: None,
+                            image_mode: bevy::sprite::SpriteImageMode::Auto,
+                            alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                        },
+                        bevy::transform::components::Transform {
+                            translation: bevy::math::Vec3::new(0.0, 0.0, 2.2),
+                            rotation: bevy::math::Quat::IDENTITY,
+                            scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
+                        },
+                        bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    world.spawn((
+                        Role::AppTitle,
+                        bevy::sprite::Text2d(std::string::String::from(
+                            [
+                                "Linux-Subsystem-for-Arxumbra",
+                                "macOS-Subsystem-for-Arxumbra",
+                                "Windows-Subsystem-for-Arxumbra",
+                            ][(cfg!(target_os = "windows") as usize) * 2
+                                + (cfg!(target_os = "macos") as usize)],
+                        )),
+                        bevy::text::TextFont {
+                            font: bevy::text::FontSource::Handle(bevy::asset::Handle::Uuid(
+                                bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
+                                core::marker::PhantomData,
+                            )),
+                            font_size: bevy::text::FontSize::Px(20.0),
+                            weight: bevy::text::FontWeight::NORMAL,
+                            width: bevy::text::FontWidth::NORMAL,
+                            style: bevy::text::FontStyle::Normal,
+                            font_smoothing: bevy::text::FontSmoothing::AntiAliased,
+                            font_features: bevy::text::FontFeatures::builder().build(),
+                            font_variations: bevy::text::FontVariations::builder().build(),
+                        },
+                        bevy::text::TextColor(bevy::color::Color::srgb(
+                            240.0 / 255.0,
+                            240.0 / 255.0,
+                            240.0 / 255.0,
+                        )),
+                        bevy::text::TextLayout {
+                            justify: bevy::text::Justify::Left,
+                            linebreak: bevy::text::LineBreak::WordBoundary,
+                        },
+                        bevy::text::TextBounds {
+                            width: None,
+                            height: None,
+                        },
+                        bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.5)),
+                        bevy::transform::components::Transform {
+                            translation: bevy::math::Vec3::new(0.0, 0.0, 2.4),
+                            rotation: bevy::math::Quat::IDENTITY,
+                            scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
+                        },
+                        bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    world.spawn((
+                        Role::TabBody(Control::HomeTab),
+                        bevy::sprite::Sprite {
+                            image: pill.clone(),
+                            texture_atlas: None,
+                            color: bevy::color::Color::srgb(
+                                28.0 / 255.0,
+                                28.0 / 255.0,
+                                28.0 / 255.0,
+                            ),
+                            flip_x: false,
+                            flip_y: false,
+                            custom_size: Some(bevy::math::Vec2::new(1.0, 1.0)),
+                            rect: None,
+                            image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                bevy::sprite::TextureSlicer {
+                                    border: bevy::sprite::BorderRect {
+                                        min_inset: bevy::math::Vec2::new(16.0, 14.0),
+                                        max_inset: bevy::math::Vec2::new(16.0, 14.0),
+                                    },
+                                    center_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
+                                    sides_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
+                                    max_corner_scale: 1.0,
+                                },
+                            ),
+                            alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                        },
+                        bevy::transform::components::Transform {
+                            translation: bevy::math::Vec3::new(0.0, 0.0, 3.0),
+                            rotation: bevy::math::Quat::IDENTITY,
+                            scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
+                        },
+                        bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    world.spawn((
+                        Role::TabIcon(Control::HomeTab),
+                        bevy::sprite::Sprite {
+                            image: house.clone(),
+                            texture_atlas: None,
+                            color: bevy::color::Color::srgb(
+                                200.0 / 255.0,
+                                200.0 / 255.0,
+                                200.0 / 255.0,
+                            ),
+                            flip_x: false,
+                            flip_y: false,
+                            custom_size: Some(bevy::math::Vec2::new(24.0, 24.0)),
+                            rect: None,
+                            image_mode: bevy::sprite::SpriteImageMode::Auto,
+                            alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                        },
+                        bevy::transform::components::Transform {
+                            translation: bevy::math::Vec3::new(0.0, 0.0, 3.2),
+                            rotation: bevy::math::Quat::IDENTITY,
+                            scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
+                        },
+                        bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    world.spawn((
+                        Role::TabLabel(Control::HomeTab),
+                        bevy::sprite::Text2d(std::string::String::from("Home")),
+                        bevy::text::TextFont {
+                            font: bevy::text::FontSource::Handle(bevy::asset::Handle::Uuid(
+                                bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
+                                core::marker::PhantomData,
+                            )),
+                            font_size: bevy::text::FontSize::Px(20.0),
+                            weight: bevy::text::FontWeight::NORMAL,
+                            width: bevy::text::FontWidth::NORMAL,
+                            style: bevy::text::FontStyle::Normal,
+                            font_smoothing: bevy::text::FontSmoothing::AntiAliased,
+                            font_features: bevy::text::FontFeatures::builder().build(),
+                            font_variations: bevy::text::FontVariations::builder().build(),
+                        },
+                        bevy::text::TextColor(bevy::color::Color::srgb(
+                            225.0 / 255.0,
+                            225.0 / 255.0,
+                            225.0 / 255.0,
+                        )),
+                        bevy::text::TextLayout {
+                            justify: bevy::text::Justify::Left,
+                            linebreak: bevy::text::LineBreak::WordBoundary,
+                        },
+                        bevy::text::TextBounds {
+                            width: None,
+                            height: None,
+                        },
+                        bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
+                        bevy::transform::components::Transform {
+                            translation: bevy::math::Vec3::new(0.0, 0.0, 3.3),
+                            rotation: bevy::math::Quat::IDENTITY,
+                            scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
+                        },
+                        bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    world.spawn((
+                        Role::TabRing(Control::HomeTab),
+                        bevy::sprite::Sprite {
+                            image: ring.clone(),
+                            texture_atlas: None,
+                            color: bevy::color::Color::WHITE,
+                            flip_x: false,
+                            flip_y: false,
+                            custom_size: Some(bevy::math::Vec2::new(1.0, 1.0)),
+                            rect: None,
+                            image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                bevy::sprite::TextureSlicer {
+                                    border: bevy::sprite::BorderRect {
+                                        min_inset: bevy::math::Vec2::new(16.0, 14.0),
+                                        max_inset: bevy::math::Vec2::new(16.0, 14.0),
+                                    },
+                                    center_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
+                                    sides_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
+                                    max_corner_scale: 1.0,
+                                },
+                            ),
+                            alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                        },
+                        bevy::transform::components::Transform {
+                            translation: bevy::math::Vec3::new(0.0, 0.0, 3.4),
+                            rotation: bevy::math::Quat::IDENTITY,
+                            scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
+                        },
+                        bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    world.spawn((
+                        Role::TabBody(Control::RegistryTab),
+                        bevy::sprite::Sprite {
+                            image: pill.clone(),
+                            texture_atlas: None,
+                            color: bevy::color::Color::srgb(
+                                28.0 / 255.0,
+                                28.0 / 255.0,
+                                28.0 / 255.0,
+                            ),
+                            flip_x: false,
+                            flip_y: false,
+                            custom_size: Some(bevy::math::Vec2::new(1.0, 1.0)),
+                            rect: None,
+                            image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                bevy::sprite::TextureSlicer {
+                                    border: bevy::sprite::BorderRect {
+                                        min_inset: bevy::math::Vec2::new(16.0, 14.0),
+                                        max_inset: bevy::math::Vec2::new(16.0, 14.0),
+                                    },
+                                    center_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
+                                    sides_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
+                                    max_corner_scale: 1.0,
+                                },
+                            ),
+                            alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                        },
+                        bevy::transform::components::Transform {
+                            translation: bevy::math::Vec3::new(0.0, 0.0, 3.0),
+                            rotation: bevy::math::Quat::IDENTITY,
+                            scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
+                        },
+                        bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    world.spawn((
+                        Role::TabIcon(Control::RegistryTab),
+                        bevy::sprite::Sprite {
+                            image: registry.clone(),
+                            texture_atlas: None,
+                            color: bevy::color::Color::srgb(
+                                200.0 / 255.0,
+                                200.0 / 255.0,
+                                200.0 / 255.0,
+                            ),
+                            flip_x: false,
+                            flip_y: false,
+                            custom_size: Some(bevy::math::Vec2::new(24.0, 24.0)),
+                            rect: None,
+                            image_mode: bevy::sprite::SpriteImageMode::Auto,
+                            alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                        },
+                        bevy::transform::components::Transform {
+                            translation: bevy::math::Vec3::new(0.0, 0.0, 3.2),
+                            rotation: bevy::math::Quat::IDENTITY,
+                            scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
+                        },
+                        bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    world.spawn((
+                        Role::TabLabel(Control::RegistryTab),
+                        bevy::sprite::Text2d(std::string::String::from("Extension Registry")),
+                        bevy::text::TextFont {
+                            font: bevy::text::FontSource::Handle(bevy::asset::Handle::Uuid(
+                                bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
+                                core::marker::PhantomData,
+                            )),
+                            font_size: bevy::text::FontSize::Px(20.0),
+                            weight: bevy::text::FontWeight::NORMAL,
+                            width: bevy::text::FontWidth::NORMAL,
+                            style: bevy::text::FontStyle::Normal,
+                            font_smoothing: bevy::text::FontSmoothing::AntiAliased,
+                            font_features: bevy::text::FontFeatures::builder().build(),
+                            font_variations: bevy::text::FontVariations::builder().build(),
+                        },
+                        bevy::text::TextColor(bevy::color::Color::srgb(
+                            225.0 / 255.0,
+                            225.0 / 255.0,
+                            225.0 / 255.0,
+                        )),
+                        bevy::text::TextLayout {
+                            justify: bevy::text::Justify::Left,
+                            linebreak: bevy::text::LineBreak::WordBoundary,
+                        },
+                        bevy::text::TextBounds {
+                            width: None,
+                            height: None,
+                        },
+                        bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
+                        bevy::transform::components::Transform {
+                            translation: bevy::math::Vec3::new(0.0, 0.0, 3.3),
+                            rotation: bevy::math::Quat::IDENTITY,
+                            scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
+                        },
+                        bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    world.spawn((
+                        Role::TabRing(Control::RegistryTab),
+                        bevy::sprite::Sprite {
+                            image: ring,
+                            texture_atlas: None,
+                            color: bevy::color::Color::WHITE,
+                            flip_x: false,
+                            flip_y: false,
+                            custom_size: Some(bevy::math::Vec2::new(1.0, 1.0)),
+                            rect: None,
+                            image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                bevy::sprite::TextureSlicer {
+                                    border: bevy::sprite::BorderRect {
+                                        min_inset: bevy::math::Vec2::new(16.0, 14.0),
+                                        max_inset: bevy::math::Vec2::new(16.0, 14.0),
+                                    },
+                                    center_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
+                                    sides_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
+                                    max_corner_scale: 1.0,
+                                },
+                            ),
+                            alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                        },
+                        bevy::transform::components::Transform {
+                            translation: bevy::math::Vec3::new(0.0, 0.0, 3.4),
+                            rotation: bevy::math::Quat::IDENTITY,
+                            scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
+                        },
+                        bevy::camera::visibility::Visibility::Hidden,
+                    ));
+                    (|group_root: bevy::ecs::entity::Entity,
                       world: &mut bevy::ecs::world::World| {
                         world.spawn((
-                            bevy::sprite::Sprite {
-                                image: glow,
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(48.0, height)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 6.0 - 24.0,
-                                    0.0,
-                                    3.0,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: core,
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(4.0, height)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(-width / 6.0 - 2.0, 0.0, 4.0),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: separator,
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(width / 3.0 - 48.0, 3.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 3.0,
-                                    height / 2.0 - 103.5,
-                                    6.0,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
+                            Role::CardBackground,
+                            bevy::ecs::hierarchy::ChildOf(group_root),
                             bevy::sprite::Sprite {
                                 image: pill.clone(),
                                 texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
+                                color: bevy::color::Color::srgb(
+                                    18.0 / 255.0,
+                                    18.0 / 255.0,
+                                    18.0 / 255.0,
+                                ),
                                 flip_x: false,
                                 flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(width / 3.0 - 40.0, 64.0)),
+                                custom_size: Some(bevy::math::Vec2::new(1.0, 1.0)),
                                 rect: None,
                                 image_mode: bevy::sprite::SpriteImageMode::Sliced(
                                     bevy::sprite::TextureSlicer {
                                         border: bevy::sprite::BorderRect {
-                                            min_inset: bevy::math::Vec2::new(32.0, 0.0),
-                                            max_inset: bevy::math::Vec2::new(32.0, 0.0),
+                                            min_inset: bevy::math::Vec2::new(16.0, 14.0),
+                                            max_inset: bevy::math::Vec2::new(16.0, 14.0),
                                         },
                                         center_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
                                         sides_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
@@ -252,343 +684,43 @@ fn main() {
                                 alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
                             },
                             bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 3.0,
-                                    height / 2.0 - 152.0,
-                                    5.0,
-                                ),
+                                translation: bevy::math::Vec3::new(0.0, 0.0, 2.0),
                                 rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
+                                scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
                             },
                             bevy::camera::visibility::Visibility::Hidden,
                         ));
                         world.spawn((
-                            bevy::sprite::Sprite {
-                                image: house,
-                                texture_atlas: None,
-                                color: bevy::color::Color::BLACK,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(26.0, 22.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 2.0 + 56.0,
-                                    height / 2.0 - 152.0,
-                                    5.5,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Text2d(std::string::String::from("Home")),
-                            bevy::text::TextFont {
-                                font: bevy::text::FontSource::Handle(bevy::asset::Handle::Uuid(
-                                    bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
-                                    core::marker::PhantomData,
-                                )),
-                                font_size: bevy::text::FontSize::Px(24.0),
-                                weight: bevy::text::FontWeight::NORMAL,
-                                width: bevy::text::FontWidth::NORMAL,
-                                style: bevy::text::FontStyle::Normal,
-                                font_smoothing: bevy::text::FontSmoothing::AntiAliased,
-                                font_features: bevy::text::FontFeatures::builder().build(),
-                                font_variations: bevy::text::FontVariations::builder().build(),
-                            },
-                            bevy::text::TextColor(bevy::color::Color::BLACK),
-                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 2.0 + 88.0,
-                                    height / 2.0 - 152.0,
-                                    6.0,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: pill.clone(),
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(width / 3.0 - 40.0, 64.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
-                                    bevy::sprite::TextureSlicer {
-                                        border: bevy::sprite::BorderRect {
-                                            min_inset: bevy::math::Vec2::new(32.0, 0.0),
-                                            max_inset: bevy::math::Vec2::new(32.0, 0.0),
-                                        },
-                                        center_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
-                                        sides_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
-                                        max_corner_scale: 1.0,
-                                    },
-                                ),
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 3.0,
-                                    height / 2.0 - 227.0,
-                                    5.0,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: registry,
-                                texture_atlas: None,
-                                color: bevy::color::Color::BLACK,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(26.0, 22.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 2.0 + 56.0,
-                                    height / 2.0 - 227.0,
-                                    5.5,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: app_icon,
-                                texture_atlas: None,
-                                color: bevy::color::Color::BLACK,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(26.0, 26.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 2.0 + 52.0,
-                                    height / 2.0 - 52.0,
-                                    2.5,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Text2d(std::string::String::from("Extension Registry")),
-                            bevy::text::TextFont {
-                                font: bevy::text::FontSource::Handle(bevy::asset::Handle::Uuid(
-                                    bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
-                                    core::marker::PhantomData,
-                                )),
-                                font_size: bevy::text::FontSize::Px(24.0),
-                                weight: bevy::text::FontWeight::NORMAL,
-                                width: bevy::text::FontWidth::NORMAL,
-                                style: bevy::text::FontStyle::Normal,
-                                font_smoothing: bevy::text::FontSmoothing::AntiAliased,
-                                font_features: bevy::text::FontFeatures::builder().build(),
-                                font_variations: bevy::text::FontVariations::builder().build(),
-                            },
-                            bevy::text::TextColor(bevy::color::Color::BLACK),
-                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 2.0 + 88.0,
-                                    height / 2.0 - 227.0,
-                                    6.0,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: well.clone(),
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(72.0, 72.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    84.0 - width / 6.0,
-                                    height / 2.0 - 84.0,
-                                    2.9,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: menu_card,
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(
-                                    width - width / 3.0 - 48.0,
-                                    height - 48.0,
-                                )),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
-                                    bevy::sprite::TextureSlicer {
-                                        border: bevy::sprite::BorderRect {
-                                            min_inset: bevy::math::Vec2::new(40.0, 28.0),
-                                            max_inset: bevy::math::Vec2::new(40.0, 28.0),
-                                        },
-                                        center_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
-                                        sides_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
-                                        max_corner_scale: 1.0,
-                                    },
-                                ),
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::ecs::name::Name::new("menu"),
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(width / 6.0, 0.0, 2.0),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: lab,
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(640.0, 288.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
-                                    bevy::sprite::TextureSlicer {
-                                        border: bevy::sprite::BorderRect {
-                                            min_inset: bevy::math::Vec2::new(40.0, 20.0),
-                                            max_inset: bevy::math::Vec2::new(40.0, 20.0),
-                                        },
-                                        center_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
-                                        sides_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
-                                        max_corner_scale: 1.0,
-                                    },
-                                ),
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::ecs::name::Name::new("menu"),
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(368.0 - width / 6.0, 252.0, 2.5),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: well,
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(72.0, 72.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::ecs::name::Name::new("menu"),
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    111.5 - width / 6.0,
-                                    332.0,
-                                    2.6,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
+                            Role::CardIcon,
+                            bevy::ecs::hierarchy::ChildOf(group_root),
                             bevy::sprite::Sprite {
                                 image: flask,
                                 texture_atlas: None,
                                 color: bevy::color::Color::WHITE,
                                 flip_x: false,
                                 flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(48.0, 40.0)),
+                                custom_size: Some(bevy::math::Vec2::new(28.0, 28.0)),
                                 rect: None,
                                 image_mode: bevy::sprite::SpriteImageMode::Auto,
                                 alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
                             },
-                            bevy::ecs::name::Name::new("menu"),
                             bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    111.5 - width / 6.0,
-                                    332.5,
-                                    2.7,
-                                ),
+                                translation: bevy::math::Vec3::new(0.0, 0.0, 2.4),
                                 rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
+                                scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
                             },
                             bevy::camera::visibility::Visibility::Hidden,
                         ));
                         world.spawn((
-                            bevy::sprite::Sprite {
-                                image: bevy::asset::Handle::Uuid(
-                                    bevy::asset::AssetId::<bevy::image::Image>::DEFAULT_UUID,
-                                    core::marker::PhantomData,
-                                ),
-                                texture_atlas: None,
-                                color: bevy::color::Color::srgb(0.36, 0.36, 0.36),
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(2.0, 72.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Opaque,
-                            },
-                            bevy::ecs::name::Name::new("menu"),
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    172.5 - width / 6.0,
-                                    332.5,
-                                    2.7,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
+                            Role::CardTitle,
+                            bevy::ecs::hierarchy::ChildOf(group_root),
                             bevy::sprite::Text2d(std::string::String::from("Laboratory")),
                             bevy::text::TextFont {
                                 font: bevy::text::FontSource::Handle(bevy::asset::Handle::Uuid(
                                     bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
                                     core::marker::PhantomData,
                                 )),
-                                font_size: bevy::text::FontSize::Px(30.0),
+                                font_size: bevy::text::FontSize::Px(26.0),
                                 weight: bevy::text::FontWeight::NORMAL,
                                 width: bevy::text::FontWidth::NORMAL,
                                 style: bevy::text::FontStyle::Normal,
@@ -596,55 +728,39 @@ fn main() {
                                 font_features: bevy::text::FontFeatures::builder().build(),
                                 font_variations: bevy::text::FontVariations::builder().build(),
                             },
-                            bevy::text::TextColor(bevy::color::Color::WHITE),
-                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
-                            bevy::ecs::name::Name::new("menu"),
+                            bevy::text::TextColor(bevy::color::Color::srgb(
+                                240.0 / 255.0,
+                                240.0 / 255.0,
+                                240.0 / 255.0,
+                            )),
+                            bevy::text::TextLayout {
+                                justify: bevy::text::Justify::Left,
+                                linebreak: bevy::text::LineBreak::WordBoundary,
+                            },
+                            bevy::text::TextBounds {
+                                width: None,
+                                height: None,
+                            },
+                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.5)),
                             bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    196.0 - width / 6.0,
-                                    332.0,
-                                    2.8,
-                                ),
+                                translation: bevy::math::Vec3::new(0.0, 0.0, 2.5),
                                 rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
+                                scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
                             },
                             bevy::camera::visibility::Visibility::Hidden,
                         ));
                         world.spawn((
-                            bevy::sprite::Sprite {
-                                image: bevy::asset::Handle::Uuid(
-                                    bevy::asset::AssetId::<bevy::image::Image>::DEFAULT_UUID,
-                                    core::marker::PhantomData,
-                                ),
-                                texture_atlas: None,
-                                color: bevy::color::Color::srgb(0.36, 0.36, 0.36),
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(584.0, 2.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Opaque,
-                            },
-                            bevy::ecs::name::Name::new("menu"),
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    368.0 - width / 6.0,
-                                    271.0,
-                                    2.7,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Text2d(std::string::String::from("Coming Soon")),
+                            Role::CardDescription,
+                            bevy::ecs::hierarchy::ChildOf(group_root),
+                            bevy::sprite::Text2d(std::string::String::from(
+                                "Manage the installed Arxumbra subsystem extensions.",
+                            )),
                             bevy::text::TextFont {
                                 font: bevy::text::FontSource::Handle(bevy::asset::Handle::Uuid(
                                     bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
                                     core::marker::PhantomData,
                                 )),
-                                font_size: bevy::text::FontSize::Px(20.0),
+                                font_size: bevy::text::FontSize::Px(18.0),
                                 weight: bevy::text::FontWeight::NORMAL,
                                 width: bevy::text::FontWidth::NORMAL,
                                 style: bevy::text::FontStyle::Normal,
@@ -652,61 +768,72 @@ fn main() {
                                 font_features: bevy::text::FontFeatures::builder().build(),
                                 font_variations: bevy::text::FontVariations::builder().build(),
                             },
-                            bevy::text::TextColor(bevy::color::Color::srgb(0.58, 0.58, 0.58)),
-                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
-                            bevy::ecs::name::Name::new("menu"),
+                            bevy::text::TextColor(bevy::color::Color::srgb(
+                                170.0 / 255.0,
+                                170.0 / 255.0,
+                                170.0 / 255.0,
+                            )),
+                            bevy::text::TextLayout {
+                                justify: bevy::text::Justify::Left,
+                                linebreak: bevy::text::LineBreak::WordBoundary,
+                            },
+                            bevy::text::TextBounds {
+                                width: None,
+                                height: None,
+                            },
+                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.5)),
                             bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    76.0 - width / 6.0,
-                                    240.0,
-                                    2.7,
-                                ),
+                                translation: bevy::math::Vec3::new(0.0, 0.0, 2.5),
                                 rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
+                                scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
                             },
                             bevy::camera::visibility::Visibility::Hidden,
                         ));
                         world.spawn((
+                            Role::CardSeparator,
+                            bevy::ecs::hierarchy::ChildOf(group_root),
                             bevy::sprite::Sprite {
-                                image: bevy::asset::Handle::Uuid(
-                                    bevy::asset::AssetId::<bevy::image::Image>::DEFAULT_UUID,
-                                    core::marker::PhantomData,
-                                ),
+                                image: solid,
                                 texture_atlas: None,
-                                color: bevy::color::Color::srgb(0.36, 0.36, 0.36),
+                                color: bevy::color::Color::srgb(
+                                    56.0 / 255.0,
+                                    56.0 / 255.0,
+                                    56.0 / 255.0,
+                                ),
                                 flip_x: false,
                                 flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(584.0, 2.0)),
+                                custom_size: Some(bevy::math::Vec2::new(1.0, 1.0)),
                                 rect: None,
                                 image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Opaque,
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
                             },
-                            bevy::ecs::name::Name::new("menu"),
                             bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    368.0 - width / 6.0,
-                                    207.0,
-                                    2.7,
-                                ),
+                                translation: bevy::math::Vec3::new(0.0, 0.0, 2.4),
                                 rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
+                                scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
                             },
                             bevy::camera::visibility::Visibility::Hidden,
                         ));
                         world.spawn((
+                            Role::LaunchBody,
+                            bevy::ecs::hierarchy::ChildOf(group_root),
                             bevy::sprite::Sprite {
-                                image: pill,
+                                image: pill.clone(),
                                 texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
+                                color: bevy::color::Color::srgb(
+                                    235.0 / 255.0,
+                                    235.0 / 255.0,
+                                    235.0 / 255.0,
+                                ),
                                 flip_x: false,
                                 flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(584.0, 64.0)),
+                                custom_size: Some(bevy::math::Vec2::new(1.0, 1.0)),
                                 rect: None,
                                 image_mode: bevy::sprite::SpriteImageMode::Sliced(
                                     bevy::sprite::TextureSlicer {
                                         border: bevy::sprite::BorderRect {
-                                            min_inset: bevy::math::Vec2::new(32.0, 0.0),
-                                            max_inset: bevy::math::Vec2::new(32.0, 0.0),
+                                            min_inset: bevy::math::Vec2::new(16.0, 14.0),
+                                            max_inset: bevy::math::Vec2::new(16.0, 14.0),
                                         },
                                         center_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
                                         sides_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
@@ -715,50 +842,48 @@ fn main() {
                                 ),
                                 alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
                             },
-                            bevy::ecs::name::Name::new("menu"),
                             bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    368.0 - width / 6.0,
-                                    164.0,
-                                    2.7,
-                                ),
+                                translation: bevy::math::Vec3::new(0.0, 0.0, 2.6),
                                 rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
+                                scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
                             },
                             bevy::camera::visibility::Visibility::Hidden,
                         ));
                         world.spawn((
+                            Role::LaunchIcon,
+                            bevy::ecs::hierarchy::ChildOf(group_root),
                             bevy::sprite::Sprite {
                                 image: rocket_pill,
                                 texture_atlas: None,
-                                color: bevy::color::Color::BLACK,
+                                color: bevy::color::Color::srgb(
+                                    20.0 / 255.0,
+                                    20.0 / 255.0,
+                                    20.0 / 255.0,
+                                ),
                                 flip_x: false,
                                 flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(26.0, 26.0)),
+                                custom_size: Some(bevy::math::Vec2::new(24.0, 24.0)),
                                 rect: None,
                                 image_mode: bevy::sprite::SpriteImageMode::Auto,
                                 alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
                             },
-                            bevy::ecs::name::Name::new("menu-ink"),
                             bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    323.0 - width / 6.0,
-                                    164.0,
-                                    2.8,
-                                ),
+                                translation: bevy::math::Vec3::new(0.0, 0.0, 2.7),
                                 rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
+                                scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
                             },
                             bevy::camera::visibility::Visibility::Hidden,
                         ));
                         world.spawn((
+                            Role::LaunchLabel,
+                            bevy::ecs::hierarchy::ChildOf(group_root),
                             bevy::sprite::Text2d(std::string::String::from("Launch")),
                             bevy::text::TextFont {
                                 font: bevy::text::FontSource::Handle(bevy::asset::Handle::Uuid(
                                     bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
                                     core::marker::PhantomData,
                                 )),
-                                font_size: bevy::text::FontSize::Px(24.0),
+                                font_size: bevy::text::FontSize::Px(22.0),
                                 weight: bevy::text::FontWeight::NORMAL,
                                 width: bevy::text::FontWidth::NORMAL,
                                 style: bevy::text::FontStyle::Normal,
@@ -766,82 +891,72 @@ fn main() {
                                 font_features: bevy::text::FontFeatures::builder().build(),
                                 font_variations: bevy::text::FontVariations::builder().build(),
                             },
-                            bevy::text::TextColor(bevy::color::Color::BLACK),
-                            bevy::sprite::Anchor(bevy::math::Vec2::new(0.0, 0.0)),
-                            bevy::ecs::name::Name::new("menu"),
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    386.0 - width / 6.0,
-                                    164.0,
-                                    2.8,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: rocket,
-                                texture_atlas: None,
-                                color: bevy::color::Color::srgba(1.0, 1.0, 1.0, 0.0),
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(44.0, 44.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::ecs::name::Name::new("slot"),
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    84.0 - width / 6.0,
-                                    height / 2.0 - 84.0,
-                                    2.95,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Sprite {
-                                image: badge,
-                                texture_atlas: None,
-                                color: bevy::color::Color::WHITE,
-                                flip_x: false,
-                                flip_y: false,
-                                custom_size: Some(bevy::math::Vec2::new(56.0, 56.0)),
-                                rect: None,
-                                image_mode: bevy::sprite::SpriteImageMode::Auto,
-                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
-                            },
-                            bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 2.0 + 52.0,
-                                    height / 2.0 - 52.0,
-                                    2.0,
-                                ),
-                                rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
-                            },
-                            bevy::camera::visibility::Visibility::Hidden,
-                        ));
-                        world.spawn((
-                            bevy::sprite::Text2d(std::string::String::from(
-                                [
-                                    "Linux-Subsystem-for-Arxumbra",
-                                    "macOS-Subsystem-for-Arxumbra",
-                                    "Windows-Subsystem-for-Arxumbra",
-                                ][(cfg!(target_os = "windows") as usize) * 2
-                                    + (cfg!(target_os = "macos") as usize)],
+                            bevy::text::TextColor(bevy::color::Color::srgb(
+                                20.0 / 255.0,
+                                20.0 / 255.0,
+                                20.0 / 255.0,
                             )),
+                            bevy::text::TextLayout {
+                                justify: bevy::text::Justify::Left,
+                                linebreak: bevy::text::LineBreak::WordBoundary,
+                            },
+                            bevy::text::TextBounds {
+                                width: None,
+                                height: None,
+                            },
+                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
+                            bevy::transform::components::Transform {
+                                translation: bevy::math::Vec3::new(0.0, 0.0, 2.7),
+                                rotation: bevy::math::Quat::IDENTITY,
+                                scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
+                            },
+                            bevy::camera::visibility::Visibility::Hidden,
+                        ));
+                        world.spawn((
+                            Role::Badge,
+                            bevy::ecs::hierarchy::ChildOf(group_root),
+                            bevy::sprite::Sprite {
+                                image: pill.clone(),
+                                texture_atlas: None,
+                                color: bevy::color::Color::srgb(
+                                    30.0 / 255.0,
+                                    30.0 / 255.0,
+                                    30.0 / 255.0,
+                                ),
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::new(1.0, 1.0)),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                    bevy::sprite::TextureSlicer {
+                                        border: bevy::sprite::BorderRect {
+                                            min_inset: bevy::math::Vec2::new(16.0, 14.0),
+                                            max_inset: bevy::math::Vec2::new(16.0, 14.0),
+                                        },
+                                        center_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
+                                        sides_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
+                                        max_corner_scale: 1.0,
+                                    },
+                                ),
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                            },
+                            bevy::transform::components::Transform {
+                                translation: bevy::math::Vec3::new(0.0, 0.0, 2.4),
+                                rotation: bevy::math::Quat::IDENTITY,
+                                scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
+                            },
+                            bevy::camera::visibility::Visibility::Hidden,
+                        ));
+                        world.spawn((
+                            Role::BadgeLabel,
+                            bevy::ecs::hierarchy::ChildOf(group_root),
+                            bevy::sprite::Text2d(std::string::String::from("Coming Soon")),
                             bevy::text::TextFont {
                                 font: bevy::text::FontSource::Handle(bevy::asset::Handle::Uuid(
                                     bevy::asset::AssetId::<bevy::text::Font>::DEFAULT_UUID,
                                     core::marker::PhantomData,
                                 )),
-                                font_size: bevy::text::FontSize::Px(24.0),
+                                font_size: bevy::text::FontSize::Px(14.0),
                                 weight: bevy::text::FontWeight::NORMAL,
                                 width: bevy::text::FontWidth::NORMAL,
                                 style: bevy::text::FontStyle::Normal,
@@ -849,663 +964,1205 @@ fn main() {
                                 font_features: bevy::text::FontFeatures::builder().build(),
                                 font_variations: bevy::text::FontVariations::builder().build(),
                             },
-                            bevy::text::TextColor(bevy::color::Color::WHITE),
-                            bevy::sprite::Anchor(bevy::math::Vec2::new(-0.5, 0.0)),
+                            bevy::text::TextColor(bevy::color::Color::srgb(
+                                160.0 / 255.0,
+                                160.0 / 255.0,
+                                160.0 / 255.0,
+                            )),
+                            bevy::text::TextLayout {
+                                justify: bevy::text::Justify::Center,
+                                linebreak: bevy::text::LineBreak::WordBoundary,
+                            },
+                            bevy::text::TextBounds {
+                                width: None,
+                                height: None,
+                            },
+                            bevy::sprite::Anchor(bevy::math::Vec2::ZERO),
                             bevy::transform::components::Transform {
-                                translation: bevy::math::Vec3::new(
-                                    -width / 2.0 + 96.0,
-                                    height / 2.0 - 52.0,
-                                    5.0,
-                                ),
+                                translation: bevy::math::Vec3::new(0.0, 0.0, 2.5),
                                 rotation: bevy::math::Quat::IDENTITY,
-                                scale: bevy::math::Vec3::new(1.0, 1.0, 0.0),
+                                scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
+                            },
+                            bevy::camera::visibility::Visibility::Hidden,
+                        ));
+                        world.spawn((
+                            Role::Well,
+                            bevy::ecs::hierarchy::ChildOf(group_root),
+                            bevy::sprite::Sprite {
+                                image: pill.clone(),
+                                texture_atlas: None,
+                                color: bevy::color::Color::srgb(
+                                    10.0 / 255.0,
+                                    10.0 / 255.0,
+                                    10.0 / 255.0,
+                                ),
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::new(1.0, 1.0)),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Sliced(
+                                    bevy::sprite::TextureSlicer {
+                                        border: bevy::sprite::BorderRect {
+                                            min_inset: bevy::math::Vec2::new(16.0, 14.0),
+                                            max_inset: bevy::math::Vec2::new(16.0, 14.0),
+                                        },
+                                        center_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
+                                        sides_scale_mode: bevy::sprite::SliceScaleMode::Stretch,
+                                        max_corner_scale: 1.0,
+                                    },
+                                ),
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                            },
+                            bevy::transform::components::Transform {
+                                translation: bevy::math::Vec3::new(0.0, 0.0, 2.4),
+                                rotation: bevy::math::Quat::IDENTITY,
+                                scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
+                            },
+                            bevy::camera::visibility::Visibility::Hidden,
+                        ));
+                        world.spawn((
+                            Role::Rocket,
+                            bevy::ecs::hierarchy::ChildOf(group_root),
+                            bevy::sprite::Sprite {
+                                image: rocket,
+                                texture_atlas: None,
+                                color: bevy::color::Color::WHITE,
+                                flip_x: false,
+                                flip_y: false,
+                                custom_size: Some(bevy::math::Vec2::new(96.0, 96.0)),
+                                rect: None,
+                                image_mode: bevy::sprite::SpriteImageMode::Auto,
+                                alpha_mode: bevy::sprite::SpriteAlphaMode::Blend,
+                            },
+                            bevy::transform::components::Transform {
+                                translation: bevy::math::Vec3::new(0.0, 0.0, 2.5),
+                                rotation: bevy::math::Quat::IDENTITY,
+                                scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
                             },
                             bevy::camera::visibility::Visibility::Hidden,
                         ));
                     })(
                         world
-                            .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
-                            .add(bevy::image::Image {
-                                data: Some(
-                                    (0..24576u32)
-                                        .flat_map(|index: u32| {
-                                            (|x: f32, y: f32| {
-                                                [
-                                                    255u8,
-                                                    255u8,
-                                                    255u8,
-                                                    ((0.48 * (x / 47.5).powf(2.0) * f32::min(f32::min(y, 511.0 - y) / 12.0, 1.0)).clamp(0.0, 1.0)
-                                                        * 255.0) as u8,
-                                                ]
-                                            })(
-                                                (index % 48) as f32 + 0.5,
-                                                (index / 48) as f32 + 0.5,
-                                            )
-                                        })
-                                        .collect::<std::vec::Vec<u8>>(),
-                                ),
-                                data_order:
-                                    bevy::render::render_resource::TextureDataOrder::LayerMajor,
-                                texture_descriptor:
-                                    bevy::render::render_resource::TextureDescriptor {
-                                        label: Some("divider-glow"),
-                                        size: bevy::render::render_resource::Extent3d {
-                                            width: 48,
-                                            height: 512,
-                                            depth_or_array_layers: 1,
-                                        },
-                                        mip_level_count: 1,
-                                        sample_count: 1,
-                                        dimension:
-                                            bevy::render::render_resource::TextureDimension::D2,
-                                        format:
-                                            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-                                        usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
-                                            | bevy::render::render_resource::TextureUsages::COPY_DST,
-                                        view_formats: &[],
-                                    },
-                                sampler: bevy::image::ImageSampler::Default,
-                                texture_view_descriptor: None,
-                                asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
-                                    | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-                                copy_on_resize: false,
-                            }),
-                        world
-                            .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
-                            .add(bevy::image::Image {
-                                data: Some(
-                                    (0..2048u32)
-                                        .flat_map(|index: u32| {
-                                            (|x: f32, y: f32| {
-                                                [
-                                                    255u8,
-                                                    255u8,
-                                                    255u8,
-                                                    ((0.5
-                                                        - (f32::hypot(
-                                                            f32::max(2.0 - x, 0.0),
-                                                            f32::max(f32::max(2.0 - y, y - 510.0), 0.0),
-                                                        ) - 2.0))
-                                                        .clamp(0.0, 1.0)
-                                                        * 255.0) as u8,
-                                                ]
-                                            })(
-                                                (index % 4) as f32 + 0.5,
-                                                (index / 4) as f32 + 0.5,
-                                            )
-                                        })
-                                        .collect::<std::vec::Vec<u8>>(),
-                                ),
-                                data_order:
-                                    bevy::render::render_resource::TextureDataOrder::LayerMajor,
-                                texture_descriptor:
-                                    bevy::render::render_resource::TextureDescriptor {
-                                        label: Some("divider-core"),
-                                        size: bevy::render::render_resource::Extent3d {
-                                            width: 4,
-                                            height: 512,
-                                            depth_or_array_layers: 1,
-                                        },
-                                        mip_level_count: 1,
-                                        sample_count: 1,
-                                        dimension:
-                                            bevy::render::render_resource::TextureDimension::D2,
-                                        format:
-                                            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-                                        usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
-                                            | bevy::render::render_resource::TextureUsages::COPY_DST,
-                                        view_formats: &[],
-                                    },
-                                sampler: bevy::image::ImageSampler::Default,
-                                texture_view_descriptor: None,
-                                asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
-                                    | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-                                copy_on_resize: false,
-                            }),
-                        world
-                            .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
-                            .add(bevy::image::Image {
-                                data: Some(
-                                    (0..1776u32)
-                                        .flat_map(|index: u32| {
-                                            (|x: f32, y: f32| {
-                                                [
-                                                    255u8,
-                                                    255u8,
-                                                    255u8,
-                                                    ((0.5
-                                                        - (f32::hypot(
-                                                            f32::max(f32::max(1.5 - x, x - 590.5), 0.0),
-                                                            f32::abs(y - 1.5),
-                                                        ) - 1.5))
-                                                        .clamp(0.0, 1.0)
-                                                        * 255.0) as u8,
-                                                ]
-                                            })(
-                                                (index % 592) as f32 + 0.5,
-                                                (index / 592) as f32 + 0.5,
-                                            )
-                                        })
-                                        .collect::<std::vec::Vec<u8>>(),
-                                ),
-                                data_order:
-                                    bevy::render::render_resource::TextureDataOrder::LayerMajor,
-                                texture_descriptor:
-                                    bevy::render::render_resource::TextureDescriptor {
-                                        label: Some("header-separator"),
-                                        size: bevy::render::render_resource::Extent3d {
-                                            width: 592,
-                                            height: 3,
-                                            depth_or_array_layers: 1,
-                                        },
-                                        mip_level_count: 1,
-                                        sample_count: 1,
-                                        dimension:
-                                            bevy::render::render_resource::TextureDimension::D2,
-                                        format:
-                                            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-                                        usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
-                                            | bevy::render::render_resource::TextureUsages::COPY_DST,
-                                        view_formats: &[],
-                                    },
-                                sampler: bevy::image::ImageSampler::Default,
-                                texture_view_descriptor: None,
-                                asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
-                                    | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-                                copy_on_resize: false,
-                            }),
-                        world
-                            .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
-                            .add(bevy::image::Image {
-                                data: Some(
-                                    (0..4864u32)
-                                        .flat_map(|index: u32| {
-                                            (|x: f32, y: f32| {
-                                                (|d: f32, lum: f32| {
-                                                    [
-                                                        lum as u8,
-                                                        lum as u8,
-                                                        lum as u8,
-                                                        ((f32::max(
-                                                            (0.5 - d).clamp(0.0, 1.0),
-                                                            0.35 * f32::max(1.0 - (d - 0.5) / 4.0, 0.0).powf(1.4),
-                                                        )) * 255.0) as u8,
-                                                    ]
-                                                })(
-                                                    f32::hypot(
-                                                        f32::max(f32::max(32.0 - x, x - 43.0), 0.0),
-                                                        f32::abs(y - 31.5),
-                                                    ) - 28.0,
-                                                    255.0 - 22.0 * ((y - 4.0) / 56.0).clamp(0.0, 1.0).powi(2)
-                                                        - 18.0 * ((y >= 58.0) as u8 as f32),
-                                                )
-                                            })(
-                                                (index % 76) as f32 + 0.5,
-                                                (index / 76) as f32 + 0.5,
-                                            )
-                                        })
-                                        .collect::<std::vec::Vec<u8>>(),
-                                ),
-                                data_order:
-                                    bevy::render::render_resource::TextureDataOrder::LayerMajor,
-                                texture_descriptor:
-                                    bevy::render::render_resource::TextureDescriptor {
-                                        label: Some("pill"),
-                                        size: bevy::render::render_resource::Extent3d {
-                                            width: 76,
-                                            height: 64,
-                                            depth_or_array_layers: 1,
-                                        },
-                                        mip_level_count: 1,
-                                        sample_count: 1,
-                                        dimension:
-                                            bevy::render::render_resource::TextureDimension::D2,
-                                        format:
-                                            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-                                        usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
-                                            | bevy::render::render_resource::TextureUsages::COPY_DST,
-                                        view_formats: &[],
-                                    },
-                                sampler: bevy::image::ImageSampler::Default,
-                                texture_view_descriptor: None,
-                                asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
-                                    | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-                                copy_on_resize: false,
-                            }),
-                        world
-                            .resource::<bevy::asset::AssetServer>()
-                            .load::<bevy::image::Image>("icons/house.png"),
-                        world
-                            .resource::<bevy::asset::AssetServer>()
-                            .load::<bevy::image::Image>("icons/registry.png"),
-                        world
-                            .resource::<bevy::asset::AssetServer>()
-                            .load::<bevy::image::Image>("app-icon.png"),
-                        world
-                            .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
-                            .add(bevy::image::Image {
-                                data: Some(
-                                    (0..(96 * ((height - 48.0) as u32)))
-                                        .flat_map(|index: u32| {
-                                            (|x: f32, y: f32, height: f32| {
-                                                (|d: f32, lum: f32| {
-                                                    [
-                                                        (lum + 0.22 * (1.0 + (d + 0.5) / 3.0).clamp(0.0, 1.0).powf(1.4) * 255.0) as u8,
-                                                        (lum + 0.22 * (1.0 + (d + 0.5) / 3.0).clamp(0.0, 1.0).powf(1.4) * 255.0) as u8,
-                                                        (lum + 0.22 * (1.0 + (d + 0.5) / 3.0).clamp(0.0, 1.0).powf(1.4) * 255.0) as u8,
-                                                        (f32::max(
-                                                            (0.5 - d).clamp(0.0, 1.0),
-                                                            0.22 * (1.0 + (d + 0.5) / 3.0).clamp(0.0, 1.0).powf(1.4),
-                                                        ) * 255.0) as u8,
-                                                    ]
-                                                })(
-                                                    f32::hypot(
-                                                        f32::max(f32::max(28.0 - x, x - 68.0), 0.0),
-                                                        f32::max(f32::max(28.0 - y, y - (height - 48.0 - 28.0)), 0.0),
-                                                    ) - 28.0,
-                                                    12.0 + 8.0 * ((6.0 - y) / 3.0).clamp(0.0, 1.0)
-                                                        - 7.0
-                                                            * ((y + ((x * 0.618).fract() * 2.0 - 1.0) * 0.95)
-                                                                / (height - 48.0))
-                                                                .clamp(0.0, 1.0),
-                                                )
-                                            })(
-                                                (index % 96) as f32 + 0.5,
-                                                (index / 96) as f32 + 0.5,
-                                                height,
-                                            )
-                                        })
-                                        .collect::<std::vec::Vec<u8>>(),
-                                ),
-                                data_order:
-                                    bevy::render::render_resource::TextureDataOrder::LayerMajor,
-                                texture_descriptor:
-                                    bevy::render::render_resource::TextureDescriptor {
-                                        label: Some("menu-card"),
-                                        size: bevy::render::render_resource::Extent3d {
-                                            width: 96,
-                                            height: (height - 48.0) as u32,
-                                            depth_or_array_layers: 1,
-                                        },
-                                        mip_level_count: 1,
-                                        sample_count: 1,
-                                        dimension:
-                                            bevy::render::render_resource::TextureDimension::D2,
-                                        format:
-                                            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-                                        usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
-                                            | bevy::render::render_resource::TextureUsages::COPY_DST,
-                                        view_formats: &[],
-                                    },
-                                sampler: bevy::image::ImageSampler::Default,
-                                texture_view_descriptor: None,
-                                asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
-                                    | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-                                copy_on_resize: false,
-                            }),
-                        world
-                            .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
-                            .add(bevy::image::Image {
-                                data: Some(
-                                    (0..27648u32)
-                                        .flat_map(|index: u32| {
-                                            (|x: f32, y: f32| {
-                                                (|d: f32, lum: f32| {
-                                                    [
-                                                        (lum + 0.22 * (1.0 + (d + 0.5) / 2.5).clamp(0.0, 1.0).powf(1.4) * 255.0) as u8,
-                                                        (lum + 0.22 * (1.0 + (d + 0.5) / 2.5).clamp(0.0, 1.0).powf(1.4) * 255.0) as u8,
-                                                        (lum + 0.22 * (1.0 + (d + 0.5) / 2.5).clamp(0.0, 1.0).powf(1.4) * 255.0) as u8,
-                                                        (f32::max(
-                                                            (0.5 - d).clamp(0.0, 1.0),
-                                                            0.22 * (1.0 + (d + 0.5) / 2.5).clamp(0.0, 1.0).powf(1.4),
-                                                        ) * 255.0) as u8,
-                                                    ]
-                                                })(
-                                                    f32::hypot(
-                                                        f32::max(f32::max(20.0 - x, x - 76.0), 0.0),
-                                                        f32::max(f32::max(20.0 - y, y - (288.0 - 20.0)), 0.0),
-                                                    ) - 20.0,
-                                                    24.0 + 10.0 * ((6.0 - y) / 3.0).clamp(0.0, 1.0)
-                                                        - 4.0 * (y / 288.0).clamp(0.0, 1.0)
-                                                        - 5.0 * ((y - 284.0) / 4.0).clamp(0.0, 1.0),
-                                                )
-                                            })(
-                                                (index % 96) as f32 + 0.5,
-                                                (index / 96) as f32 + 0.5,
-                                            )
-                                        })
-                                        .collect::<std::vec::Vec<u8>>(),
-                                ),
-                                data_order:
-                                    bevy::render::render_resource::TextureDataOrder::LayerMajor,
-                                texture_descriptor:
-                                    bevy::render::render_resource::TextureDescriptor {
-                                        label: Some("lab-tile"),
-                                        size: bevy::render::render_resource::Extent3d {
-                                            width: 96,
-                                            height: 288,
-                                            depth_or_array_layers: 1,
-                                        },
-                                        mip_level_count: 1,
-                                        sample_count: 1,
-                                        dimension:
-                                            bevy::render::render_resource::TextureDimension::D2,
-                                        format:
-                                            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-                                        usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
-                                            | bevy::render::render_resource::TextureUsages::COPY_DST,
-                                        view_formats: &[],
-                                    },
-                                sampler: bevy::image::ImageSampler::Default,
-                                texture_view_descriptor: None,
-                                asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
-                                    | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-                                copy_on_resize: false,
-                            }),
-                        world
-                            .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
-                            .add(bevy::image::Image {
-                                data: Some(
-                                    (0..5184u32)
-                                        .flat_map(|index: u32| {
-                                            (|x: f32, y: f32| {
-                                                (|d: f32| {
-                                                    (|rim: f32| {
-                                                        [
-                                                            (rim * 255.0) as u8,
-                                                            (rim * 255.0) as u8,
-                                                            (rim * 255.0) as u8,
-                                                            ((0.5 - d).clamp(0.0, 1.0) * 255.0) as u8,
-                                                        ]
-                                                    })((0.30 * (1.0 + d / 2.5).clamp(0.0, 1.0).powf(1.4)).clamp(0.0, 1.0))
-                                                })(
-                                                    f32::hypot(
-                                                        f32::max(f32::max(12.0 - x, x - 60.0), 0.0),
-                                                        f32::max(f32::max(12.0 - y, y - 60.0), 0.0),
-                                                    ) - 12.0,
-                                                )
-                                            })(
-                                                (index % 72) as f32 + 0.5,
-                                                (index / 72) as f32 + 0.5,
-                                            )
-                                        })
-                                        .collect::<std::vec::Vec<u8>>(),
-                                ),
-                                data_order:
-                                    bevy::render::render_resource::TextureDataOrder::LayerMajor,
-                                texture_descriptor:
-                                    bevy::render::render_resource::TextureDescriptor {
-                                        label: Some("lab-well"),
-                                        size: bevy::render::render_resource::Extent3d {
-                                            width: 72,
-                                            height: 72,
-                                            depth_or_array_layers: 1,
-                                        },
-                                        mip_level_count: 1,
-                                        sample_count: 1,
-                                        dimension:
-                                            bevy::render::render_resource::TextureDimension::D2,
-                                        format:
-                                            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-                                        usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
-                                            | bevy::render::render_resource::TextureUsages::COPY_DST,
-                                        view_formats: &[],
-                                    },
-                                sampler: bevy::image::ImageSampler::Default,
-                                texture_view_descriptor: None,
-                                asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
-                                    | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-                                copy_on_resize: false,
-                            }),
-                        world
-                            .resource::<bevy::asset::AssetServer>()
-                            .load::<bevy::image::Image>("icons/flask.png"),
-                        world
-                            .resource::<bevy::asset::AssetServer>()
-                            .load::<bevy::image::Image>("icons/rocket.png"),
-                        world
-                            .resource::<bevy::asset::AssetServer>()
-                            .load::<bevy::image::Image>("icons/rocket-pill.png"),
-                        world
-                            .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
-                            .add(bevy::image::Image {
-                                data: Some(
-                                    (0..3136u32)
-                                        .flat_map(|index: u32| {
-                                            (|x: f32, y: f32| {
-                                                (|d: f32, lum: f32| {
-                                                    [
-                                                        lum as u8,
-                                                        lum as u8,
-                                                        lum as u8,
-                                                        ((f32::max(
-                                                            (0.5 - d).clamp(0.0, 1.0),
-                                                            0.30 * f32::max(1.0 - (d - 0.5) / 3.5, 0.0).powf(1.4),
-                                                        )) * 255.0) as u8,
-                                                    ]
-                                                })(
-                                                    f32::hypot(
-                                                        f32::max(f32::max(18.0 - x, x - 38.0), 0.0),
-                                                        f32::max(f32::max(18.0 - y, y - 38.0), 0.0),
-                                                    ) - 14.0,
-                                                    255.0 - 26.0 * ((y - 4.0) / 48.0).clamp(0.0, 1.0).powi(2),
-                                                )
-                                            })(
-                                                (index % 56) as f32 + 0.5,
-                                                (index / 56) as f32 + 0.5,
-                                            )
-                                        })
-                                        .collect::<std::vec::Vec<u8>>(),
-                                ),
-                                data_order:
-                                    bevy::render::render_resource::TextureDataOrder::LayerMajor,
-                                texture_descriptor:
-                                    bevy::render::render_resource::TextureDescriptor {
-                                        label: Some("badge"),
-                                        size: bevy::render::render_resource::Extent3d {
-                                            width: 56,
-                                            height: 56,
-                                            depth_or_array_layers: 1,
-                                        },
-                                        mip_level_count: 1,
-                                        sample_count: 1,
-                                        dimension:
-                                            bevy::render::render_resource::TextureDimension::D2,
-                                        format:
-                                            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-                                        usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
-                                            | bevy::render::render_resource::TextureUsages::COPY_DST,
-                                        view_formats: &[],
-                                    },
-                                sampler: bevy::image::ImageSampler::Default,
-                                texture_view_descriptor: None,
-                                asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
-                                    | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-                                copy_on_resize: false,
-                            }),
+                            .spawn((
+                                Role::RegistryRoot,
+                                bevy::transform::components::Transform {
+                                    translation: bevy::math::Vec3::new(0.0, 0.0, 0.0),
+                                    rotation: bevy::math::Quat::IDENTITY,
+                                    scale: bevy::math::Vec3::new(1.0, 1.0, 1.0),
+                                },
+                                bevy::camera::visibility::Visibility::Hidden,
+                            ))
+                            .id(),
                         world,
                     );
                 })(
                     world
-                        .query::<&bevy::window::Monitor>()
-                        .iter(world)
-                        .fold((1920.0, 1080.0), |_, monitor| {
-                            (monitor.physical_width as f32, monitor.physical_height as f32)
+                        .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
+                        .add(bevy::image::Image {
+                            data: Some(
+                                (0..16u32)
+                                    .flat_map(|_index: u32| [255u8, 255u8, 255u8, 255u8])
+                                    .collect::<std::vec::Vec<u8>>(),
+                            ),
+                            data_order:
+                                bevy::render::render_resource::TextureDataOrder::LayerMajor,
+                            texture_descriptor:
+                                bevy::render::render_resource::TextureDescriptor {
+                                    label: Some("ui-solid"),
+                                    size: bevy::render::render_resource::Extent3d {
+                                        width: 4,
+                                        height: 4,
+                                        depth_or_array_layers: 1,
+                                    },
+                                    mip_level_count: 1,
+                                    sample_count: 1,
+                                    dimension:
+                                        bevy::render::render_resource::TextureDimension::D2,
+                                    format:
+                                        bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+                                    usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
+                                        | bevy::render::render_resource::TextureUsages::COPY_DST,
+                                    view_formats: &[],
+                                },
+                            sampler: bevy::image::ImageSampler::Default,
+                            texture_view_descriptor: None,
+                            asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
+                                | bevy::asset::RenderAssetUsages::RENDER_WORLD,
+                            copy_on_resize: false,
                         }),
+                    world
+                        .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
+                        .add(bevy::image::Image {
+                            data: Some(
+                                (0..4096u32)
+                                    .flat_map(|index: u32| {
+                                        (|x: f32, y: f32| {
+                                            (|d: f32| {
+                                                [
+                                                    255u8,
+                                                    255u8,
+                                                    255u8,
+                                                    ((14.5 - d).clamp(0.0, 1.0) * 255.0) as u8,
+                                                ]
+                                            })(f32::hypot(
+                                                f32::max(f32::max(14.0 - x, x - 50.0), 0.0),
+                                                f32::max(f32::max(14.0 - y, y - 50.0), 0.0),
+                                            ))
+                                        })(
+                                            (index % 64) as f32 + 0.5,
+                                            (index / 64) as f32 + 0.5,
+                                        )
+                                    })
+                                    .collect::<std::vec::Vec<u8>>(),
+                            ),
+                            data_order:
+                                bevy::render::render_resource::TextureDataOrder::LayerMajor,
+                            texture_descriptor:
+                                bevy::render::render_resource::TextureDescriptor {
+                                    label: Some("ui-pill"),
+                                    size: bevy::render::render_resource::Extent3d {
+                                        width: 64,
+                                        height: 64,
+                                        depth_or_array_layers: 1,
+                                    },
+                                    mip_level_count: 1,
+                                    sample_count: 1,
+                                    dimension:
+                                        bevy::render::render_resource::TextureDimension::D2,
+                                    format:
+                                        bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+                                    usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
+                                        | bevy::render::render_resource::TextureUsages::COPY_DST,
+                                    view_formats: &[],
+                                },
+                            sampler: bevy::image::ImageSampler::Default,
+                            texture_view_descriptor: None,
+                            asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
+                                | bevy::asset::RenderAssetUsages::RENDER_WORLD,
+                            copy_on_resize: false,
+                        }),
+                    world
+                        .resource_mut::<bevy::asset::Assets<bevy::image::Image>>()
+                        .add(bevy::image::Image {
+                            data: Some(
+                                (0..4096u32)
+                                    .flat_map(|index: u32| {
+                                        (|x: f32, y: f32| {
+                                            (|d: f32| {
+                                                [
+                                                    255u8,
+                                                    255u8,
+                                                    255u8,
+                                                    (((14.5 - d).clamp(0.0, 1.0)
+                                                        * (1.0 - (11.5 - d).clamp(0.0, 1.0)))
+                                                        * 255.0) as u8,
+                                                ]
+                                            })(f32::hypot(
+                                                f32::max(f32::max(14.0 - x, x - 50.0), 0.0),
+                                                f32::max(f32::max(14.0 - y, y - 50.0), 0.0),
+                                            ))
+                                        })(
+                                            (index % 64) as f32 + 0.5,
+                                            (index / 64) as f32 + 0.5,
+                                        )
+                                    })
+                                    .collect::<std::vec::Vec<u8>>(),
+                            ),
+                            data_order:
+                                bevy::render::render_resource::TextureDataOrder::LayerMajor,
+                            texture_descriptor:
+                                bevy::render::render_resource::TextureDescriptor {
+                                    label: Some("ui-ring"),
+                                    size: bevy::render::render_resource::Extent3d {
+                                        width: 64,
+                                        height: 64,
+                                        depth_or_array_layers: 1,
+                                    },
+                                    mip_level_count: 1,
+                                    sample_count: 1,
+                                    dimension:
+                                        bevy::render::render_resource::TextureDimension::D2,
+                                    format:
+                                        bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+                                    usage: bevy::render::render_resource::TextureUsages::TEXTURE_BINDING
+                                        | bevy::render::render_resource::TextureUsages::COPY_DST,
+                                    view_formats: &[],
+                                },
+                            sampler: bevy::image::ImageSampler::Default,
+                            texture_view_descriptor: None,
+                            asset_usage: bevy::asset::RenderAssetUsages::MAIN_WORLD
+                                | bevy::asset::RenderAssetUsages::RENDER_WORLD,
+                            copy_on_resize: false,
+                        }),
+                    world
+                        .resource::<bevy::asset::AssetServer>()
+                        .load::<bevy::image::Image>("icons/house.png"),
+                    world
+                        .resource::<bevy::asset::AssetServer>()
+                        .load::<bevy::image::Image>("icons/registry.png"),
+                    world
+                        .resource::<bevy::asset::AssetServer>()
+                        .load::<bevy::image::Image>("app-icon.png"),
+                    world
+                        .resource::<bevy::asset::AssetServer>()
+                        .load::<bevy::image::Image>("icons/flask.png"),
+                    world
+                        .resource::<bevy::asset::AssetServer>()
+                        .load::<bevy::image::Image>("icons/rocket-pill.png"),
+                    world
+                        .resource::<bevy::asset::AssetServer>()
+                        .load::<bevy::image::Image>("icons/rocket.png"),
                     world,
                 );
             },
         )
         .add_systems(
             bevy::app::Update,
-            |world: &mut bevy::ecs::world::World| {
-                (|(f1, escape): (bool, bool),
-                  delta: f32,
-                  pressed: bool,
-                  cursor: bevy::math::Vec2,
-                  (width, height): (f32, f32),
-                  (hidden, launched, hold): (bool, bool, f32),
-                  world: &mut bevy::ecs::world::World| {
-                    if f1 || escape || pressed || hold != 0.0 {
-                        (|hidden_next: bool,
-                          launched_next: bool,
-                          hold_next: f32,
-                          world: &mut bevy::ecs::world::World| {
-                            if hold_next >= 7.0 {
-                                world
-                                    .resource_mut::<
-                                        bevy::ecs::message::Messages<bevy::app::AppExit>,
-                                    >()
-                                    .write(bevy::app::AppExit::Success);
-                            }
-                            world
-                                .query_filtered::<
-                                    (
-                                        &mut bevy::camera::visibility::Visibility,
-                                        &mut bevy::transform::components::Transform,
-                                        Option<&bevy::ecs::name::Name>,
-                                        Option<&mut bevy::sprite::Sprite>,
-                                    ),
-                                    bevy::ecs::query::Without<bevy::camera::Camera2d>,
-                                >()
-                                .iter_mut(world)
-                                .for_each(|(visibility, transform, name, sprite)| {
-                                    if transform.scale.z != hold_next {
-                                        transform.into_inner().scale.z = hold_next;
-                                    }
-                                    (|slot: bool, named: bool| {
-                                        (|vis_next: bevy::camera::visibility::Visibility| {
-                                            if *visibility != vis_next {
-                                                *visibility.into_inner() = vis_next;
-                                            }
-                                        })(
-                                            [
-                                                bevy::camera::visibility::Visibility::Hidden,
-                                                bevy::camera::visibility::Visibility::Visible,
-                                            ][(!hidden_next && (!named || launched_next == slot))
-                                                as usize],
-                                        );
-                                        sprite.into_iter().for_each(
-                                            |sprite: bevy::ecs::change_detection::Mut<
-                                                bevy::sprite::Sprite,
-                                            >| {
-                                                (|current: bevy::color::Color,
-                                                  sprite: bevy::ecs::change_detection::Mut<
-                                                      bevy::sprite::Sprite,
-                                                  >| {
-                                                    (|next: bevy::color::Color| {
-                                                        if current != next {
-                                                            sprite.into_inner().color = next;
-                                                        }
-                                                    })(
-                                                        [
-                                                            current,
+            |keys: bevy::ecs::system::Res<
+                 bevy::input::ButtonInput<bevy::input::keyboard::KeyCode>,
+             >,
+             mouse: bevy::ecs::system::Res<
+                 bevy::input::ButtonInput<bevy::input::mouse::MouseButton>,
+             >,
+             windows: bevy::ecs::system::Query<
+                 &bevy::window::Window,
+                 bevy::ecs::query::With<bevy::window::PrimaryWindow>,
+             >,
+             time: bevy::ecs::system::Res<bevy::time::Time>,
+             state: bevy::ecs::system::ResMut<UiState>,
+             exit: bevy::ecs::system::ResMut<
+                 bevy::ecs::message::Messages<bevy::app::AppExit>,
+             >,
+             entities: bevy::ecs::system::Query<
+                 (
+                     &Role,
+                     &mut bevy::camera::visibility::Visibility,
+                     &mut bevy::transform::components::Transform,
+                     Option<&mut bevy::sprite::Sprite>,
+                     Option<&mut bevy::text::TextColor>,
+                     Option<&mut bevy::text::TextBounds>,
+                     Option<&bevy::text::TextLayoutInfo>,
+                 ),
+                 bevy::ecs::query::Without<bevy::camera::Camera2d>,
+             >| {
+                for window in windows.iter() {
+                    if keys.just_pressed(bevy::input::keyboard::KeyCode::F1)
+                        || keys.just_pressed(bevy::input::keyboard::KeyCode::Tab)
+                        || keys.just_pressed(bevy::input::keyboard::KeyCode::Enter)
+                        || keys.just_pressed(bevy::input::keyboard::KeyCode::Space)
+                        || keys.pressed(bevy::input::keyboard::KeyCode::Escape)
+                        || mouse.just_pressed(bevy::input::mouse::MouseButton::Left)
+                        || mouse.just_released(bevy::input::mouse::MouseButton::Left)
+                        || state.hold != 0.0
+                        || state.armed.is_some()
+                        || !state.interactive_logged
+                        || !state.measured_settled
+                        || window.focused != state.window_focused
+                        || window.cursor_position() != state.last_cursor
+                        || window.width() != state.layout.width
+                        || window.height() != state.layout.height
+                        || window.scale_factor() != state.layout.scale
+                    {
+                        (|current: UiState,
+                          title_measured: Option<f32>,
+                          desc_measured: Option<f32>,
+                          delta: f32,
+                          elapsed: f32,
+                          width_now: f32,
+                          height_now: f32,
+                          scale_now: f32,
+                          f1_edge: bool,
+                          tab_edge: bool,
+                          shift_held: bool,
+                          enter_edge: bool,
+                          space_edge: bool,
+                          escape_held: bool,
+                          down_edge: bool,
+                          up_edge: bool,
+                          window_focused: bool,
+                          cursor_now: Option<bevy::math::Vec2>,
+                          state,
+                          exit,
+                          entities| {
+                            (|title_h_next: f32, desc_h_next: f32| {
+                                (|sidebar_w: f32,
+                                  content_w: f32,
+                                  card_w: f32,
+                                  tabs_top: f32,
+                                  title_w: f32| {
+                                    (|card_x: f32, card_h: f32, launch_w: f32| {
+                                        (|layout_next: Layout,
+                                          layout_dirty: bool,
+                                          settled_next: bool| {
+                                            (|hud_next: bool, hold_next: f32| {
+                                                (|hover_next: Option<Control>| {
+                                                    (|armed_mid: Option<Control>,
+                                                      focused_mid: Option<Control>,
+                                                      fk_mid: bool| {
+                                                        (|selected_r: Destination,
+                                                          launched_r: bool,
+                                                          armed_mid2: Option<Control>,
+                                                          focused_mid2: Option<Control>,
+                                                          fk_mid2: bool| {
+                                                            (|selected_next: Destination,
+                                                              launched_next: bool,
+                                                              armed_next: Option<Control>,
+                                                              focused_next: Option<Control>,
+                                                              fk_next: bool| {
+                                                                if hold_next >= 7.0 {
+                                                                    exit.into_inner().write(
+                                                                        bevy::app::AppExit::Success,
+                                                                    );
+                                                                }
+                                                                if !current.interactive_logged
+                                                                    && elapsed >= 2.0
+                                                                {
+                                                                    bevy::log::info!(
+                                                                        "ARXUMBRA-INTERACTIVE selected={:?} hud={} launched={} w={} h={} s={} home={},{},{},{} registry={},{},{},{} launch={},{},{},{}",
+                                                                        selected_next,
+                                                                        hud_next,
+                                                                        launched_next,
+                                                                        layout_next.width,
+                                                                        layout_next.height,
+                                                                        layout_next.scale,
+                                                                        layout_next.home_tab.min.x,
+                                                                        layout_next.home_tab.min.y,
+                                                                        layout_next.home_tab.size().x,
+                                                                        layout_next.home_tab.size().y,
+                                                                        layout_next.registry_tab.min.x,
+                                                                        layout_next.registry_tab.min.y,
+                                                                        layout_next.registry_tab.size().x,
+                                                                        layout_next.registry_tab.size().y,
+                                                                        layout_next.launch.min.x,
+                                                                        layout_next.launch.min.y,
+                                                                        layout_next.launch.size().x,
+                                                                        layout_next.launch.size().y,
+                                                                    );
+                                                                }
+                                                                if layout_dirty {
+                                                                    bevy::log::info!(
+                                                                        "ARXUMBRA-LAYOUT w={} h={} s={} home={},{},{},{} registry={},{},{},{} launch={},{},{},{}",
+                                                                        layout_next.width,
+                                                                        layout_next.height,
+                                                                        layout_next.scale,
+                                                                        layout_next.home_tab.min.x,
+                                                                        layout_next.home_tab.min.y,
+                                                                        layout_next.home_tab.size().x,
+                                                                        layout_next.home_tab.size().y,
+                                                                        layout_next.registry_tab.min.x,
+                                                                        layout_next.registry_tab.min.y,
+                                                                        layout_next.registry_tab.size().x,
+                                                                        layout_next.registry_tab.size().y,
+                                                                        layout_next.launch.min.x,
+                                                                        layout_next.launch.min.y,
+                                                                        layout_next.launch.size().x,
+                                                                        layout_next.launch.size().y,
+                                                                    );
+                                                                }
+                                                                *state.into_inner() = UiState {
+                                                                    selected: selected_next,
+                                                                    hud_visible: hud_next,
+                                                                    hovered: hover_next,
+                                                                    focused: focused_next,
+                                                                    focus_keyboard: fk_next,
+                                                                    armed: armed_next,
+                                                                    launched: launched_next,
+                                                                    hold: hold_next,
+                                                                    window_focused,
+                                                                    last_cursor: cursor_now,
+                                                                    layout: layout_next,
+                                                                    title_h: title_h_next,
+                                                                    desc_h: desc_h_next,
+                                                                    measured_settled: settled_next,
+                                                                    interactive_logged:
+                                                                        current.interactive_logged
+                                                                            || elapsed >= 2.0,
+                                                                };
+                                                                for (
+                                                                    role,
+                                                                    visibility,
+                                                                    transform,
+                                                                    sprite,
+                                                                    text_color,
+                                                                    text_bounds,
+                                                                    _layout_info,
+                                                                ) in entities
+                                                                {
+                                                                    (|rect: Option<
+                                                                            bevy::math::Rect,
+                                                                        >,
+                                                                      is_text: bool,
+                                                                      shown: bool,
+                                                                      tint: Option<
+                                                                            bevy::color::Color,
+                                                                        >,
+                                                                      ink: Option<
+                                                                            bevy::color::Color,
+                                                                        >,
+                                                                      wrap: Option<f32>| {
+                                                                        (|vis_next: bevy::camera::visibility::Visibility| {
+                                                                            if *visibility
+                                                                                != vis_next
+                                                                            {
+                                                                                *visibility
+                                                                                    .into_inner(
+                                                                                    ) = vis_next;
+                                                                            }
+                                                                        })([
+                                                                            bevy::camera::visibility::Visibility::Hidden,
+                                                                            bevy::camera::visibility::Visibility::Visible,
+                                                                        ][shown as usize]);
+                                                                        match rect {
+                                                                            Some(rect) => {
+                                                                                if layout_dirty {
+                                                                                    (|kept_z: f32, transform: bevy::ecs::change_detection::Mut<bevy::transform::components::Transform>| {
+                                                                                    (|next: bevy::transform::components::Transform| {
+                                                                                        if *transform
+                                                                                            != next
+                                                                                        {
+                                                                                            *transform
+                                                                                                .into_inner(
+                                                                                                ) = next;
+                                                                                        }
+                                                                                    })(bevy::transform::components::Transform {
+                                                                                        translation: bevy::math::Vec3::new(
+                                                                                            [
+                                                                                                (rect.min.x
+                                                                                                    + rect
+                                                                                                        .size(
+                                                                                                        )
+                                                                                                        .x
+                                                                                                        / 2.0
+                                                                                                    - layout_next
+                                                                                                        .width
+                                                                                                        / 2.0)
+                                                                                                    * layout_next
+                                                                                                        .scale,
+                                                                                                (rect.min.x
+                                                                                                    - layout_next
+                                                                                                        .width
+                                                                                                        / 2.0)
+                                                                                                    * layout_next
+                                                                                                        .scale,
+                                                                                            ][is_text
+                                                                                                as usize],
+                                                                                            [
+                                                                                                (layout_next
+                                                                                                    .height
+                                                                                                    / 2.0
+                                                                                                    - (rect.min.y
+                                                                                                        + rect
+                                                                                                            .size(
+                                                                                                            )
+                                                                                                            .y
+                                                                                                            / 2.0))
+                                                                                                    * layout_next
+                                                                                                        .scale,
+                                                                                                (layout_next
+                                                                                                    .height
+                                                                                                    / 2.0
+                                                                                                    - rect.min.y)
+                                                                                                    * layout_next
+                                                                                                        .scale,
+                                                                                            ][is_text
+                                                                                                as usize],
+                                                                                            kept_z,
+                                                                                        ),
+                                                                                        rotation: bevy::math::Quat::IDENTITY,
+                                                                                        scale: [
+                                                                                            bevy::math::Vec3::new(
+                                                                                                layout_next
+                                                                                                    .scale,
+                                                                                                layout_next
+                                                                                                    .scale,
+                                                                                                1.0,
+                                                                                            ),
+                                                                                            bevy::math::Vec3::new(
+                                                                                                1.0,
+                                                                                                1.0,
+                                                                                                1.0,
+                                                                                            ),
+                                                                                        ][is_text
+                                                                                            as usize],
+                                                                                    });
+                                                                                    })(transform.translation.z, transform);
+                                                                                }
+                                                                                sprite.into_iter().for_each(|sprite: bevy::ecs::change_detection::Mut<bevy::sprite::Sprite>| {
+                                                                                    (|current_sprite: bevy::sprite::Sprite, sprite: bevy::ecs::change_detection::Mut<bevy::sprite::Sprite>| {
+                                                                                        (|next: bevy::sprite::Sprite| {
+                                                                                            if current_sprite.color != next.color || current_sprite.custom_size != next.custom_size {
+                                                                                                *sprite.into_inner() = next;
+                                                                                            }
+                                                                                        })(bevy::sprite::Sprite {
+                                                                                            color: tint.unwrap_or(current_sprite.color),
+                                                                                            custom_size: [current_sprite.custom_size, Some(rect.size())][layout_dirty as usize],
+                                                                                            ..current_sprite
+                                                                                        });
+                                                                                    })(sprite.clone(), sprite);
+                                                                                });
+                                                                                text_color.into_iter().for_each(|text_color: bevy::ecs::change_detection::Mut<bevy::text::TextColor>| {
+                                                                                    (|current_ink: bevy::color::Color, text_color: bevy::ecs::change_detection::Mut<bevy::text::TextColor>| {
+                                                                                        (|next: bevy::text::TextColor| {
+                                                                                            if current_ink != next.0 {
+                                                                                                *text_color.into_inner() = next;
+                                                                                            }
+                                                                                        })(bevy::text::TextColor(ink.unwrap_or(current_ink)));
+                                                                                    })(text_color.0, text_color);
+                                                                                });
+                                                                                text_bounds.into_iter().for_each(|text_bounds: bevy::ecs::change_detection::Mut<bevy::text::TextBounds>| {
+                                                                                    if layout_dirty {
+                                                                                        (|next: Option<f32>| {
+                                                                                            if text_bounds.width != next {
+                                                                                                text_bounds.into_inner().width = next;
+                                                                                            }
+                                                                                        })(wrap);
+                                                                                    }
+                                                                                });
+                                                                            },
+                                                                            None => {}
+                                                                        }
+                                                                    })(
+                                                                        match role {
+                                                                            Role::SidebarPanel => (
+                                                                                Some(bevy::math::Rect::new(0.0, 0.0, layout_next.sidebar_w, layout_next.height)),
+                                                                                false,
+                                                                                hud_next,
+                                                                                Some(bevy::color::Color::srgb(12.0 / 255.0, 12.0 / 255.0, 12.0 / 255.0)),
+                                                                                None,
+                                                                                None,
+                                                                            ),
+                                                                            Role::Divider => (
+                                                                                Some(bevy::math::Rect::new(layout_next.sidebar_w - 2.0, 0.0, layout_next.sidebar_w, layout_next.height)),
+                                                                                false,
+                                                                                hud_next,
+                                                                                Some(bevy::color::Color::srgb(56.0 / 255.0, 56.0 / 255.0, 56.0 / 255.0)),
+                                                                                None,
+                                                                                None,
+                                                                            ),
+                                                                            Role::AppIcon => (
+                                                                                Some(layout_next.icon),
+                                                                                false,
+                                                                                hud_next,
+                                                                                Some(bevy::color::Color::WHITE),
+                                                                                None,
+                                                                                None,
+                                                                            ),
+                                                                            Role::AppTitle => (
+                                                                                Some(layout_next.title),
+                                                                                true,
+                                                                                hud_next,
+                                                                                None,
+                                                                                Some(bevy::color::Color::srgb(240.0 / 255.0, 240.0 / 255.0, 240.0 / 255.0)),
+                                                                                Some(layout_next.title.size().x),
+                                                                            ),
+                                                                            Role::TabBody(control) => (
+                                                                                Some(match *control {
+                                                                                    Control::HomeTab => layout_next.home_tab,
+                                                                                    Control::RegistryTab => layout_next.registry_tab,
+                                                                                    Control::Launch => layout_next.launch,
+                                                                                }),
+                                                                                false,
+                                                                                hud_next,
+                                                                                Some((|gray: u8| {
+                                                                                    bevy::color::Color::srgb(gray as f32 / 255.0, gray as f32 / 255.0, gray as f32 / 255.0)
+                                                                                })(match (
+                                                                                    selected_next == match *control {
+                                                                                        Control::HomeTab => Destination::Home,
+                                                                                        Control::RegistryTab => Destination::Registry,
+                                                                                        Control::Launch => Destination::Home,
+                                                                                    },
+                                                                                    armed_next == Some(*control),
+                                                                                    hover_next == Some(*control),
+                                                                                ) {
+                                                                                    (true, true, _) => 215,
+                                                                                    (true, _, true) => 245,
+                                                                                    (true, _, _) => 235,
+                                                                                    (false, true, _) => 20,
+                                                                                    (false, _, true) => 44,
+                                                                                    (false, _, _) => 28,
+                                                                                })),
+                                                                                None,
+                                                                                None,
+                                                                            ),
+                                                                            Role::TabIcon(control) => (
+                                                                                Some((|tab: bevy::math::Rect| {
+                                                                                    bevy::math::Rect::new(tab.min.x + 14.0, tab.min.y + 16.0, tab.min.x + 38.0, tab.min.y + 40.0)
+                                                                                })(match *control {
+                                                                                    Control::HomeTab => layout_next.home_tab,
+                                                                                    Control::RegistryTab => layout_next.registry_tab,
+                                                                                    Control::Launch => layout_next.launch,
+                                                                                })),
+                                                                                false,
+                                                                                hud_next,
+                                                                                Some((|gray: u8| {
+                                                                                    bevy::color::Color::srgb(gray as f32 / 255.0, gray as f32 / 255.0, gray as f32 / 255.0)
+                                                                                })([
+                                                                                    225u8,
+                                                                                    20u8,
+                                                                                ][(selected_next == match *control {
+                                                                                    Control::HomeTab => Destination::Home,
+                                                                                    Control::RegistryTab => Destination::Registry,
+                                                                                    Control::Launch => Destination::Home,
+                                                                                }) as usize])),
+                                                                                None,
+                                                                                None,
+                                                                            ),
+                                                                            Role::TabLabel(control) => (
+                                                                                Some((|tab: bevy::math::Rect| {
+                                                                                    bevy::math::Rect::new(tab.min.x + 50.0, tab.min.y + 28.0, tab.max.x - 10.0, tab.min.y + 52.0)
+                                                                                })(match *control {
+                                                                                    Control::HomeTab => layout_next.home_tab,
+                                                                                    Control::RegistryTab => layout_next.registry_tab,
+                                                                                    Control::Launch => layout_next.launch,
+                                                                                })),
+                                                                                true,
+                                                                                hud_next,
+                                                                                None,
+                                                                                Some((|gray: u8| {
+                                                                                    bevy::color::Color::srgb(gray as f32 / 255.0, gray as f32 / 255.0, gray as f32 / 255.0)
+                                                                                })([
+                                                                                    225u8,
+                                                                                    20u8,
+                                                                                ][(selected_next == match *control {
+                                                                                    Control::HomeTab => Destination::Home,
+                                                                                    Control::RegistryTab => Destination::Registry,
+                                                                                    Control::Launch => Destination::Home,
+                                                                                }) as usize])),
+                                                                                Some((|tab: bevy::math::Rect| {
+                                                                                    tab.size().x - 60.0
+                                                                                })(match *control {
+                                                                                    Control::HomeTab => layout_next.home_tab,
+                                                                                    Control::RegistryTab => layout_next.registry_tab,
+                                                                                    Control::Launch => layout_next.launch,
+                                                                                })),
+                                                                            ),
+                                                                            Role::TabRing(control) => (
+                                                                                Some((|tab: bevy::math::Rect| {
+                                                                                    bevy::math::Rect::new(tab.min.x - 3.0, tab.min.y - 3.0, tab.max.x + 3.0, tab.max.y + 3.0)
+                                                                                })(match *control {
+                                                                                    Control::HomeTab => layout_next.home_tab,
+                                                                                    Control::RegistryTab => layout_next.registry_tab,
+                                                                                    Control::Launch => layout_next.launch,
+                                                                                })),
+                                                                                false,
+                                                                                hud_next
+                                                                                    && fk_next
+                                                                                    && focused_next == Some(*control),
+                                                                                Some((|gray: u8| {
+                                                                                    bevy::color::Color::srgb(gray as f32 / 255.0, gray as f32 / 255.0, gray as f32 / 255.0)
+                                                                                })([
+                                                                                    250u8,
+                                                                                    15u8,
+                                                                                ][(selected_next == match *control {
+                                                                                    Control::HomeTab => Destination::Home,
+                                                                                    Control::RegistryTab => Destination::Registry,
+                                                                                    Control::Launch => Destination::Home,
+                                                                                }) as usize])),
+                                                                                None,
+                                                                                None,
+                                                                            ),
+                                                                            Role::RegistryRoot => (
+                                                                                None,
+                                                                                false,
+                                                                                hud_next
+                                                                                    && selected_next == Destination::Registry,
+                                                                                None,
+                                                                                None,
+                                                                                None,
+                                                                            ),
+                                                                            Role::CardBackground => (
+                                                                                Some(layout_next.card),
+                                                                                false,
+                                                                                true,
+                                                                                Some(bevy::color::Color::srgb(18.0 / 255.0, 18.0 / 255.0, 18.0 / 255.0)),
+                                                                                None,
+                                                                                None,
+                                                                            ),
+                                                                            Role::CardIcon => (
+                                                                                Some(layout_next.card_icon),
+                                                                                false,
+                                                                                true,
+                                                                                Some(bevy::color::Color::WHITE),
+                                                                                None,
+                                                                                None,
+                                                                            ),
+                                                                            Role::CardTitle => (
+                                                                                Some(layout_next.card_title),
+                                                                                true,
+                                                                                true,
+                                                                                None,
+                                                                                Some(bevy::color::Color::srgb(240.0 / 255.0, 240.0 / 255.0, 240.0 / 255.0)),
+                                                                                Some(layout_next.card_title.size().x),
+                                                                            ),
+                                                                            Role::CardDescription => (
+                                                                                Some(layout_next.desc),
+                                                                                true,
+                                                                                !launched_next,
+                                                                                None,
+                                                                                Some(bevy::color::Color::srgb(170.0 / 255.0, 170.0 / 255.0, 170.0 / 255.0)),
+                                                                                Some(layout_next.desc.size().x),
+                                                                            ),
+                                                                            Role::CardSeparator => (
+                                                                                Some(layout_next.sep),
+                                                                                false,
+                                                                                !launched_next,
+                                                                                Some(bevy::color::Color::srgb(56.0 / 255.0, 56.0 / 255.0, 56.0 / 255.0)),
+                                                                                None,
+                                                                                None,
+                                                                            ),
+                                                                            Role::LaunchBody => (
+                                                                                Some(layout_next.launch),
+                                                                                false,
+                                                                                !launched_next,
+                                                                                Some((|gray: u8| {
+                                                                                    bevy::color::Color::srgb(gray as f32 / 255.0, gray as f32 / 255.0, gray as f32 / 255.0)
+                                                                                })(match (
+                                                                                    armed_next == Some(Control::Launch),
+                                                                                    hover_next == Some(Control::Launch),
+                                                                                ) {
+                                                                                    (true, _) => 215,
+                                                                                    (_, true) => 250,
+                                                                                    (_, _) => 235,
+                                                                                })),
+                                                                                None,
+                                                                                None,
+                                                                            ),
+                                                                            Role::LaunchIcon => (
+                                                                                Some(bevy::math::Rect::new(layout_next.launch.min.x + 16.0, layout_next.launch.min.y + 16.0, layout_next.launch.min.x + 40.0, layout_next.launch.min.y + 40.0)),
+                                                                                false,
+                                                                                !launched_next,
+                                                                                Some(bevy::color::Color::srgb(20.0 / 255.0, 20.0 / 255.0, 20.0 / 255.0)),
+                                                                                None,
+                                                                                None,
+                                                                            ),
+                                                                            Role::LaunchLabel => (
+                                                                                Some(bevy::math::Rect::new(layout_next.launch.min.x + 52.0, layout_next.launch.min.y + 28.0, layout_next.launch.max.x - 12.0, layout_next.launch.min.y + 52.0)),
+                                                                                true,
+                                                                                !launched_next,
+                                                                                None,
+                                                                                Some(bevy::color::Color::srgb(20.0 / 255.0, 20.0 / 255.0, 20.0 / 255.0)),
+                                                                                Some(layout_next.launch.size().x - 64.0),
+                                                                            ),
+                                                                            Role::Badge => (
+                                                                                Some(layout_next.badge),
+                                                                                false,
+                                                                                true,
+                                                                                Some(bevy::color::Color::srgb(30.0 / 255.0, 30.0 / 255.0, 30.0 / 255.0)),
+                                                                                None,
+                                                                                None,
+                                                                            ),
+                                                                            Role::BadgeLabel => (
+                                                                                Some(bevy::math::Rect::new((layout_next.badge.min.x + layout_next.badge.max.x) / 2.0, (layout_next.badge.min.y + layout_next.badge.max.y) / 2.0, (layout_next.badge.min.x + layout_next.badge.max.x) / 2.0, (layout_next.badge.min.y + layout_next.badge.max.y) / 2.0)),
+                                                                                true,
+                                                                                true,
+                                                                                None,
+                                                                                Some(bevy::color::Color::srgb(160.0 / 255.0, 160.0 / 255.0, 160.0 / 255.0)),
+                                                                                Some(layout_next.badge.size().x - 16.0),
+                                                                            ),
+                                                                            Role::Well => (
+                                                                                Some(layout_next.well),
+                                                                                false,
+                                                                                launched_next,
+                                                                                Some(bevy::color::Color::srgb(10.0 / 255.0, 10.0 / 255.0, 10.0 / 255.0)),
+                                                                                None,
+                                                                                None,
+                                                                            ),
+                                                                            Role::Rocket => (
+                                                                                Some((|well: bevy::math::Rect| {
+                                                                                    bevy::math::Rect::new(well.min.x + (well.size().x - 96.0) / 2.0, well.min.y + (well.size().y - 96.0) / 2.0, well.min.x + (well.size().x + 96.0) / 2.0, well.min.y + (well.size().y + 96.0) / 2.0)
+                                                                                })(layout_next.well)),
+                                                                                false,
+                                                                                launched_next,
+                                                                                Some(bevy::color::Color::WHITE),
+                                                                                None,
+                                                                                None,
+                                                                            ),
+                                                                        },
+                                                                    );
+                                                                }
+                                                            })(
+                                                                if (enter_edge || space_edge)
+                                                                    && hud_next
+                                                                {
+                                                                    match focused_mid2 {
+                                                                        Some(Control::HomeTab) => {
+                                                                            Destination::Home
+                                                                        }
+                                                                        Some(Control::RegistryTab) => {
+                                                                            Destination::Registry
+                                                                        }
+                                                                        _ => selected_r,
+                                                                    }
+                                                                } else {
+                                                                    selected_r
+                                                                },
+                                                                launched_r
+                                                                    || ((enter_edge || space_edge)
+                                                                        && hud_next
+                                                                        && focused_mid2
+                                                                            == Some(
+                                                                                Control::Launch,
+                                                                            )
+                                                                        && selected_r
+                                                                            == Destination::Registry
+                                                                        && !launched_r),
+                                                                match armed_mid2 {
+                                                                    Some(Control::Launch) => [
+                                                                        None,
+                                                                        Some(Control::Launch),
+                                                                    ][(hud_next
+                                                                        && selected_r
+                                                                            == Destination::Registry
+                                                                        && !launched_r)
+                                                                        as usize],
+                                                                    other => other,
+                                                                },
+                                                                match focused_mid2 {
+                                                                    Some(Control::Launch) => [
+                                                                        None,
+                                                                        Some(Control::Launch),
+                                                                    ][(hud_next
+                                                                        && selected_r
+                                                                            == Destination::Registry
+                                                                        && !launched_r)
+                                                                        as usize],
+                                                                    Some(Control::HomeTab) => [
+                                                                        None,
+                                                                        Some(Control::HomeTab),
+                                                                    ][hud_next as usize],
+                                                                    Some(Control::RegistryTab) => [
+                                                                        None,
+                                                                        Some(
+                                                                            Control::RegistryTab,
+                                                                        ),
+                                                                    ][hud_next as usize],
+                                                                    None => None,
+                                                                },
+                                                                fk_mid2,
+                                                            )
+                                                        })(
+                                                            if up_edge
+                                                                && armed_mid.is_some()
+                                                                && hover_next == armed_mid
+                                                                && window_focused
+                                                            {
+                                                                match armed_mid {
+                                                                    Some(Control::HomeTab) => {
+                                                                        Destination::Home
+                                                                    }
+                                                                    Some(Control::RegistryTab) => {
+                                                                        Destination::Registry
+                                                                    }
+                                                                    _ => current.selected,
+                                                                }
+                                                            } else {
+                                                                current.selected
+                                                            },
+                                                            current.launched
+                                                                || (up_edge
+                                                                    && armed_mid
+                                                                        == Some(Control::Launch)
+                                                                    && hover_next == armed_mid
+                                                                    && window_focused),
+                                                            [armed_mid, None][up_edge as usize],
                                                             [
-                                                                bevy::color::Color::srgba(
-                                                                    1.0, 1.0, 1.0, 0.0,
+                                                                focused_mid,
+                                                                (|result: (usize, usize)| {
+                                                                    if result.1 == 99 {
+                                                                        None
+                                                                    } else {
+                                                                        Some(
+                                                                            [
+                                                                                Control::HomeTab,
+                                                                                Control::RegistryTab,
+                                                                                Control::Launch,
+                                                                            ][result.1],
+                                                                        )
+                                                                    }
+                                                                })(
+                                                                    (1..4usize).fold(
+                                                                        (99usize, 99usize),
+                                                                        |acc: (usize, usize),
+                                                                         step: usize| {
+                                                                            (|eligible: [bool; 3]| {
+                                                                                (|index: usize| {
+                                                                                    if acc.0 == 99
+                                                                                        && eligible
+                                                                                            [index]
+                                                                                    {
+                                                                                        (step, index)
+                                                                                    } else {
+                                                                                        acc
+                                                                                    }
+                                                                                })(
+                                                                                    if focused_mid
+                                                                                        == None
+                                                                                    {
+                                                                                        step - 1
+                                                                                    } else if shift_held
+                                                                                    {
+                                                                                        ([
+                                                                                            0usize,
+                                                                                            1usize,
+                                                                                            2usize,
+                                                                                        ][match focused_mid
+                                                                                        {
+                                                                                            Some(
+                                                                                                Control::HomeTab,
+                                                                                            ) => 0,
+                                                                                            Some(
+                                                                                                Control::RegistryTab,
+                                                                                            ) => 1,
+                                                                                            _ => 2,
+                                                                                        }]
+                                                                                            + 3
+                                                                                            - step)
+                                                                                            % 3
+                                                                                    } else {
+                                                                                        ([
+                                                                                            0usize,
+                                                                                            1usize,
+                                                                                            2usize,
+                                                                                        ][match focused_mid
+                                                                                        {
+                                                                                            Some(
+                                                                                                Control::HomeTab,
+                                                                                            ) => 0,
+                                                                                            Some(
+                                                                                                Control::RegistryTab,
+                                                                                            ) => 1,
+                                                                                            _ => 2,
+                                                                                        }]
+                                                                                            + step)
+                                                                                            % 3
+                                                                                    },
+                                                                                )
+                                                                            })([
+                                                                                hud_next,
+                                                                                hud_next,
+                                                                                hud_next
+                                                                                    && selected_r
+                                                                                        == Destination::Registry
+                                                                                    && !launched_r,
+                                                                            ])
+                                                                        },
+                                                                    ),
                                                                 ),
-                                                                bevy::color::Color::WHITE,
-                                                            ][launched_next as usize],
-                                                        ][slot as usize],
-                                                    );
-                                                })(sprite.color, sprite);
+                                                                focused_mid,
+                                                            ][tab_edge as usize],
+                                                            [fk_mid, true][tab_edge as usize],
+                                                        )
+                                                    })(
+                                                        if !window_focused || !hud_next {
+                                                            None
+                                                        } else if down_edge {
+                                                            hover_next
+                                                        } else {
+                                                            match current.armed {
+                                                                Some(Control::Launch) => [
+                                                                    None,
+                                                                    Some(Control::Launch),
+                                                                ][(current.selected
+                                                                    == Destination::Registry
+                                                                    && !current.launched)
+                                                                    as usize],
+                                                                other => other,
+                                                            }
+                                                        },
+                                                        if down_edge
+                                                            && hover_next.is_some()
+                                                            && window_focused
+                                                            && hud_next
+                                                        {
+                                                            hover_next
+                                                        } else {
+                                                            current.focused
+                                                        },
+                                                        if down_edge
+                                                            && hover_next.is_some()
+                                                            && window_focused
+                                                            && hud_next
+                                                        {
+                                                            false
+                                                        } else {
+                                                            current.focus_keyboard
+                                                        },
+                                                    )
+                                                })(
+                                                    if !window_focused || !hud_next {
+                                                        None
+                                                    } else {
+                                                        cursor_now.into_iter().fold(
+                                                            None,
+                                                            |_: Option<Control>,
+                                                             point: bevy::math::Vec2| {
+                                                                [
+                                                                    Control::HomeTab,
+                                                                    Control::RegistryTab,
+                                                                    Control::Launch,
+                                                                ]
+                                                                .into_iter()
+                                                                .fold(
+                                                                    None,
+                                                                    |acc: Option<Control>,
+                                                                     control: Control| {
+                                                                        (|eligible: bool,
+                                                                          rect: bevy::math::Rect| {
+                                                                            if acc.is_none()
+                                                                                && eligible
+                                                                                && rect
+                                                                                    .contains(
+                                                                                        point,
+                                                                                    )
+                                                                            {
+                                                                                Some(control)
+                                                                            } else {
+                                                                                acc
+                                                                            }
+                                                                        })(
+                                                                            match control {
+                                                                                Control::HomeTab => {
+                                                                                    true
+                                                                                }
+                                                                                Control::RegistryTab => {
+                                                                                    true
+                                                                                }
+                                                                                Control::Launch => {
+                                                                                    current.selected == Destination::Registry && !current.launched
+                                                                                }
+                                                                            },
+                                                                            match control {
+                                                                                Control::HomeTab => {
+                                                                                    layout_next
+                                                                                        .home_tab
+                                                                                }
+                                                                                Control::RegistryTab => {
+                                                                                    layout_next
+                                                                                        .registry_tab
+                                                                                }
+                                                                                Control::Launch => {
+                                                                                    layout_next
+                                                                                        .launch
+                                                                                }
+                                                                            },
+                                                                        )
+                                                                    },
+                                                                )
+                                                            },
+                                                        )
+                                                    },
+                                                )
+                                            })(
+                                                if f1_edge {
+                                                    !current.hud_visible
+                                                } else {
+                                                    current.hud_visible
+                                                },
+                                                (current.hold + delta * escape_held as u8 as f32)
+                                                    * escape_held as u8 as f32,
+                                            )
+                                        })(
+                                            Layout {
+                                                width: width_now,
+                                                height: height_now,
+                                                scale: scale_now,
+                                                sidebar_w,
+                                                pad: 16.0,
+                                                icon: bevy::math::Rect::new(16.0, 16.0, 48.0, 48.0),
+                                                title: bevy::math::Rect::new(58.0, 16.0, 58.0 + title_w, 16.0 + title_h_next),
+                                                home_tab: bevy::math::Rect::new(16.0, tabs_top, sidebar_w - 16.0, tabs_top + 56.0),
+                                                registry_tab: bevy::math::Rect::new(16.0, tabs_top + 64.0, sidebar_w - 16.0, tabs_top + 120.0),
+                                                card: bevy::math::Rect::new(card_x, 24.0, card_x + card_w, 24.0 + card_h),
+                                                card_icon: bevy::math::Rect::new(card_x + 20.0, 44.0, card_x + 48.0, 72.0),
+                                                card_title: bevy::math::Rect::new(card_x + 60.0, 44.0, card_x + card_w - 160.0, 72.0),
+                                                desc: bevy::math::Rect::new(card_x + 20.0, 88.0, card_x + card_w - 20.0, 88.0 + desc_h_next),
+                                                sep: bevy::math::Rect::new(card_x + 20.0, 104.0 + desc_h_next, card_x + card_w - 20.0, 105.0 + desc_h_next),
+                                                launch: bevy::math::Rect::new(card_x + 20.0, 121.0 + desc_h_next, card_x + 20.0 + launch_w, 177.0 + desc_h_next),
+                                                badge: bevy::math::Rect::new(card_x + card_w - 136.0, 44.0, card_x + card_w - 20.0, 72.0),
+                                                well: bevy::math::Rect::new(card_x + 20.0, 88.0, card_x + card_w - 20.0, 24.0 + card_h - 20.0),
                                             },
-                                        );
+                                            width_now != current.layout.width
+                                                || height_now != current.layout.height
+                                                || scale_now != current.layout.scale
+                                                || title_h_next != current.title_h
+                                                || desc_h_next != current.desc_h,
+                                            title_measured == Some(title_h_next)
+                                                && desc_measured == Some(desc_h_next)
+                                                && !(width_now != current.layout.width
+                                                    || height_now != current.layout.height
+                                                    || scale_now != current.layout.scale
+                                                    || title_h_next != current.title_h
+                                                    || desc_h_next != current.desc_h),
+                                        )
                                     })(
-                                        name.into_iter().fold(
-                                            false,
-                                            |_, name: &bevy::ecs::name::Name| {
-                                                name.as_str() == "slot"
-                                            },
-                                        ),
-                                        name.is_some(),
-                                    );
-                                });
-                        })(
-                            hidden != f1,
-                            launched
-                                || (pressed
-                                    && hidden == f1
-                                    && cursor.x >= width / 3.0 + 81.0
-                                    && cursor.x <= width / 3.0 + 655.0
-                                    && cursor.y >= height / 2.0 - 192.0
-                                    && cursor.y <= height / 2.0 - 139.0),
-                            (hold + delta * escape as u8 as f32) * escape as u8 as f32,
-                            world,
-                        );
-                    }
-                })(
-                    (|keys: &bevy::input::ButtonInput<bevy::input::keyboard::KeyCode>| {
-                        (
-                            keys.just_pressed(bevy::input::keyboard::KeyCode::F1),
-                            keys.pressed(bevy::input::keyboard::KeyCode::Escape),
-                        )
-                    })(
-                        world
-                            .resource::<
-                                bevy::input::ButtonInput<bevy::input::keyboard::KeyCode>,
-                            >(),
-                    ),
-                    world.resource::<bevy::time::Time>().delta_secs(),
-                    world
-                        .resource::<bevy::input::ButtonInput<bevy::input::mouse::MouseButton>>()
-                        .just_pressed(bevy::input::mouse::MouseButton::Left),
-                    world
-                        .query::<&bevy::window::Window>()
-                        .iter(world)
-                        .fold(bevy::math::Vec2::ZERO, |_, window| {
-                            window
-                                .cursor_position()
-                                .into_iter()
-                                .fold(bevy::math::Vec2::ZERO, |_, point| point)
-                        }),
-                    world
-                        .query::<&bevy::window::Monitor>()
-                        .iter(world)
-                        .fold((1920.0, 1080.0), |_, monitor| {
-                            (monitor.physical_width as f32, monitor.physical_height as f32)
-                        }),
-                    world
-                        .query_filtered::<
-                            (
-                                &bevy::camera::visibility::Visibility,
-                                &bevy::transform::components::Transform,
-                                Option<&bevy::sprite::Sprite>,
-                                Option<&bevy::ecs::name::Name>,
-                            ),
-                            bevy::ecs::query::Without<bevy::camera::Camera2d>,
-                        >()
-                        .iter(world)
-                        .fold(
-                            (false, false, 0.0),
-                            |state: (bool, bool, f32), (visibility, transform, sprite, name)| {
-                                (|slot: bool| {
-                                    (
-                                        [
-                                            state.0,
-                                            *visibility
-                                                == bevy::camera::visibility::Visibility::Hidden,
-                                        ][name.is_none() as usize],
-                                        sprite.into_iter().fold(
-                                            state.1,
-                                            |value: bool, sprite: &bevy::sprite::Sprite| {
-                                                value
-                                                    || (slot
-                                                        && sprite.color.to_srgba().alpha > 0.5)
-                                            },
-                                        ),
-                                        transform.scale.z,
+                                        sidebar_w + 24.0 + (content_w - card_w) / 2.0,
+                                        (173.0 + desc_h_next).min(height_now - 48.0),
+                                        (card_w - 40.0).min(240.0),
                                     )
                                 })(
-                                    name.into_iter().fold(
-                                        false,
-                                        |_, name: &bevy::ecs::name::Name| name.as_str() == "slot",
-                                    ),
+                                    (width_now * 0.26).clamp(180.0, 340.0),
+                                    (width_now - (width_now * 0.26).clamp(180.0, 340.0) - 48.0)
+                                        .max(240.0),
+                                    (width_now - (width_now * 0.26).clamp(180.0, 340.0) - 48.0)
+                                        .max(240.0)
+                                        .min(560.0),
+                                    title_h_next.max(32.0) + 32.0,
+                                    ((width_now * 0.26).clamp(180.0, 340.0) - 74.0).max(60.0),
                                 )
-                            },
-                        ),
-                    world,
-                );
+                            })(
+                                title_measured.unwrap_or(current.title_h),
+                                desc_measured.unwrap_or(current.desc_h),
+                            )
+                        })(
+                            state.clone(),
+                            entities.iter().fold(
+                                None,
+                                |acc: Option<f32>,
+                                 (role, _visibility, _transform, _sprite, _text_color, _text_bounds, layout_info)| {
+                                    match (role, layout_info) {
+                                        (Role::AppTitle, Some(layout_info)) => [
+                                            acc,
+                                            Some(layout_info.size.y / layout_info.scale_factor),
+                                        ][(layout_info.scale_factor > 0.0) as usize],
+                                        _ => acc,
+                                    }
+                                },
+                            ),
+                            entities.iter().fold(
+                                None,
+                                |acc: Option<f32>,
+                                 (role, _visibility, _transform, _sprite, _text_color, _text_bounds, layout_info)| {
+                                    match (role, layout_info) {
+                                        (Role::CardDescription, Some(layout_info)) => [
+                                            acc,
+                                            Some(layout_info.size.y / layout_info.scale_factor),
+                                        ][(layout_info.scale_factor > 0.0) as usize],
+                                        _ => acc,
+                                    }
+                                },
+                            ),
+                            time.delta_secs(),
+                            time.elapsed_secs(),
+                            window.width(),
+                            window.height(),
+                            window.scale_factor(),
+                            keys.just_pressed(bevy::input::keyboard::KeyCode::F1),
+                            keys.just_pressed(bevy::input::keyboard::KeyCode::Tab),
+                            keys.pressed(bevy::input::keyboard::KeyCode::ShiftLeft)
+                                || keys.pressed(bevy::input::keyboard::KeyCode::ShiftRight),
+                            keys.just_pressed(bevy::input::keyboard::KeyCode::Enter),
+                            keys.just_pressed(bevy::input::keyboard::KeyCode::Space),
+                            keys.pressed(bevy::input::keyboard::KeyCode::Escape),
+                            mouse.just_pressed(bevy::input::mouse::MouseButton::Left),
+                            mouse.just_released(bevy::input::mouse::MouseButton::Left),
+                            window.focused,
+                            window.cursor_position(),
+                            state,
+                            exit,
+                            entities,
+                        );
+                    }
+                }
             },
         )
         .run();

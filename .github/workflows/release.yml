@@ -91,10 +91,11 @@ jobs:
           restore-keys: |
             cargo-${{ runner.os }}-${{ matrix.target }}-
 
-      - name: Ensure Cargo.lock exists (regenerated through Cargo, never by hand)
+      - name: Require the committed Cargo-resolved lockfile
         run: |
           set -euo pipefail
-          test -f Cargo.lock || cargo generate-lockfile
+          test -f Cargo.lock
+          grep -q "name = \"bevy\"" Cargo.lock
 
       - name: Verify the release matrix and executable names from the workflow file
         run: |
