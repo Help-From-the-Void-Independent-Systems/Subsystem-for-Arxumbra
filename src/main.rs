@@ -53,7 +53,7 @@ fn main() {
         action_label_bounds: f32,
     }
 
-    #[derive(Resource)]
+    #[derive(bevy::ecs::resource::Resource)]
     struct UiState {
         selected: Destination,
         hud_visible: bool,
@@ -67,14 +67,14 @@ fn main() {
         layout: LayoutFrame,
     }
 
-    #[derive(Resource)]
+    #[derive(bevy::ecs::resource::Resource)]
     struct UiImages {
         pill: bevy::asset::Handle<bevy::image::Image>,
         panel: bevy::asset::Handle<bevy::image::Image>,
         ring: bevy::asset::Handle<bevy::image::Image>,
     }
 
-    #[derive(Resource)]
+    #[derive(bevy::ecs::resource::Resource)]
     struct UiEntities {
         sidebar_panel: bevy::ecs::entity::Entity,
         divider: bevy::ecs::entity::Entity,

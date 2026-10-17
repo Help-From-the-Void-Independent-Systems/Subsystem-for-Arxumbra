@@ -199,18 +199,41 @@ jobs:
         shell: bash
         run: |
           set +e
-          message=$(grep -m 2 -E '^error' "$EVIDENCE_DIR/check.log" | cut -c 1-90 | tr '\n' ' ')
-          tailmessage=$(tail -n 2 "$EVIDENCE_DIR/check.log" | cut -c 1-90 | tr '\n' ' ')
-          {
-            echo "message<<MARKER_CHECK_MESSAGE"
-            echo "$message"
-            echo "MARKER_CHECK_MESSAGE"
-            echo "tailmessage<<MARKER_CHECK_TAIL"
-            echo "$tailmessage"
-            echo "MARKER_CHECK_TAIL"
-          } >> "$GITHUB_OUTPUT"
+          grep -E '^error' "$EVIDENCE_DIR/check.log" | cut -c 1-90 > .check-errors
+          for index in 0 1 2 3 4 5; do
+            line=$(sed -n "$((index + 1))p" .check-errors)
+            echo "e$index=$line" >> "$GITHUB_OUTPUT"
+          done
 
-      - name: "Check errors: ${{ steps.check_reflect.outputs.message }} tail: ${{ steps.check_reflect.outputs.tailmessage }}"
+      - name: "Check e0: ${{ steps.check_reflect.outputs.e0 }}"
+        if: always()
+        shell: bash
+        run: echo recorded
+
+      - name: "Check e1: ${{ steps.check_reflect.outputs.e1 }}"
+        if: always()
+        shell: bash
+        run: echo recorded
+
+      - name: "Check e2: ${{ steps.check_reflect.outputs.e2 }}"
+        if: always()
+        shell: bash
+        run: echo recorded
+
+      - name: "Check e3: ${{ steps.check_reflect.outputs.e3 }}"
+        if: always()
+        shell: bash
+        run: echo recorded
+
+      - name: "Check e4: ${{ steps.check_reflect.outputs.e4 }}"
+        if: always()
+        shell: bash
+        run: echo recorded
+
+      - name: "Check e5: ${{ steps.check_reflect.outputs.e5 }}"
+        if: always()
+        shell: bash
+        run: echo recorded
         if: always()
         shell: bash
         run: echo recorded
