@@ -222,7 +222,7 @@ fn main() {
         .add_systems(
             bevy::app::Startup,
             bevy::ecs::schedule::IntoScheduleConfigs::chain((
-                |mut commands: Commands, server: Res<AssetServer>| {
+                |mut commands: bevy::ecs::system::Commands, server: bevy::ecs::system::Res<bevy::asset::AssetServer>| {
                     commands.spawn((bevy::camera::Camera2d, bevy::render::view::Msaa::Off));
                     commands.insert_resource(UiImages {
                         pill: server.add(bevy::image::Image {
@@ -399,7 +399,7 @@ fn main() {
                     });
                 },
                 bevy::ecs::schedule::ApplyDeferred,
-                |mut commands: Commands, images: Res<UiImages>, server: Res<AssetServer>| {
+                |mut commands: bevy::ecs::system::Commands, images: bevy::ecs::system::Res<UiImages>, server: bevy::ecs::system::Res<bevy::asset::AssetServer>| {
                     commands.insert_resource(UiEntities {
                         sidebar_panel: commands
                             .spawn((
@@ -976,12 +976,12 @@ fn main() {
         .add_systems(
             bevy::app::Update,
             bevy::ecs::schedule::IntoScheduleConfigs::chain((
-                |mut state: ResMut<UiState>,
-                 keys: Res<ButtonInput<KeyCode>>,
-                 mouse: Res<ButtonInput<MouseButton>>,
-                 time: Res<Time>,
-                 mut commands: Commands,
-                 windows: Query<(Entity, &Window), With<PrimaryWindow>>| {
+                |mut state: bevy::ecs::system::ResMut<UiState>,
+                 keys: bevy::ecs::system::Res<bevy::input::ButtonInput<bevy::input::keyboard::KeyCode>>,
+                 mouse: bevy::ecs::system::Res<bevy::input::ButtonInput<bevy::input::mouse::MouseButton>>,
+                 time: bevy::ecs::system::Res<bevy::time::Time>,
+                 mut commands: bevy::ecs::system::Commands,
+                 windows: bevy::ecs::system::Query<(bevy::ecs::entity::Entity, &bevy::window::Window), bevy::ecs::system::With<bevy::window::PrimaryWindow>>| {
                     windows.iter().next().into_iter().for_each(|(entity, window)| {
                         if !window.focused {
                             if state.hover.is_some() {
@@ -995,7 +995,7 @@ fn main() {
                                 state.focus_from_keyboard = false;
                             }
                         }
-                        if keys.just_pressed(KeyCode::F1) {
+                        if keys.just_pressed(bevy::input::keyboard::KeyCode::F1) {
                             state.hud_visible = !state.hud_visible;
                             state.hover = None;
                             state.armed = None;
@@ -1011,7 +1011,7 @@ fn main() {
                                 commands.entity(entity).despawn();
                             }
                         })(
-                            if keys.pressed(KeyCode::Escape) {
+                            if keys.pressed(bevy::input::keyboard::KeyCode::Escape) {
                                 state.escape_hold_secs + time.delta_secs()
                             } else {
                                 0.0
@@ -1145,12 +1145,12 @@ fn main() {
                                         }
                                     })(point),
                                 );
-                                if mouse.just_pressed(MouseButton::Left) {
+                                if mouse.just_pressed(bevy::input::mouse::MouseButton::Left) {
                                     state.focus = None;
                                     state.focus_from_keyboard = false;
                                     state.armed = state.hover;
                                 }
-                                if mouse.just_released(MouseButton::Left) {
+                                if mouse.just_released(bevy::input::mouse::MouseButton::Left) {
                                     state.armed.into_iter().for_each(|armed| {
                                         if state.hover == Some(armed) {
                                             state.selected = armed;
@@ -1168,7 +1168,7 @@ fn main() {
                                 }
                             }
                         }
-                        if keys.just_pressed(KeyCode::Tab) {
+                        if keys.just_pressed(bevy::input::keyboard::KeyCode::Tab) {
                             state.focus_from_keyboard = true;
                             state.focus = Some(match state.focus {
                                 Some(Destination::ExtensionRegistry) => Destination::Home,
@@ -1177,7 +1177,7 @@ fn main() {
                                 }
                             });
                         }
-                        if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::Space)
+                        if keys.just_pressed(bevy::input::keyboard::KeyCode::Enter) || keys.just_pressed(bevy::input::keyboard::KeyCode::Space)
                         {
                             state.focus.into_iter().for_each(|destination| {
                                 state.selected = destination;
@@ -1185,13 +1185,13 @@ fn main() {
                         }
                     });
                 },
-                |state: Res<UiState>,
-                 entities: Res<UiEntities>,
-                 mut commands: Commands,
-                 sprites: Query<(Entity, &Transform, &Visibility, &Sprite)>,
-                 texts: Query<
-                    (Entity, &Transform, &Visibility, &TextColor, &TextBounds),
-                    With<Text2d>,
+                |state: bevy::ecs::system::Res<UiState>,
+                 entities: bevy::ecs::system::Res<UiEntities>,
+                 mut commands: bevy::ecs::system::Commands,
+                 sprites: bevy::ecs::system::Query<(bevy::ecs::entity::Entity, &bevy::transform::components::Transform, &bevy::camera::visibility::Visibility, &bevy::sprite::Sprite)>,
+                 texts: bevy::ecs::system::Query<
+                    (bevy::ecs::entity::Entity, &bevy::transform::components::Transform, &bevy::camera::visibility::Visibility, &bevy::text::TextColor, &bevy::text::TextBounds),
+                    bevy::ecs::system::With<bevy::sprite::Text2d>,
                 >| {
                     sprites
                         .get(entities.sidebar_panel)
