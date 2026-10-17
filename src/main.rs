@@ -1025,20 +1025,23 @@ fn main() {
                             state.focus = None;
                             state.focus_from_keyboard = false;
                         }
-                        (|hold: f32| {
-                            if state.escape_hold_secs != hold {
-                                state.escape_hold_secs = hold;
-                            }
-                            if hold >= 7.0 && !state.exit_requested {
-                                state.exit_requested = true;
-                                commands.entity(entity).despawn();
-                            }
-                        })(
-                            if keys.pressed(bevy::input::keyboard::KeyCode::Escape) {
-                                state.escape_hold_secs + time.delta_secs()
+                        (|pressed: bool, delta: f32| {
+                            (|hold: f32| {
+                                if state.escape_hold_secs != hold {
+                                    state.escape_hold_secs = hold;
+                                }
+                                if hold >= 7.0 && !state.exit_requested {
+                                    state.exit_requested = true;
+                                    commands.entity(entity).despawn();
+                                }
+                            })(if keys.pressed(bevy::input::keyboard::KeyCode::Escape) {
+                                state.escape_hold_secs + delta
                             } else {
                                 0.0
-                            },
+                            });
+                        })(
+                            keys.pressed(bevy::input::keyboard::KeyCode::Escape),
+                            time.delta_secs(),
                         );
                         (|layout: LayoutFrame| {
                             if state.layout != layout {
@@ -1141,33 +1144,31 @@ fn main() {
                         })(window.cursor_position());
                         if window.focused && state.hud_visible {
                             state.cursor.into_iter().for_each(|point| {
-                                (|hover: Option<Destination>| {
-                                    if state.hover != hover {
-                                        state.hover = hover;
-                                    }
-                                })(
-                                    (|point: bevy::math::Vec2| {
-                                        if f32::abs(
-                                            point.x - state.layout.home_tab.center_x,
-                                        ) <= state.layout.home_tab.half_width
-                                            && f32::abs(
-                                                point.y - state.layout.home_tab.center_y,
-                                            ) <= state.layout.home_tab.half_height
-                                        {
-                                            Some(Destination::Home)
-                                        } else if f32::abs(
-                                            point.x - state.layout.registry_tab.center_x,
-                                        ) <= state.layout.registry_tab.half_width
-                                            && f32::abs(
-                                                point.y - state.layout.registry_tab.center_y,
-                                            ) <= state.layout.registry_tab.half_height
-                                        {
-                                            Some(Destination::ExtensionRegistry)
-                                        } else {
-                                            None
+                                (|point: bevy::math::Vec2| {
+                                    (|hover: Option<Destination>| {
+                                        if state.hover != hover {
+                                            state.hover = hover;
                                         }
-                                    })(point),
-                                );
+                                    })(if f32::abs(
+                                        point.x - state.layout.home_tab.center_x,
+                                    ) <= state.layout.home_tab.half_width
+                                        && f32::abs(
+                                            point.y - state.layout.home_tab.center_y,
+                                        ) <= state.layout.home_tab.half_height
+                                    {
+                                        Some(Destination::Home)
+                                    } else if f32::abs(
+                                        point.x - state.layout.registry_tab.center_x,
+                                    ) <= state.layout.registry_tab.half_width
+                                        && f32::abs(
+                                            point.y - state.layout.registry_tab.center_y,
+                                        ) <= state.layout.registry_tab.half_height
+                                    {
+                                        Some(Destination::ExtensionRegistry)
+                                    } else {
+                                        None
+                                    });
+                                })(point);
                                 if mouse.just_pressed(bevy::input::mouse::MouseButton::Left) {
                                     state.focus = None;
                                     state.focus_from_keyboard = false;
