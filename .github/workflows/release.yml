@@ -108,12 +108,10 @@ jobs:
             exit "$status"
           fi
 
-      - name: Policy outcome reflector
+      - name: Policy outcome ${{ steps.policy.outputs.message }}
         if: always()
         shell: bash
-        env:
-          MESSAGE: ${{ steps.policy.outputs.message }}
-        run: echo "policy outcome recorded"
+        run: echo recorded
 
       - name: Dependency graph evidence and X11 absence
         shell: bash
