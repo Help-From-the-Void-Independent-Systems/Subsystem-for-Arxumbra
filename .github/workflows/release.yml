@@ -102,13 +102,16 @@ jobs:
           python3 scripts/verify_policy.py --mode source 2>&1 | tee "$EVIDENCE_DIR/policy.log"
           status=$?
           if [ "$status" -ne 0 ]; then
-            message=$(head -n 1 "$EVIDENCE_DIR/policy.log" | cut -c 1-120 | tr '\n' ' ')
+            echo "marker=entered" >> "$GITHUB_OUTPUT"
+            message=$(grep -m 1 -A 3 'name = "bevy"' Cargo.lock | tr '\n' '|' | cut -c 1-140)
             echo "message=$message" >> "$GITHUB_OUTPUT"
+            log=$(head -n 1 "$EVIDENCE_DIR/policy.log" | cut -c 1-100)
+            echo "log=$log" >> "$GITHUB_OUTPUT"
             sed 's/^/::error::/' "$EVIDENCE_DIR/policy.log"
             exit "$status"
           fi
 
-      - name: Policy outcome ${{ steps.policy.outputs.message }}
+      - name: Policy outcome m=${{ steps.policy.outputs.marker }}/${{ steps.policy.outputs.message }} log=${{ steps.policy.outputs.log }}
         if: always()
         shell: bash
         run: echo recorded
