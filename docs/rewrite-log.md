@@ -459,9 +459,18 @@ SHA↔version mapping lives here (verified via the GitHub refs API and
     any evidence line. Three changes follow from that:
     (a) the install now runs with `-o DPkg::Lock::Timeout=180` inside a
     three-attempt loop that refreshes the package lists between attempts,
-    because exit 100 on a runner that installed packages successfully 35
-    minutes earlier in the same job is the signature of the dpkg lock held
-    by the image's automatic-update services;
+    and, if the batch still fails, retries package by package so that one
+    bad name cannot hide the rest; only the tools the harness itself needs
+    (`xvfb`, `xdotool`, `imagemagick`) are fatal when unavailable, while a
+    missing X11 runtime library is reported per package and left to show
+    up as a `dlopen` failure in the mirrored application log. Remote run
+    `39035672621` proved the value of the mirroring: the annotated apt
+    tail read `E: Unable to locate package libxrandr1` — the Debian-style
+    name was wrong, Ubuntu noble ships the Xrandr runtime as
+    **`libxrandr2`** (SONAME `libXrandr.so.2`), exactly the library winit's
+    x11 backend dlopens. Every other name in the list was re-checked
+    against the SONAME convention (`libx11-6`, `libxcursor1`, `libxi6`,
+    `libxkbcommon0`, `libxkbcommon-x11-0`);
     (b) every failure reason is accumulated into one
     `::error title=smoke-failures::` annotation and the ANSI-stripped
     application log is mirrored (head 4 lines as warnings, tail 9 as
@@ -474,6 +483,23 @@ SHA↔version mapping lives here (verified via the GitHub refs API and
     exits on its own, or a `grep` that finds nothing in a pipeline) would
     abort the step mid-evidence. The exit code is now captured with
     `wait "$APP_PID" || APP_RC=$?`.
+36. (rev-4) Smoke screen geometry. Xvfb was started as `1366x768x24` while
+    the application requests a borderless fullscreen window with a
+    `1920x1080` resolution. Xvfb runs no window manager, so
+    `_NET_WM_STATE_FULLSCREEN` is not guaranteed to be honoured: the window
+    could have been placed at its requested `1920x1080` geometry on a
+    smaller screen, i.e. clipped, and the pointer coordinates the harness
+    derives from the application's own logical rects would then not map
+    onto the visible screen. The screen is now `1920x1080x24`, so the
+    requested geometry, the fullscreen geometry and the root window
+    coincide on either path and the logical coordinates parsed from
+    `ARXUMBRA-INTERACTIVE` are root-screen coordinates. The
+    "cursor moved away" step targets `(1880, 1040)`: at that viewport the
+    sidebar occupies x 0..340 and the card x 850..1410 / y 24..269, so the
+    point is on screen and outside every interactive rect. Two notices were
+    added (the `xdpyinfo` dimensions and the application's own `w=/h=/s=`
+    metrics) so that a geometry mismatch appears in the annotations instead
+    of only in unreadable stdout.
 35. (rev-4) Equality-guarded snapshot write. `ResMut::into_inner` consumes
     the parameter and unconditionally calls `set_changed()`
     (`bevy_ecs/src/change_detection/traits.rs`, `impl_methods!`), so an
@@ -552,3 +578,17 @@ SHA↔version mapping lives here (verified via the GitHub refs API and
   so the next run rebuilds Bevy from scratch. The first compile-clean,
   lint-clean, link-clean remote run of this crate; the only remaining
   unknown is the smoke gate, which decision 34 addresses.
+- Remote CI iteration `9b541bd` (run `39035672621`, job `117404844654`):
+  policy ✓, `cargo fmt --check` ✓ (the new equality-guarded write matched
+  rustfmt without the bootstrap workflow pushing anything — `git ls-remote`
+  still pointed at `9b541bd` after the "Apply rustfmt to the sources" step
+  of run `39035669208` succeeded), lockfile requirement ✓, dependency
+  metadata ✓, clippy ✓, `cargo check --all-targets` ✓, `cargo test` ✓
+  (zero tests), **release build ✓**, smoke ✗. The hardened smoke step
+  delivered its first real diagnosis through annotations alone: three apt
+  attempts, each warned, then the mirrored apt tail named
+  `E: Unable to locate package libxrandr1` (decision 34a). The artifact
+  step again reported `No files were found with the provided path:
+  /tmp/shots /tmp/smoke.log` because the step aborted before launching the
+  application, so no screenshot or application-log evidence exists yet for
+  this crate under Xvfb.

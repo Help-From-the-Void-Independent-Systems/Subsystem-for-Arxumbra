@@ -665,7 +665,8 @@ jobs:
         run: |
           set +e
           set -u
-          PACKAGES="xvfb xauth xdotool imagemagick x11-utils mesa-vulkan-drivers libvulkan1 vulkan-tools libx11-6 libxcursor1 libxrandr1 libxi6 libxkbcommon0 libxkbcommon-x11-0"
+          PACKAGES="xvfb xauth xdotool imagemagick x11-utils mesa-vulkan-drivers libvulkan1 vulkan-tools libx11-6 libxcursor1 libxrandr2 libxi6 libxkbcommon0 libxkbcommon-x11-0"
+          REQUIRED="xvfb xdotool imagemagick"
           APT_LOG=/tmp/apt-smoke.log
           APT_OK=0
           for attempt in 1 2 3; do
@@ -673,16 +674,31 @@ jobs:
               APT_OK=1
               break
             fi
-            echo "::warning title=smoke-apt::install attempt ${attempt} did not succeed; refreshing the package lists"
-            sleep 20
+            echo "::warning title=smoke-apt::batch install attempt ${attempt} did not succeed; refreshing the package lists"
+            sleep 15
             sudo apt-get -o DPkg::Lock::Timeout=180 update >> "$APT_LOG" 2>&1
           done
           if [ "$APT_OK" != 1 ]; then
-            tail -n 9 "$APT_LOG" | while IFS= read -r line; do
+            { grep -E "^E: " "$APT_LOG" || true; } | while IFS= read -r line; do
               echo "::error title=smoke-apt::${line}"
             done
-            echo "::error::smoke FAIL: the smoke environment packages could not be installed after three attempts"
-            exit 1
+            MISSING=""
+            for pkg in $PACKAGES; do
+              if sudo apt-get -o DPkg::Lock::Timeout=180 install -y "$pkg" >> "$APT_LOG" 2>&1; then
+                continue
+              fi
+              MISSING="${MISSING}${pkg} "
+              echo "::warning title=smoke-apt::package ${pkg} is not installable on this runner image"
+            done
+            for pkg in $REQUIRED; do
+              case " ${MISSING} " in
+                *" ${pkg} "*)
+                  echo "::error::smoke FAIL: required smoke tool ${pkg} could not be installed (unavailable: ${MISSING})"
+                  exit 1
+                  ;;
+              esac
+            done
+            echo "::warning title=smoke-apt::continuing with a partial environment; unavailable packages: ${MISSING}"
           fi
           ICD=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
           if [ -f "$ICD" ]; then
@@ -692,12 +708,15 @@ jobs:
           { grep -i -m 2 -E "deviceName|driverName" /tmp/vkinfo.log || true; } | while IFS= read -r line; do
             echo "::notice title=smoke-vulkan::${line}"
           done
-          Xvfb :99 -screen 0 1366x768x24 > /tmp/xvfb.log 2>&1 &
+          Xvfb :99 -screen 0 1920x1080x24 > /tmp/xvfb.log 2>&1 &
           XVFB_PID=$!
           export DISPLAY=:99
           sleep 2
           xdpyinfo > /tmp/xdpyinfo.log 2>&1
           head -3 /tmp/xdpyinfo.log
+          { grep -E "dimensions|depth of root" /tmp/xdpyinfo.log || true; } | while IFS= read -r line; do
+            echo "::notice title=smoke-screen::${line}"
+          done
           LOG=/tmp/smoke.log
           SHOTS=/tmp/shots
           mkdir -p "$SHOTS"
@@ -738,6 +757,8 @@ jobs:
           LAUNCH_RECT=$(echo "$LINE" | sed -n 's/.*launch=\([-0-9.,]*\).*/\1/p')
           echo "control rects from the application log: home=$HOME_RECT registry=$REG_RECT launch=$LAUNCH_RECT"
           echo "::notice title=smoke-rects::home=$HOME_RECT registry=$REG_RECT launch=$LAUNCH_RECT"
+          APP_DIMS=$(echo "$LINE" | sed -n 's/.* w=\([0-9.]*\) h=\([0-9.]*\) s=\([0-9.]*\) .*/w=\1 h=\2 s=\3/p')
+          echo "::notice title=smoke-app-window::application window metrics ${APP_DIMS:-not parsed from the log}"
           if [ -z "$HOME_RECT" ] || [ -z "$REG_RECT" ]; then
             FAIL=1
             REASONS="${REASONS}control rects could not be parsed from the application log; "
@@ -769,7 +790,7 @@ jobs:
           xdotool mouseup 1
           sleep 1.5
           import -window root "$SHOTS/home2.png"
-          xdotool mousemove 1360 760
+          xdotool mousemove 1880 1040
           sleep 1
           import -window root "$SHOTS/home2n.png"
           xdotool mousemove "$CENTER_RX" "$CENTER_RY"
