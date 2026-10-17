@@ -130,7 +130,7 @@ jobs:
             echo "locksize=$locksize"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Policy bevy=${{ steps.policy_reflect.outputs.summary }} reason=${{ steps.policy_reflect.outputs.reason }} size=${{ steps.policy_reflect.outputs.locksize }}
+      - name: "Policy bevy=${{ steps.policy_reflect.outputs.summary }} reason=${{ steps.policy_reflect.outputs.reason }} size=${{ steps.policy_reflect.outputs.locksize }}"
         if: always()
         shell: bash
         run: echo recorded
@@ -202,7 +202,7 @@ jobs:
           message=$(grep -m 2 -E '^error' "$EVIDENCE_DIR/check.log" | cut -c 1-100 | tr '\n' ' ')
           echo "message=$message" >> "$GITHUB_OUTPUT"
 
-      - name: Check errors: ${{ steps.check_reflect.outputs.message }}
+      - name: "Check errors: ${{ steps.check_reflect.outputs.message }}"
         if: always()
         shell: bash
         run: echo recorded
@@ -230,7 +230,7 @@ jobs:
           message=$(grep -m 2 -E '^error' "$EVIDENCE_DIR/clippy.log" | cut -c 1-100 | tr '\n' ' ')
           echo "message=$message" >> "$GITHUB_OUTPUT"
 
-      - name: Clippy errors: ${{ steps.clippy_reflect.outputs.message }}
+      - name: "Clippy errors: ${{ steps.clippy_reflect.outputs.message }}"
         if: always()
         shell: bash
         run: echo recorded
