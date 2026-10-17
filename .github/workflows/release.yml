@@ -298,16 +298,22 @@ jobs:
           fi
 
       - name: Stage distribution directory
+        shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           mkdir -p "dist/${{ matrix.artifact }}"
-          cp "target/${{ matrix.target }}/release/subsystem-for-arxumbra${{ matrix.extension }}" "$STAGED_EXECUTABLE"
+          if ! cp "target/${{ matrix.target }}/release/subsystem-for-arxumbra${{ matrix.extension }}" "$STAGED_EXECUTABLE" 2>&1; then
+            echo "::error::[stage] executable missing; release directory contents:"
+            ls -la "target/${{ matrix.target }}/release" 2>&1 | head -n 30 | sed 's/^/::error::[stage] /'
+            exit 1
+          fi
           chmod 755 "$STAGED_EXECUTABLE" || true
           cp -r assets "dist/${{ matrix.artifact }}/assets"
 
       - name: Record staged executable type
+        shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           if command -v file > /dev/null 2>&1; then
             file "$STAGED_EXECUTABLE" | tee "$EVIDENCE_DIR/executable-type.log"
           else
