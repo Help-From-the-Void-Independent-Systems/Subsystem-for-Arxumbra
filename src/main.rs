@@ -1316,7 +1316,7 @@ fn main() {
                                 } else {
                                     bevy::camera::visibility::Visibility::Hidden
                                 },
-                                bevy::text::TextBounds::new_horizontal(state.layout.title_bounds)
+                                bevy::text::TextBounds::new_horizontal(state.layout.title_bounds),
                                 bevy::math::Vec3::new(
                                     state.layout.title_x,
                                     state.layout.title_y,
@@ -1541,7 +1541,7 @@ fn main() {
                                             0.88
                                         },
                                     ),
-                                    bevy::text::TextBounds::new_horizontal(state.layout.tab_label_bounds)
+                                    bevy::text::TextBounds::new_horizontal(state.layout.tab_label_bounds),
                                     bevy::math::Vec3::new(
                                         state.layout.tab_label_x,
                                         state.layout.home_tab.center_y,
@@ -1766,7 +1766,7 @@ fn main() {
                                             0.88
                                         },
                                     ),
-                                    bevy::text::TextBounds::new_horizontal(state.layout.tab_label_bounds)
+                                    bevy::text::TextBounds::new_horizontal(state.layout.tab_label_bounds),
                                     bevy::math::Vec3::new(
                                         state.layout.tab_label_x,
                                         state.layout.registry_tab.center_y,
@@ -2173,7 +2173,7 @@ fn main() {
                                     } else {
                                         bevy::camera::visibility::Visibility::Hidden
                                     },
-                                    bevy::text::TextBounds::new_horizontal(state.layout.caption_bounds)
+                                    bevy::text::TextBounds::new_horizontal(state.layout.caption_bounds),
                                     bevy::math::Vec3::new(
                                         state.layout.caption_x,
                                         state.layout.caption_y,
@@ -2283,7 +2283,7 @@ fn main() {
                                     } else {
                                         bevy::camera::visibility::Visibility::Hidden
                                     },
-                                    bevy::text::TextBounds::new_horizontal(state.layout.action_label_bounds)
+                                    bevy::text::TextBounds::new_horizontal(state.layout.action_label_bounds),
                                     bevy::math::Vec3::new(
                                         state.layout.action_label_x,
                                         state.layout.action.center_y,
