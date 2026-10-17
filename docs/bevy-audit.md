@@ -202,6 +202,18 @@ runtime test; a parse-level simulation is never counted as a GitHub run.
 | `LogPlugin` | `crates/bevy_log/src/lib.rs:218-303` | fields include a `fn`-pointer `custom_layer`; `Default` = INFO + `wgpu=error,naga=warn` | `LogPlugin::default()` — no author `fn` item needed; readiness lines pass the default filter |
 | `Messages<AppExit>` | `crates/bevy_ecs/src/message/*` (rev-3 path re-verified) | `write(&mut self, T)` via `ResMut::into_inner()` | Escape-hold ≥7.0 s writes `AppExit::Success` (process exit code 0, asserted by the smoke check) |
 
+### Revision-4 second verification round (compile-error driven, same pinned tree)
+
+| API / fact | exact source location (v0.20.0) | verified contract | application decision |
+| --- | --- | --- | --- |
+| `ResMut::into_inner` | `crates/bevy_ecs/src/change_detection/traits.rs:514` (`impl_methods!`, `pub fn into_inner(mut self) -> &'w mut $target { self.set_changed(); self.value }`), applied to `ResMut` at `change_detection/params.rs:650` | consumes the parameter and unconditionally flags change ticks | the snapshot assignment is guarded by `UiState: PartialEq` equality so gated-but-unchanged frames flag nothing (§4) |
+| `ResMut` / `Res` path | `crates/bevy_ecs/src/change_detection/params.rs:618`, re-exported through `bevy_ecs::system` (`system/mod.rs:428-429`) | `bevy::ecs::system::ResMut<T>` resolves in 0.20 even though the struct moved to `change_detection::params` | typed system parameters keep their rev-3 spellings |
+| `Messages::write` | `crates/bevy_ecs/src/message/messages.rs:125` (`pub fn write(&mut self, message: M) -> MessageId<M>`) | 0.20 renamed `Events`/`EventWriter`/`send` to `Messages`/`MessageWriter`/`write`; the plain resource is writable through `ResMut` | `ResMut<Messages<AppExit>>` + `into_inner().write(AppExit::Success)` — no `MessageWriter` parameter needed |
+| query *item* vs *query-data* types | `crates/bevy_ecs/src/system/query.rs` (`type QueryItem<'w, D> = <D as QueryData>::Item`), `bevy_ecs/src/change_detection/params.rs:1018` (`Mut<'w, T>`) | a query's parameter spelling is `&mut T` while iteration yields `Mut<T>`; they are different types, so an unannotated closure parameter cannot be inferred from a `for` pattern — rustc binds the *item* shape and then mismatches the argument | the entity query is a system parameter (annotated once) and is **captured**, never threaded as a closure argument; this is what keeps the `&mut` inventory at 8 |
+| `bevy_log` output shape | `crates/bevy_log/src/lib.rs:367` (`tracing_subscriber::fmt::Layer::default().with_writer(std::io::stderr)`), no `with_ansi(false)` anywhere in the crate | records go to stderr with ANSI colour enabled regardless of redirection; the message text itself is uncoloured | the smoke harness captures `2>&1`, greps with `.*`-anchored `sed` patterns, and strips escapes before mirroring the log into annotations |
+| `Msaa` | `crates/bevy_render/src/view/mod.rs:248` (`pub enum Msaa`, `#[reflect(Component…)]`, `#[extract_app(RenderApp)]`) | usable as a per-camera component | `Camera2d` + `Msaa::Off` on the single camera entity (software renderer: no MSAA cost, no visual claim) |
+| `Sprite` field set | `crates/bevy_sprite/src/sprite.rs:17-41` | exactly nine public fields in 0.20 (`image, texture_atlas, color, flip_x, flip_y, custom_size, rect, image_mode, alpha_mode`) | every spawn writes the full literal — no `..Default` hiding a field change across versions |
+
 ## Revision-4 `&mut` status
 
 The rev-3 approval (nine spellings) explicitly does not carry over to this

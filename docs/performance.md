@@ -151,7 +151,14 @@ implementation):
 | startup | 8 procedural textures incl. a monitor-height-dependent card texture; 26 spawns | 3 procedural textures (4×4, 64×64, 64×64) + 6 PNG loads; 26 spawns; layout performed once on the first Update frame (no duplicated layout math anywhere in the tree, including CI — the harness parses application-logged rects) | STRUCTURAL |
 | per-frame state reconstruction | state read back from `Visibility`/alpha/`scale.z` on gated frames | eliminated: authoritative `UiState` snapshot; presentation is write-only downstream | STRUCTURAL |
 
-Assets are built once (`UiImages` + spawn-time handles) and never
+A gated frame is split into a pure transition (no system parameter is
+touched, nothing is allocated, the result is one `Copy` `(UiState, bool)`
+value) and one effect pass that runs only when the gate opened: at most one
+equality-guarded resource assignment, at most one exit message, at most two
+log lines, and the guarded component writes listed above.
+
+Assets are built once (each spawned sprite retains its own `Handle<Image>`;
+no separate image resource is kept, because nothing would read it) and never
 regenerated; hover/focus changes touch only color/visibility; a settled
 focus ring performs zero allocations and zero geometry updates per frame.
 Optional interaction transitions were deliberately not implemented

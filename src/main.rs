@@ -1770,7 +1770,9 @@ fn main() {
                                 next_state.layout.launch.size().y,
                             );
                         }
-                        *state.into_inner() = next_state;
+                        if *state != next_state {
+                            *state.into_inner() = next_state;
+                        }
                         for (
                             role,
                             visibility,

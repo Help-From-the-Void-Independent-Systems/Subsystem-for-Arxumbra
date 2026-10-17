@@ -663,25 +663,47 @@ jobs:
 
       - name: Headless X11 smoke check (Xvfb + lavapipe + scripted interaction; software rendering reported separately)
         run: |
-          set -uo pipefail
-          sudo apt-get update || sudo apt-get update
+          set +e
+          set -u
           PACKAGES="xvfb xauth xdotool imagemagick x11-utils mesa-vulkan-drivers libvulkan1 vulkan-tools libx11-6 libxcursor1 libxrandr1 libxi6 libxkbcommon0 libxkbcommon-x11-0"
-          sudo apt-get install -y $PACKAGES || (sleep 10 && sudo apt-get update && sudo apt-get install -y $PACKAGES)
+          APT_LOG=/tmp/apt-smoke.log
+          APT_OK=0
+          for attempt in 1 2 3; do
+            if sudo apt-get -o DPkg::Lock::Timeout=180 install -y $PACKAGES > "$APT_LOG" 2>&1; then
+              APT_OK=1
+              break
+            fi
+            echo "::warning title=smoke-apt::install attempt ${attempt} did not succeed; refreshing the package lists"
+            sleep 20
+            sudo apt-get -o DPkg::Lock::Timeout=180 update >> "$APT_LOG" 2>&1
+          done
+          if [ "$APT_OK" != 1 ]; then
+            tail -n 9 "$APT_LOG" | while IFS= read -r line; do
+              echo "::error title=smoke-apt::${line}"
+            done
+            echo "::error::smoke FAIL: the smoke environment packages could not be installed after three attempts"
+            exit 1
+          fi
           ICD=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
           if [ -f "$ICD" ]; then
             export VK_ICD_FILENAMES="$ICD"
           fi
-          vulkaninfo --summary > /tmp/vkinfo.log 2>&1 || true
-          cat /tmp/vkinfo.log
+          vulkaninfo --summary > /tmp/vkinfo.log 2>&1
+          { grep -i -m 2 -E "deviceName|driverName" /tmp/vkinfo.log || true; } | while IFS= read -r line; do
+            echo "::notice title=smoke-vulkan::${line}"
+          done
           Xvfb :99 -screen 0 1366x768x24 > /tmp/xvfb.log 2>&1 &
           XVFB_PID=$!
           export DISPLAY=:99
           sleep 2
-          xdpyinfo | head -3
+          xdpyinfo > /tmp/xdpyinfo.log 2>&1
+          head -3 /tmp/xdpyinfo.log
           LOG=/tmp/smoke.log
           SHOTS=/tmp/shots
           mkdir -p "$SHOTS"
           FAIL=0
+          REASONS=""
+          AE_REPORT=""
           ./target/release/subsystem-for-arxumbra > "$LOG" 2>&1 &
           APP_PID=$!
           READY=0
@@ -696,26 +718,30 @@ jobs:
             fi
           done
           if [ "$READY" != 1 ]; then
-            echo "::error::smoke FAIL: ARXUMBRA-INTERACTIVE readiness line not found within 90 s"
             FAIL=1
+            REASONS="${REASONS}readiness line ARXUMBRA-INTERACTIVE not seen within 90 s; "
           fi
           if ! grep -q "ARXUMBRA-STARTUP" "$LOG"; then
-            echo "::error::smoke FAIL: ARXUMBRA-STARTUP line missing"
             FAIL=1
+            REASONS="${REASONS}ARXUMBRA-STARTUP line missing; "
           fi
           if grep -q "panicked" "$LOG"; then
-            echo "::error::smoke FAIL: process panicked"
             FAIL=1
+            REASONS="${REASONS}the process panicked; "
           fi
           ADAPTER=$(grep -i -m1 "AdapterInfo" "$LOG" || true)
           echo "adapter evidence: ${ADAPTER:-none found}"
           echo "::notice title=smoke-adapter::${ADAPTER:-AdapterInfo line not found; renderer identity unconfirmed}"
-          LINE=$(grep "ARXUMBRA-INTERACTIVE" "$LOG" | head -1)
+          LINE=$(grep -m1 "ARXUMBRA-INTERACTIVE" "$LOG" || true)
           HOME_RECT=$(echo "$LINE" | sed -n 's/.*home=\([-0-9.,]*\) registry=.*/\1/p')
           REG_RECT=$(echo "$LINE" | sed -n 's/.*registry=\([-0-9.,]*\) launch=.*/\1/p')
           LAUNCH_RECT=$(echo "$LINE" | sed -n 's/.*launch=\([-0-9.,]*\).*/\1/p')
           echo "control rects from the application log: home=$HOME_RECT registry=$REG_RECT launch=$LAUNCH_RECT"
           echo "::notice title=smoke-rects::home=$HOME_RECT registry=$REG_RECT launch=$LAUNCH_RECT"
+          if [ -z "$HOME_RECT" ] || [ -z "$REG_RECT" ]; then
+            FAIL=1
+            REASONS="${REASONS}control rects could not be parsed from the application log; "
+          fi
           CENTER_HX=$(echo "$HOME_RECT" | awk -F, '{printf "%d", $1 + $3 / 2}')
           CENTER_HY=$(echo "$HOME_RECT" | awk -F, '{printf "%d", $2 + $4 / 2}')
           CENTER_RX=$(echo "$REG_RECT" | awk -F, '{printf "%d", $1 + $3 / 2}')
@@ -757,24 +783,26 @@ jobs:
           import -window root "$SHOTS/cancel1.png"
           for PAIR in "home0 home1 4000 gt F1 reveals the HUD" "home1 focus1 100 gt Tab shows the focus ring" "focus1 focus2 100 gt the focus ring moves" "home1 registry1 4000 gt Enter opens the Registry panel" "registry1 hover1 2000 gt hovering the Home tab restyles it" "hover1 home2 4000 gt clicking Home removes the Registry panel" "cancel1 registry1 4000 gt the cancelled press did not select Registry"; do
             set -- $PAIR
-            compare -metric AE -fuzz 2% "$SHOTS/$1.png" "$SHOTS/$2.png" null: 2>"/tmp/ae_$1_$2.txt" || true
+            compare -metric AE -fuzz 2% "$SHOTS/$1.png" "$SHOTS/$2.png" null: 2>"/tmp/ae_$1_$2.txt"
             AE=$(tr -dc "0-9" < "/tmp/ae_$1_$2.txt")
             echo "AE($1,$2)=$AE (expect $3 $4: $5)"
-            echo "::notice title=smoke-ae::$1 vs $2 = $AE (expect $3 $4)"
+            AE_REPORT="${AE_REPORT}$1~$2=${AE:-none} "
             if [ -z "$AE" ]; then
-              echo "::error::smoke FAIL: comparison $1 vs $2 produced no metric"
               FAIL=1
+              REASONS="${REASONS}comparison $1 vs $2 produced no metric; "
             elif [ "$3" = gt ] && [ "$AE" -le "$4" ]; then
-              echo "::error::smoke FAIL: $1 vs $2 changed by only $AE pixels"
               FAIL=1
+              REASONS="${REASONS}$1 vs $2 changed by only $AE pixels, expected more than $4; "
             fi
           done
-          compare -metric AE -fuzz 2% "$SHOTS/home2n.png" "$SHOTS/cancel1.png" null: 2>/tmp/ae_same.txt || true
+          compare -metric AE -fuzz 2% "$SHOTS/home2n.png" "$SHOTS/cancel1.png" null: 2>/tmp/ae_same.txt
           AE_SAME=$(tr -dc "0-9" < /tmp/ae_same.txt)
           echo "AE(home2n,cancel1)=$AE_SAME (expect lt 3000: release outside changed nothing but the cursor)"
+          AE_REPORT="${AE_REPORT}home2n~cancel1=${AE_SAME:-none}"
+          echo "::notice title=smoke-ae::${AE_REPORT}"
           if [ -n "$AE_SAME" ] && [ "$AE_SAME" -ge 3000 ]; then
-            echo "::error::smoke FAIL: release outside altered the scene by $AE_SAME pixels"
             FAIL=1
+            REASONS="${REASONS}release outside altered the scene by $AE_SAME pixels; "
           fi
           xdotool keydown Escape || true
           EXITED=0
@@ -786,18 +814,18 @@ jobs:
             fi
           done
           xdotool keyup Escape 2>/dev/null || true
-          wait "$APP_PID"
-          APP_RC=$?
+          APP_RC=0
+          wait "$APP_PID" || APP_RC=$?
           echo "app exit code after Escape hold: $APP_RC (expect 0)"
-          echo "::notice title=smoke-exit::app exit code $APP_RC"
+          echo "::notice title=smoke-exit::app exit code $APP_RC after the Escape hold"
           if [ "$EXITED" != 1 ]; then
-            echo "::error::smoke FAIL: Escape hold did not exit the app within 20 s"
             FAIL=1
+            REASONS="${REASONS}the Escape hold did not exit the app within 20 s; "
             kill "$APP_PID" 2>/dev/null || true
             wait "$APP_PID" 2>/dev/null || true
           elif [ "$APP_RC" != 0 ]; then
-            echo "::error::smoke FAIL: unexpected exit code $APP_RC"
             FAIL=1
+            REASONS="${REASONS}unexpected exit code $APP_RC after the Escape hold; "
           fi
           kill "$XVFB_PID" 2>/dev/null || true
           {
@@ -806,17 +834,19 @@ jobs:
             tail -c 40000 "$LOG"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          if [ "$FAIL" != 0 ] || [ "$READY" != 1 ]; then
+          if [ "$FAIL" != 0 ]; then
             esc=$(printf '\033')
             sed -e "s/${esc}\[[0-9;]*m//g" "$LOG" > /tmp/smoke.plain.log
-            head -n 10 /tmp/smoke.plain.log | while IFS= read -r line; do
+            echo "::error title=smoke-failures::${REASONS}"
+            head -n 4 /tmp/smoke.plain.log | while IFS= read -r line; do
               echo "::warning title=smoke-log-head::${line}"
             done
-            tail -n 25 /tmp/smoke.plain.log | while IFS= read -r line; do
+            tail -n 9 /tmp/smoke.plain.log | while IFS= read -r line; do
               echo "::error title=smoke-log-tail::${line}"
             done
-          fi
-          if [ "$FAIL" != 0 ]; then
+            { tail -n 3 /tmp/xvfb.log || true; } | while IFS= read -r line; do
+              echo "::warning title=smoke-xvfb::${line}"
+            done
             exit 1
           fi
           echo "smoke check PASSED: startup + interactive readiness, scripted keyboard and pointer scenarios, cancelled press, Escape-hold exit 0 (software renderer lavapipe; reported separately from physical GPU results)"

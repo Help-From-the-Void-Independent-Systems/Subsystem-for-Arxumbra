@@ -392,6 +392,98 @@ SHA↔version mapping lives here (verified via the GitHub refs API and
     logs (results-receiver host unreachable); the strict steps still fail
     the job on any diff/warning.
 
+27. (rev-4) Diagnostics oracle. This environment cannot fetch Actions job
+    logs, artifacts, or check-run summaries, so the Lint step strips ANSI
+    escapes (`CARGO_TERM_COLOR: always` is workflow-level env, and colored
+    output defeated every `^error` pattern — the reason two consecutive
+    failures reported nothing but "exit code 101"), re-runs clippy with
+    `--message-format short`, and mirrors the located one-line diagnostics
+    into annotations carrying `file=`/`line=`, spread over the error,
+    warning and notice levels because GitHub retains only ten annotations
+    per level per step. The smoke step mirrors the ANSI-stripped
+    application-log head and tail the same way, on failure only.
+28. (rev-4) Temporary rustfmt bootstrap. `lockfile.yml` (already
+    `contents: write`, branch-scoped, and already slated for deletion) also
+    runs `cargo fmt --all` and commits any diff, because no Rust toolchain
+    can be installed in this sandbox (only github.com, npm and PyPI hosts
+    are reachable, so `static.rust-lang.org` is not). It has never had to
+    commit: the hand-formatted waterfall has matched rustfmt byte-for-byte
+    at every push, which the strict `cargo fmt --check` step independently
+    confirms. Both scaffolds — lockfile generation and formatting — are
+    deleted before the final state, and the policy workflow inventory
+    returns to {ci, release}.
+29. (rev-4) Effect-pass separation, forced by compile errors. The
+    transition chain now evaluates to `(UiState, layout_dirty)` and touches
+    no system parameter; the exit write, the readiness and layout log
+    lines, the snapshot write and the visual pass run in a `map_or((), …)`
+    closure outside the chain. Reason: threading `state`, `exit` and
+    `entities` as closure arguments required annotating them, and the query
+    annotation cannot be inferred from use — a query's *item* types
+    (`Mut<T>`) differ from its *query-data* spellings (`&mut T`), so rustc
+    took the item shape from the `match` patterns, bound `control: Control`
+    instead of `&Control`, and reported six "cannot be dereferenced" errors
+    plus an argument mismatch and one "type annotations needed". Annotating
+    the threaded parameter would have added five more `&mut` spellings for
+    the same five accesses (§13); capturing keeps the inventory at 8.
+30. (rev-4) Window facts fold. `for window in windows.iter()` became
+    `windows.iter().fold(…)` into one `Copy` tuple consumed by a
+    destructuring closure parameter, because a loop body may not move
+    `ResMut`/`Query` values ("value moved here, in previous iteration of
+    loop"). The fold keeps exactly one primary window's facts and needs no
+    second world borrow.
+31. (rev-4) `map_or` as tail expression. `Option::map_or` is `#[must_use]`,
+    so the visual pass's `rect.map_or((), …)` is its closure's tail
+    expression instead of a `;`-terminated statement; no discard binding is
+    needed (and `let _ =` is banned anyway). `unnecessary_map_or` was
+    verified against clippy's source to fire only on boolean-literal
+    defaults, so the unit default is safe.
+32. (rev-4) Dead code removed on compiler evidence. `UiImages` (nine
+    fields never read — each spawned `Sprite` already retains its own
+    handle) and `Layout.pad` (never read; the padding constants stay inline
+    in the formulas). The policy's struct inventory moved to
+    `["Layout", "UiState"]` and the derive count to five in the same
+    commit, so the checker still asserts the exact set.
+33. (rev-4) Lint dispositions. Fixed in code: `.max(240.0).min(560.0)` →
+    `.clamp(240.0, 560.0)` (`manual_clamp`), `focused_mid == None` →
+    `focused_mid.is_none()`. Allowed in the manifest: `type_complexity`,
+    for the typed query parameter only — scoring, alternatives and the
+    approval request are recorded in architecture.md §12.
+34. (rev-4) Smoke environment hardening. The smoke step installs the X11
+    runtime libraries that winit's x11 backend dlopens (`libx11-6`,
+    `libxcursor1`, `libxrandr1`, `libxi6`, `libxkbcommon0`,
+    `libxkbcommon-x11-0`) next to Xvfb, xauth, xdotool, imagemagick,
+    x11-utils, mesa-vulkan-drivers, libvulkan1 and vulkan-tools. Remote
+    run `39033443676` reached the smoke step and died in it with exit
+    code `100` — an `apt-get install` failure, not an application failure,
+    and it produced no annotations at all because the step aborted before
+    any evidence line. Three changes follow from that:
+    (a) the install now runs with `-o DPkg::Lock::Timeout=180` inside a
+    three-attempt loop that refreshes the package lists between attempts,
+    because exit 100 on a runner that installed packages successfully 35
+    minutes earlier in the same job is the signature of the dpkg lock held
+    by the image's automatic-update services;
+    (b) every failure reason is accumulated into one
+    `::error title=smoke-failures::` annotation and the ANSI-stripped
+    application log is mirrored (head 4 lines as warnings, tail 9 as
+    errors) so that a smoke failure is diagnosable without job-log access,
+    within the ~10-annotations-per-level cap;
+    (c) the step starts with `set +e`/`set -u` instead of `set -uo
+    pipefail`. GitHub's default shell for a Linux `run:` block is
+    `bash -e {0}`, so errexit stayed active before and any
+    non-zero-but-handled command (notably `wait "$APP_PID"` when the app
+    exits on its own, or a `grep` that finds nothing in a pipeline) would
+    abort the step mid-evidence. The exit code is now captured with
+    `wait "$APP_PID" || APP_RC=$?`.
+35. (rev-4) Equality-guarded snapshot write. `ResMut::into_inner` consumes
+    the parameter and unconditionally calls `set_changed()`
+    (`bevy_ecs/src/change_detection/traits.rs`, `impl_methods!`), so an
+    ungated write flags the resource on every gated frame even when the
+    transition produced an identical value. `UiState` derives `PartialEq`
+    and is `Copy`, so the write-back is now
+    `if *state != next_state { *state.into_inner() = next_state; }`. The
+    single read of the previous value (`!state.interactive_logged`) still
+    precedes the consumption, and nothing reads `state` afterwards.
+
 ## Commands executed for revision 4 (this environment) and outcomes
 
 - Re-downloaded and inspected Bevy `v0.20.0` (`b3bdd75b`) source; API
@@ -412,3 +504,51 @@ SHA↔version mapping lives here (verified via the GitHub refs API and
   (rev-4 implementation), `c2f43178` (CI-generated Cargo.lock), `975152b`
   (apt retry hardening). Remote results are recorded in the run ledger as
   they land; nothing is claimed before observation.
+- Remote iteration against the annotation oracle (decision 27), one push
+  per observed failure: `31b25ee` (mirroring added, produced nothing —
+  colored logs), `ca0d2f8` (ANSI stripped, short-format pass, located
+  annotations — first readable diagnostics: ten findings, four distinct
+  error codes), `81da43d` (effect-pass separation, window-facts fold,
+  destructured visual tuple — four findings left, all "use of moved
+  value"), `a94c6ab` (`map_or` instead of the option loop, `type_complexity`
+  allowed in the manifest — four lint findings left), `a0f8646` (all four
+  fixed or removed). Remote results at `a0f8646`: policy ✓, formatting ✓,
+  lockfile requirement ✓, `cargo metadata`/`tree --duplicates` ✓,
+  `cargo clippy --all-targets -- -D warnings` ✓,
+  `cargo check --all-targets` ✓, `cargo test` ✓ (zero tests, reported
+  honestly), release build and X11 smoke check in flight at the time of
+  writing.
+- Clippy source read through `api.github.com` (`rust-lang/rust-clippy`,
+  `stable`) before pushing, because a blind allow would have been
+  unjustifiable: `clippy_lints/src/types/type_complexity.rs` (the scoring
+  visitor: `10 × nest` per path/tuple/array node, `1` per reference,
+  threshold comparison is strictly greater) and
+  `clippy_lints/src/types/mod.rs` (`check_fn` → `check_fn_decl` runs for
+  `FnKind::Closure`, so closure parameter annotations are linted), plus
+  `clippy_lints/src/methods/unnecessary_map_or.rs` (fires only when the
+  default is a boolean literal).
+- Bevy `v0.20.0` source verification in the pinned tree already downloaded
+  here: `ResMut::into_inner(mut self) -> &'w mut T` generated by
+  `impl_methods!` in `bevy_ecs/src/change_detection/traits.rs` (it calls
+  `set_changed()`), `Messages::write(&mut self, M)` in
+  `bevy_ecs/src/message/messages.rs`, `Sprite`'s exact nine public fields
+  and `#[require(Transform, Visibility, VisibilityClass, Anchor)]` in
+  `bevy_sprite/src/sprite.rs`, `Msaa` living in `bevy_render::view`, and
+  `bevy_log`'s default fmt layer writing ANSI-colored records to stderr
+  (`bevy_log/src/lib.rs`, `tracing_subscriber::fmt::Layer::default()
+  .with_writer(std::io::stderr)`) — which is why the smoke harness parses
+  the log with `.*`-anchored patterns and strips escapes before mirroring.
+- Remote CI iteration `a0f8646` (run `39033443676`, job `117398449767`,
+  read through `actions/runs/…/attempts/1/jobs` and the check-run
+  annotations endpoint): policy ✓, fmt-diff report ✓, `cargo fmt --check`
+  ✓ (the hand-formatted deep-nesting waterfall again matched rustfmt
+  byte-for-byte), lockfile requirement ✓, `cargo metadata`/`tree` ✓,
+  `cargo clippy --all-targets -- -D warnings` ✓, `cargo check
+  --all-targets` ✓, `cargo test` ✓ (zero tests), **release build ✓
+  (`cargo build --locked --release`)**, X11 smoke check ✗ with `Process
+  completed with exit code 100`, artifact upload ✓ but with `No files were
+  found with the provided path: /tmp/shots /tmp/smoke.log`, and `Post
+  Cache` **skipped** — a failed job does not refresh the `target` cache,
+  so the next run rebuilds Bevy from scratch. The first compile-clean,
+  lint-clean, link-clean remote run of this crate; the only remaining
+  unknown is the smoke gate, which decision 34 addresses.
