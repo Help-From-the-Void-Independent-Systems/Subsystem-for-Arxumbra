@@ -199,13 +199,13 @@ jobs:
         shell: bash
         run: |
           set +e
-          grep -E '^error|^\s+-->' "$EVIDENCE_DIR/check.log" | cut -c 1-100 > .check-errors
-          for index in 0 1 2 3 4 5; do
+          grep -A 4 -E '^error' "$EVIDENCE_DIR/check.log" | sed 's/[0-9]* *|.*//' | cut -c 1-100 > .check-errors
+          for index in 0 1 2 3 4 5 6 7 8 9 10 11; do
             line=$(sed -n "$((index + 1))p" .check-errors)
             echo "e$index=$line" >> "$GITHUB_OUTPUT"
           done
 
-      - name: "Check e00: ${{ steps.check_reflect.outputs.e0 }} (loc) e01: ${{ steps.check_reflect.outputs.e1 }}"
+      - name: "Check e00: ${{ steps.check_reflect.outputs.e0 }} ctx e01: ${{ steps.check_reflect.outputs.e1 }}"
         if: always()
         shell: bash
         run: echo recorded
