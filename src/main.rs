@@ -1314,7 +1314,7 @@ fn main() {
                                 if *visibility != desired_visibility {
                                     commands.entity(entity).insert(desired_visibility);
                                 }
-                                if *bounds != desired_bounds {
+                                if bounds.width != desired_bounds.width || bounds.height != desired_bounds.height {
                                     commands.entity(entity).insert(desired_bounds);
                                 }
                                 if transform.translation != desired_translation
@@ -1519,7 +1519,7 @@ fn main() {
                                             .entity(entity)
                                             .insert(bevy::text::TextColor(desired_color));
                                     }
-                                    if *bounds != desired_bounds {
+                                    if bounds.width != desired_bounds.width || bounds.height != desired_bounds.height {
                                         commands.entity(entity).insert(desired_bounds);
                                     }
                                     if transform.translation != desired_translation
@@ -1747,7 +1747,7 @@ fn main() {
                                             .entity(entity)
                                             .insert(bevy::text::TextColor(desired_color));
                                     }
-                                    if *bounds != desired_bounds {
+                                    if bounds.width != desired_bounds.width || bounds.height != desired_bounds.height {
                                         commands.entity(entity).insert(desired_bounds);
                                     }
                                     if transform.translation != desired_translation
@@ -2097,7 +2097,7 @@ fn main() {
                                     if *visibility != desired_visibility {
                                         commands.entity(entity).insert(desired_visibility);
                                     }
-                                    if *bounds != desired_bounds {
+                                    if bounds.width != desired_bounds.width || bounds.height != desired_bounds.height {
                                         commands.entity(entity).insert(desired_bounds);
                                     }
                                     if transform.translation != desired_translation
@@ -2180,7 +2180,7 @@ fn main() {
                                     if *visibility != desired_visibility {
                                         commands.entity(entity).insert(desired_visibility);
                                     }
-                                    if *bounds != desired_bounds {
+                                    if bounds.width != desired_bounds.width || bounds.height != desired_bounds.height {
                                         commands.entity(entity).insert(desired_bounds);
                                     }
                                     if transform.translation != desired_translation
@@ -2293,7 +2293,7 @@ fn main() {
                                     if *visibility != desired_visibility {
                                         commands.entity(entity).insert(desired_visibility);
                                     }
-                                    if *bounds != desired_bounds {
+                                    if bounds.width != desired_bounds.width || bounds.height != desired_bounds.height {
                                         commands.entity(entity).insert(desired_bounds);
                                     }
                                     if transform.translation != desired_translation
