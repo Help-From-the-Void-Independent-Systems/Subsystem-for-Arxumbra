@@ -1,37 +1,26 @@
 [package]
 name = "Subsystem-for-Arxumbra"
-version = "0.0.0-s0"
+version = "0.0.0-s1"
 edition = "2024"
-
-[[bin]]
-name = "subsystem-for-arxumbra"
-path = "src/main.rs"
 
 [dependencies]
 mimalloc = { git = "https://github.com/purpleprotocol/mimalloc_rust", tag = "v0.1.52", default-features = false, features = [] }
 bevy = { git = "https://github.com/bevyengine/bevy", tag = "v0.20.0", default-features = false, features = [
-    "std",
-    "multi_threaded",
     "async_executor",
     "bevy_asset",
-    "bevy_winit",
-    "wayland",
-    "bevy_window",
-    "bevy_render",
-    "bevy_core_pipeline",
     "bevy_camera",
+    "bevy_core_pipeline",
     "bevy_image",
-    "png",
+    "bevy_log",
+    "bevy_render",
     "bevy_sprite",
     "bevy_sprite_render",
     "bevy_text",
-    "bevy_log",
+    "bevy_window",
+    "bevy_winit",
     "default_font",
+    "multi_threaded",
+    "png",
+    "std",
+    "wayland",
 ] }
-
-[profile.release]
-opt-level = 3
-lto = "fat"
-codegen-units = 1
-strip = true
-panic = "abort"
