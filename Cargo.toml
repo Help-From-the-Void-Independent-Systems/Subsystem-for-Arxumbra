@@ -1,9 +1,18 @@
 [package]
-name = "subsystem-for-arxumbra"
+name = "Subsystem-for-Arxumbra"
 version = "0.0.0-s0"
 edition = "2024"
+authors = ["Victor"]
+repository = "https://github.com/Help-From-the-Void-Independent-Systems/Subsystem-for-Arxumbra"
+license-file = "LICENSE"
+publish = false
+
+[[bin]]
+name = "subsystem-for-arxumbra"
+path = "src/main.rs"
 
 [dependencies]
+mimalloc = { git = "https://github.com/purpleprotocol/mimalloc_rust", tag = "v0.1.52", default-features = false, features = [] }
 bevy = { git = "https://github.com/bevyengine/bevy", tag = "v0.20.0", default-features = false, features = [
     "std",
     "multi_threaded",
@@ -23,7 +32,6 @@ bevy = { git = "https://github.com/bevyengine/bevy", tag = "v0.20.0", default-fe
     "bevy_log",
     "default_font",
 ] }
-mimalloc = "0.1.52"
 
 [profile.release]
 opt-level = 3
