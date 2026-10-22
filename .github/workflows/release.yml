@@ -57,7 +57,7 @@ jobs:
     - name: Install Rust nightly
       run: rustup toolchain install nightly-2026-10-19 --profile minimal --target "${{ matrix.target }}" --no-self-update
     - name: Build release binary
-      run: cargo +nightly-2026-10-19 --config 'profile.release.opt-level=3' --config 'profile.release.lto="fat"' --config 'profile.release.codegen-units=1' --config 'profile.release.debug=0' --config 'profile.release.strip="symbols"' --config 'profile.release.panic="abort"' --config 'profile.release.debug-assertions=false' --config 'profile.release.overflow-checks=false' --config 'profile.release.incremental=false' build --locked --release --quiet --target "${{ matrix.target }}" --bin Subsystem-for-Arxumbra
+      run: cargo +nightly-2026-10-19 --config 'build.jobs=1' --config 'profile.release.opt-level=3' --config 'profile.release.lto="thin"' --config 'profile.release.codegen-units=1' --config 'profile.release.debug=0' --config 'profile.release.strip="symbols"' --config 'profile.release.panic="abort"' --config 'profile.release.debug-assertions=false' --config 'profile.release.overflow-checks=false' --config 'profile.release.incremental=false' build --locked --release --quiet --target "${{ matrix.target }}" --bin Subsystem-for-Arxumbra
     - name: Stage executable
       run: |
         mkdir -p "dist/${{ matrix.artifact }}"
