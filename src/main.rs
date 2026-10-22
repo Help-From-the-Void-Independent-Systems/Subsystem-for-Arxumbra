@@ -36,6 +36,7 @@ fn main() {
                     },
                 },
             },
+            bevy::diagnostic::FrameCountPlugin,
             bevy::time::TimePlugin,
             bevy::transform::TransformPlugin,
             bevy::input::InputPlugin,
@@ -46,6 +47,8 @@ fn main() {
                     mode: bevy::window::WindowMode::BorderlessFullscreen(
                         bevy::window::MonitorSelection::Current,
                     ),
+                    position: bevy::window::WindowPosition::Automatic,
+                    resolution: bevy::window::WindowResolution::new(1366, 768),
                     title: std::string::String::from(if cfg!(target_os = "linux") {
                         "Linux-Subsystem-for-Arxumbra"
                     } else if cfg!(target_os = "macos") {
@@ -53,6 +56,12 @@ fn main() {
                     } else {
                         "Windows-Subsystem-for-Arxumbra"
                     }),
+                    resize_constraints: bevy::window::WindowResizeConstraints {
+                        min_width: 800.0,
+                        min_height: 500.0,
+                        ..bevy::window::WindowResizeConstraints::default()
+                    },
+                    resizable: true,
                     decorations: false,
                     transparent: false,
                     focused: true,
@@ -120,15 +129,18 @@ fn main() {
         )
         .add_systems(
             bevy::app::PostUpdate,
-            |(keys, time, windows): (
+            |(keys, windows): (
                 bevy::ecs::system::Res<
                     bevy::input::ButtonInput<bevy::input::keyboard::KeyCode>,
                 >,
-                bevy::ecs::system::Res<bevy::time::Time<bevy::time::Real>>,
                 bevy::ecs::system::Query<
                     &bevy::window::Window,
                     bevy::ecs::query::With<bevy::window::PrimaryWindow>,
                 >,
+            ),
+             (time, mut exits): (
+                bevy::ecs::system::Res<bevy::time::Time<bevy::time::Real>>,
+                bevy::ecs::message::MessageWriter<bevy::app::AppExit>,
             ),
              (mut images, mut commands): (
                 bevy::ecs::system::ResMut<bevy::asset::Assets<bevy::image::Image>>,
@@ -138,6 +150,7 @@ fn main() {
              sprites: bevy::ecs::system::Query<
                 (
                     Option<&bevy::sprite::Sprite>,
+                    Option<&bevy::transform::components::Transform>,
                     &bevy::camera::visibility::Visibility,
                 ),
                 bevy::ecs::query::Without<bevy::text::TextColor>,
@@ -149,20 +162,19 @@ fn main() {
                 ),
                 bevy::ecs::query::Without<bevy::sprite::Sprite>,
             >,
-             (layout_info, mut hud, mut transforms): (
+             (layout_info, mut hud): (
                 bevy::ecs::system::Query<&bevy::text::TextLayoutInfo>,
                 bevy::ecs::system::Local<Option<bool>>,
-                bevy::ecs::system::Query<&mut bevy::transform::components::Transform>,
             ),
-             mut navigation_state: bevy::ecs::system::Local<(
-                bool,
-                bool,
-                Option<f64>,
-                bool,
-                bool,
-                bool,
-                bool,
-            )>,
+             mut navigation_state: bevy::ecs::system::Local<
+                (
+                    bool,
+                    bool,
+                    Option<std::time::Instant>,
+                    bool,
+                    bool,
+                ),
+            >,
              mut interaction_state: bevy::ecs::system::Local<[Option<u8>; 3]>,
              mut anim: bevy::ecs::system::Local<([[f32; 3]; 3], [f32; 2])>,
              mut viewport: bevy::ecs::system::Local<bevy::math::Vec2>,
@@ -170,18 +182,23 @@ fn main() {
              mut layout: bevy::ecs::system::Local<
                 Option<[bevy::math::Rect; 15]>,
             >,
-             mut slots: bevy::ecs::system::Local<Option<[bevy::ecs::entity::Entity; 32]>>,
-             mut workspace_slots: bevy::ecs::system::Local<Option<[bevy::ecs::entity::Entity; 5]>>,
-             mut handles: bevy::ecs::system::Local<
-                Option<[bevy::asset::Handle<bevy::image::Image>; 9]>,
-            >,
-             mut dot: bevy::ecs::system::Local<(
-                Option<bevy::ecs::entity::Entity>,
-                bevy::math::Vec2,
-                bool,
-                bool,
-                bool,
-            )>| {
+             (mut slots, mut workspace_slots): (
+                bevy::ecs::system::Local<Option<[bevy::ecs::entity::Entity; 32]>>,
+                bevy::ecs::system::Local<Option<[bevy::ecs::entity::Entity; 5]>>,
+            ),
+             (mut handles, mut dot): (
+                bevy::ecs::system::Local<
+                    Option<[bevy::asset::Handle<bevy::image::Image>; 8]>,
+                >,
+                bevy::ecs::system::Local<
+                    Option<
+                        (
+                            bevy::ecs::entity::Entity,
+                            bevy::math::Vec2,
+                        ),
+                    >,
+                >,
+            )| {
                 windows.single().into_iter().for_each(|window| {
                     if hud.is_none() {
                         *hud = Some(true);
@@ -344,82 +361,8 @@ fn main() {
                                 commands.entity(entity).despawn();
                             });
                         *workspace_slots = None;
-                        dot.1.x = dot.1.x.clamp(0.0f32, viewport.x);
-                        dot.1.y = dot.1.y.clamp(0.0f32, viewport.y);
                     }
 
-                    if keys.pressed(bevy::input::keyboard::KeyCode::F1) && !dot.4 {
-                        *hud = Some(!hud.unwrap_or(false));
-                    }
-                    dot.4 = keys.pressed(bevy::input::keyboard::KeyCode::F1);
-
-                    navigation_state.6 = false;
-                    if window.focused
-                        && keys.pressed(bevy::input::keyboard::KeyCode::Escape)
-                    {
-                        if !navigation_state.5
-                            && navigation_state.3
-                            && !navigation_state.4
-                        {
-                            navigation_state.2 = Some(time.elapsed_secs_f64());
-                        }
-                        navigation_state.5 = true;
-                        if navigation_state.2.is_some_and(|started: f64| {
-                            time.elapsed_secs_f64() - started
-                                >= if navigation_state.1 { 5.0f64 } else { 7.0f64 }
-                        }) {
-                            if navigation_state.1 {
-                                navigation_state.0 = true;
-                                navigation_state.1 = false;
-                                navigation_state.2 = None;
-                                navigation_state.3 = false;
-                                navigation_state.4 = true;
-                                *interaction_state = [None, None, None];
-                            } else {
-                                navigation_state.2 = None;
-                                navigation_state.3 = false;
-                                navigation_state.4 = true;
-                                commands.write_message(bevy::app::AppExit::Success);
-                            }
-                            navigation_state.6 = true;
-                        }
-                    } else {
-                        navigation_state.2 = None;
-                        if window.focused {
-                            navigation_state.3 = true;
-                            navigation_state.4 = false;
-                        }
-                        navigation_state.5 = false;
-                    }
-                    if !window.focused {
-                        navigation_state.2 = None;
-                        navigation_state.3 = false;
-                        navigation_state.5 = false;
-                    }
-
-                    if !dot.2 {
-                        dot.1 = bevy::math::Vec2::new(viewport.x / 2.0, viewport.y / 2.0);
-                        dot.2 = true;
-                    }
-                    if window.focused
-                        && (keys.pressed(bevy::input::keyboard::KeyCode::ControlLeft)
-                            || keys.pressed(bevy::input::keyboard::KeyCode::ControlRight))
-                        && !(keys.pressed(bevy::input::keyboard::KeyCode::ShiftLeft)
-                            || keys.pressed(bevy::input::keyboard::KeyCode::ShiftRight)
-                            || keys.pressed(bevy::input::keyboard::KeyCode::AltLeft)
-                            || keys.pressed(bevy::input::keyboard::KeyCode::AltRight)
-                            || keys.pressed(bevy::input::keyboard::KeyCode::SuperLeft)
-                            || keys.pressed(bevy::input::keyboard::KeyCode::SuperRight))
-                    {
-                        dot.1 += bevy::math::Vec2::new(
-                            (keys.pressed(bevy::input::keyboard::KeyCode::KeyD) as u8 as f32)
-                                - (keys.pressed(bevy::input::keyboard::KeyCode::KeyA) as u8 as f32),
-                            (keys.pressed(bevy::input::keyboard::KeyCode::KeyS) as u8 as f32)
-                                - (keys.pressed(bevy::input::keyboard::KeyCode::KeyW) as u8 as f32),
-                        )
-                        .normalize_or_zero()
-                            * (420.0f32 * time.delta_secs().clamp(0.0f32, 0.1f32));
-                    }
                     (*layout).into_iter().for_each(
                         |[
                             sidebar,
@@ -438,64 +381,163 @@ fn main() {
                             rocket_tile,
                             identity_divider,
                         ]| {
-                            interaction_state[2] = None;
+                            *hud = Some(
+                                if keys.just_pressed(bevy::input::keyboard::KeyCode::F1) {
+                                    !hud.unwrap_or(false)
+                                } else {
+                                    hud.unwrap_or(false)
+                                },
+                            );
 
-                            interaction_state[0] = if hud.unwrap_or(false)
-                                && window.focused
+                            (*dot).into_iter().for_each(
+                                |(dot_entity, dot_position): (
+                                    bevy::ecs::entity::Entity,
+                                    bevy::math::Vec2,
+                                )| {
+                                    *dot = Some((
+                                        dot_entity,
+                                        bevy::math::Vec2::new(
+                                            dot_position.x
+                                                + ((keys.pressed(bevy::input::keyboard::KeyCode::KeyD) as u8 as f32) - (keys.pressed(bevy::input::keyboard::KeyCode::KeyA) as u8 as f32))
+                                                * (1.0
+                                                    - 0.29289322f32
+                                                        * (((((keys.pressed(bevy::input::keyboard::KeyCode::KeyD) as u8 as f32) - (keys.pressed(bevy::input::keyboard::KeyCode::KeyA) as u8 as f32)) != 0.0) && (((keys.pressed(bevy::input::keyboard::KeyCode::KeyS) as u8 as f32) - (keys.pressed(bevy::input::keyboard::KeyCode::KeyW) as u8 as f32)) != 0.0)) as u8 as f32))
+                                                * 480.0
+                                                * time.delta_secs().min(0.05)
+                                                * (window.focused as u8 as f32)
+                                                * ((keys.pressed(bevy::input::keyboard::KeyCode::ControlLeft) || keys.pressed(bevy::input::keyboard::KeyCode::ControlRight)) as u8 as f32),
+                                            dot_position.y
+                                                + ((keys.pressed(bevy::input::keyboard::KeyCode::KeyS) as u8 as f32) - (keys.pressed(bevy::input::keyboard::KeyCode::KeyW) as u8 as f32))
+                                                * (1.0
+                                                    - 0.29289322f32
+                                                        * (((((keys.pressed(bevy::input::keyboard::KeyCode::KeyD) as u8 as f32) - (keys.pressed(bevy::input::keyboard::KeyCode::KeyA) as u8 as f32)) != 0.0) && (((keys.pressed(bevy::input::keyboard::KeyCode::KeyS) as u8 as f32) - (keys.pressed(bevy::input::keyboard::KeyCode::KeyW) as u8 as f32)) != 0.0)) as u8 as f32))
+                                                * 480.0
+                                                * time.delta_secs().min(0.05)
+                                                * (window.focused as u8 as f32)
+                                                * ((keys.pressed(bevy::input::keyboard::KeyCode::ControlLeft) || keys.pressed(bevy::input::keyboard::KeyCode::ControlRight)) as u8 as f32),
+                                        )
+                                        .clamp(
+                                            bevy::math::Vec2::ZERO,
+                                            bevy::math::Vec2::new(viewport.x, viewport.y),
+                                        ),
+                                    ));
+                                },
+                            );
+
+                            interaction_state[0] = if window.focused
+                                && hud.unwrap_or(false)
                                 && !navigation_state.1
                             {
-                                if home_tab.contains(dot.1) {
-                                    Some(0u8)
-                                } else if registry_tab.contains(dot.1) {
-                                    Some(1u8)
-                                } else if navigation_state.0
-                                    && title_metrics.0 > 0.0
-                                    && launch_button.contains(dot.1)
-                                {
-                                    Some(2u8)
-                                } else {
-                                    None
-                                }
+                                (*dot).into_iter().find_map(
+                                    |(_dot_entity, dot_position): (
+                                        bevy::ecs::entity::Entity,
+                                        bevy::math::Vec2,
+                                    )| {
+                                        if home_tab.contains(dot_position) {
+                                            Some(0u8)
+                                        } else if registry_tab.contains(dot_position) {
+                                            Some(1u8)
+                                        } else if navigation_state.0
+                                            && title_metrics.0 > 0.0
+                                            && launch_button.contains(dot_position)
+                                        {
+                                            Some(2u8)
+                                        } else {
+                                            None
+                                        }
+                                    },
+                                )
                             } else {
                                 None
                             };
-                            interaction_state[1] = interaction_state[0];
 
-                            if !navigation_state.6
-                                && window.focused
-                                && keys.pressed(bevy::input::keyboard::KeyCode::KeyE)
-                                && !dot.3
+                            interaction_state[1] = if window.focused {
+                                interaction_state[0]
+                            } else {
+                                None
+                            };
+
+                            interaction_state[2] = if window.focused
+                                && !navigation_state.1
+                                && keys.just_pressed(bevy::input::keyboard::KeyCode::KeyE)
                                 && (keys.pressed(bevy::input::keyboard::KeyCode::ControlLeft)
                                     || keys.pressed(bevy::input::keyboard::KeyCode::ControlRight))
-                                && !(keys.pressed(bevy::input::keyboard::KeyCode::ShiftLeft)
-                                    || keys.pressed(bevy::input::keyboard::KeyCode::ShiftRight)
-                                    || keys.pressed(bevy::input::keyboard::KeyCode::AltLeft)
-                                    || keys.pressed(bevy::input::keyboard::KeyCode::AltRight)
-                                    || keys.pressed(bevy::input::keyboard::KeyCode::SuperLeft)
-                                    || keys.pressed(bevy::input::keyboard::KeyCode::SuperRight))
+                                && !keys.pressed(bevy::input::keyboard::KeyCode::ShiftLeft)
+                                && !keys.pressed(bevy::input::keyboard::KeyCode::ShiftRight)
+                                && !keys.pressed(bevy::input::keyboard::KeyCode::AltLeft)
+                                && !keys.pressed(bevy::input::keyboard::KeyCode::AltRight)
+                                && !keys.pressed(bevy::input::keyboard::KeyCode::SuperLeft)
+                                && !keys.pressed(bevy::input::keyboard::KeyCode::SuperRight)
                             {
-                                match interaction_state[0] {
-                                    Some(0u8) => {
-                                        navigation_state.0 = false;
-                                        interaction_state[2] = Some(0u8);
-                                    }
-                                    Some(1u8) => {
-                                        navigation_state.0 = true;
-                                        interaction_state[2] = Some(1u8);
-                                    }
-                                    Some(2u8) if navigation_state.0 && !navigation_state.1 => {
-                                        navigation_state.1 = true;
-                                        navigation_state.2 = None;
-                                        navigation_state.3 = !keys.pressed(
-                                            bevy::input::keyboard::KeyCode::Escape,
-                                        );
-                                        navigation_state.4 = false;
-                                        *interaction_state = [None, None, None];
-                                    }
-                                    _ => (),
+                                interaction_state[0]
+                            } else {
+                                None
+                            };
+
+                            if !window.focused {
+                                navigation_state.2 = None;
+                                navigation_state.3 = false;
+                                interaction_state[2] = None;
+                            } else if !keys.pressed(bevy::input::keyboard::KeyCode::Escape) {
+                                navigation_state.2 = None;
+                                navigation_state.3 = true;
+                                navigation_state.4 = false;
+                            } else if navigation_state.1
+                                && navigation_state.3
+                                && !navigation_state.4
+                            {
+                                if keys.just_pressed(bevy::input::keyboard::KeyCode::Escape) {
+                                    navigation_state.2 = Some(std::time::Instant::now());
+                                } else if navigation_state.2.is_some_and(
+                                    |started: std::time::Instant| {
+                                        started.elapsed().as_secs_f64() >= 5.0f64
+                                    },
+                                ) {
+                                    navigation_state.0 = true;
+                                    navigation_state.1 = false;
+                                    navigation_state.2 = None;
+                                    navigation_state.3 = false;
+                                    navigation_state.4 = true;
+                                    *interaction_state = [None, None, None];
+                                }
+                            } else if !navigation_state.1
+                                && navigation_state.3
+                                && !navigation_state.4
+                            {
+                                if keys.just_pressed(bevy::input::keyboard::KeyCode::Escape) {
+                                    navigation_state.2 = Some(std::time::Instant::now());
+                                } else if navigation_state.2.is_some_and(
+                                    |started: std::time::Instant| {
+                                        started.elapsed().as_secs_f64() >= 7.0f64
+                                    },
+                                ) {
+                                    exits.write(bevy::app::AppExit::Success);
+                                    navigation_state.2 = None;
+                                    navigation_state.3 = false;
+                                    navigation_state.4 = true;
+                                    *interaction_state = [None, None, None];
                                 }
                             }
-                            dot.3 = keys.pressed(bevy::input::keyboard::KeyCode::KeyE);
+
+                            match interaction_state[2] {
+                                Some(0u8) => {
+                                    navigation_state.0 = false;
+                                }
+                                Some(1u8) => {
+                                    navigation_state.0 = true;
+                                }
+                                Some(2u8) if navigation_state.0 && !navigation_state.1 => {
+                                    navigation_state.1 = true;
+                                    navigation_state.2 = None;
+                                    navigation_state.3 = !keys.pressed(
+                                        bevy::input::keyboard::KeyCode::Escape,
+                                    );
+                                    navigation_state.4 = false;
+                                    *interaction_state = [None, None, None];
+                                }
+                                _ => (),
+                            }
+
                                                         anim.0[0][0] += ((interaction_state[0] == Some(0u8)) as u8 as f32
                                 - anim.0[0][0])
                                 .clamp(-time.delta_secs() / 0.15, time.delta_secs() / 0.15);
@@ -528,7 +570,7 @@ fn main() {
                                 .clamp(-time.delta_secs() / 0.06, time.delta_secs() / 0.06);
                             anim.1[0] += (navigation_state.0 as u8 as f32 - anim.1[0])
                                 .clamp(-time.delta_secs() / 0.15, time.delta_secs() / 0.15);
-                            anim.1[1] = if hud.unwrap_or(false) && navigation_state.0 {
+                            anim.1[1] = if navigation_state.0 {
                                 anim.1[1]
                                     + (1.0f32 - anim.1[1]).clamp(
                                         -time.delta_secs() / 0.14,
@@ -698,17 +740,6 @@ fn main() {
                                         )
                                         .expect("embedded workspace icon must decode"),
                                     ),
-                                    images.add(
-                                        bevy::image::Image::from_buffer(
-                                            &[137u8, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 9, 0, 0, 0, 9, 8, 6, 0, 0, 0, 224, 145, 6, 16, 0, 0, 0, 67, 73, 68, 65, 84, 120, 218, 99, 96, 64, 2, 47, 94, 188, 224, 7, 98, 117, 16, 205, 128, 13, 0, 37, 74, 129, 248, 12, 16, 191, 134, 210, 165, 216, 20, 252, 199, 130, 75, 145, 173, 56, 131, 67, 209, 25, 176, 213, 80, 55, 188, 198, 161, 8, 36, 174, 78, 156, 73, 68, 185, 137, 104, 223, 17, 10, 39, 0, 180, 66, 194, 168, 121, 127, 219, 184, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130],
-                                        bevy::image::ImageType::Extension("png"),
-                                        bevy::image::CompressedImageFormats::NONE,
-                                        true,
-                                        bevy::image::ImageSampler::Default,
-                                        bevy::asset::RenderAssetUsages::RENDER_WORLD,
-                                        )
-                                        .expect("embedded pointer dot must decode"),
-                                    ),
                                 ]);
                             }
 
@@ -723,8 +754,7 @@ fn main() {
                                         round_solid,
                                         round_outline,
                                         workspace_icon,
-..
-                                    ]: [bevy::asset::Handle<bevy::image::Image>; 9]| {
+                                    ]: [bevy::asset::Handle<bevy::image::Image>; 8]| {
                                         *slots = Some([
                                             commands
                                                 .spawn((
@@ -1717,7 +1747,7 @@ fn main() {
                                                 &bevy::color::Color::srgb_from_array([0.204; 3]),
                                                 anim.1[1],
                                             ),
-                                            hud.unwrap_or(false) && navigation_state.0 && title_metrics.0 > 0.0,
+                                            navigation_state.0 && title_metrics.0 > 0.0,
                                         ),
                                         (
                                             panel_fill_entity,
@@ -1725,7 +1755,7 @@ fn main() {
                                                 &bevy::color::Color::srgb_from_array([0.063; 3]),
                                                 anim.1[1],
                                             ),
-                                            hud.unwrap_or(false) && navigation_state.0 && title_metrics.0 > 0.0,
+                                            navigation_state.0 && title_metrics.0 > 0.0,
                                         ),
                                         (
                                             home_tab_entity,
@@ -1845,7 +1875,7 @@ fn main() {
                                                 &bevy::color::Color::srgb_from_array([0.204; 3]),
                                                 anim.1[1],
                                             ),
-                                            hud.unwrap_or(false) && navigation_state.0 && title_metrics.0 > 0.0,
+                                            navigation_state.0 && title_metrics.0 > 0.0,
                                         ),
                                         (
                                             section_tile_entity,
@@ -1853,7 +1883,7 @@ fn main() {
                                                 &bevy::color::Color::srgb_from_array([0.133; 3]),
                                                 anim.1[1],
                                             ),
-                                            hud.unwrap_or(false) && navigation_state.0 && title_metrics.0 > 0.0,
+                                            navigation_state.0 && title_metrics.0 > 0.0,
                                         ),
                                         (
                                             section_icon_entity,
@@ -1861,7 +1891,7 @@ fn main() {
                                                 &bevy::color::Color::srgb_from_array([0.902; 3]),
                                                 anim.1[1],
                                             ),
-                                            hud.unwrap_or(false) && navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
+                                            navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
                                         ),
                                         (
                                             card_border_entity,
@@ -1869,7 +1899,7 @@ fn main() {
                                                 &bevy::color::Color::srgb_from_array([0.204; 3]),
                                                 anim.1[1],
                                             ),
-                                            hud.unwrap_or(false) && navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
+                                            navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
                                         ),
                                         (
                                             card_fill_entity,
@@ -1877,7 +1907,7 @@ fn main() {
                                                 &bevy::color::Color::srgb_from_array([0.090; 3]),
                                                 anim.1[1],
                                             ),
-                                            hud.unwrap_or(false) && navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
+                                            navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
                                         ),
                                         (
                                             flask_tile_entity,
@@ -1885,7 +1915,7 @@ fn main() {
                                                 &bevy::color::Color::srgb_from_array([0.173; 3]),
                                                 anim.1[1],
                                             ),
-                                            hud.unwrap_or(false) && navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
+                                            navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
                                         ),
                                         (
                                             flask_icon_entity,
@@ -1893,7 +1923,7 @@ fn main() {
                                                 &bevy::color::Color::srgb_from_array([0.902; 3]),
                                                 anim.1[1],
                                             ),
-                                            hud.unwrap_or(false) && navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
+                                            navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
                                         ),
                                         (
                                             card_divider_entity,
@@ -1901,7 +1931,7 @@ fn main() {
                                                 &bevy::color::Color::srgb_from_array([0.204; 3]),
                                                 anim.1[1],
                                             ),
-                                            hud.unwrap_or(false) && navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
+                                            navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
                                         ),
                                         (
                                             launch_button_entity,
@@ -1914,7 +1944,7 @@ fn main() {
                                                             * anim.0[2][2]; 3]),
                                                 anim.1[1],
                                             ),
-                                            hud.unwrap_or(false) && navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
+                                            navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
                                         ),
                                         (
                                             launch_ring_entity,
@@ -1924,8 +1954,7 @@ fn main() {
                                                 0.463,
                                                 anim.0[1][2] * anim.1[1],
                                             ),
-                                            hud.unwrap_or(false)
-                                                && navigation_state.0
+                                            navigation_state.0
                                                 && !navigation_state.1
                                                 && title_metrics.0 > 0.0
                                                 && anim.0[1][2] > 0.0,
@@ -1939,7 +1968,7 @@ fn main() {
                                                         - (0.05 * anim.0[2][2]); 3]),
                                                 anim.1[1],
                                             ),
-                                            hud.unwrap_or(false) && navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
+                                            navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
                                         ),
                                         (
                                             rocket_icon_entity,
@@ -1949,7 +1978,7 @@ fn main() {
                                                         + (0.902 - 0.686) * anim.0[0][2]; 3]),
                                                 anim.1[1],
                                             ),
-                                            hud.unwrap_or(false) && navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
+                                            navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
                                         ),
                                     ]
                                     .into_iter()
@@ -1962,8 +1991,9 @@ fn main() {
                                             sprites
                                                 .get(entity)
                                                 .map(
-                                                    |(sprite, visibility): (
+                                                    |(sprite, _transform, visibility): (
                                                         Option<&bevy::sprite::Sprite>,
+                                                        Option<&bevy::transform::components::Transform>,
                                                         &bevy::camera::visibility::Visibility,
                                                     )| {
                                                         sprite.into_iter().for_each(
@@ -2027,7 +2057,7 @@ fn main() {
                                                 &bevy::color::Color::srgb_from_array([0.902; 3]),
                                                 anim.1[1],
                                             ),
-                                            hud.unwrap_or(false) && navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
+                                            navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
                                         ),
                                         (
                                             card_title_entity,
@@ -2035,7 +2065,7 @@ fn main() {
                                                 &bevy::color::Color::srgb_from_array([0.902; 3]),
                                                 anim.1[1],
                                             ),
-                                            hud.unwrap_or(false) && navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
+                                            navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
                                         ),
                                         (
                                             launch_label_entity,
@@ -2045,7 +2075,7 @@ fn main() {
                                                         + (0.902 - 0.686) * anim.0[0][2]; 3]),
                                                 anim.1[1],
                                             ),
-                                            hud.unwrap_or(false) && navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
+                                            navigation_state.0 && !navigation_state.1 && title_metrics.0 > 0.0,
                                         ),
                                     ]
                                     .into_iter()
@@ -2113,8 +2143,7 @@ fn main() {
                                                 &bevy::color::Color::srgb_from_array([0.902; 3]),
                                                 anim.1[1],
                                             ),
-                                            hud.unwrap_or(false)
-                                                && navigation_state.0
+                                            navigation_state.0
                                                 && navigation_state.1
                                                 && title_metrics.0 > 0.0,
                                         ),
@@ -2129,8 +2158,9 @@ fn main() {
                                             sprites
                                                 .get(entity)
                                                 .map(
-                                                    |(sprite, visibility): (
+                                                    |(sprite, _transform, visibility): (
                                                         Option<&bevy::sprite::Sprite>,
+                                                        Option<&bevy::transform::components::Transform>,
                                                         &bevy::camera::visibility::Visibility,
                                                     )| {
                                                         sprite.into_iter().for_each(
@@ -2167,8 +2197,7 @@ fn main() {
                                                 &bevy::color::Color::srgb_from_array([0.902; 3]),
                                                 anim.1[1],
                                             ),
-                                            hud.unwrap_or(false)
-                                                && navigation_state.0
+                                            navigation_state.0
                                                 && navigation_state.1
                                                 && title_metrics.0 > 0.0,
                                         ),
@@ -2218,102 +2247,115 @@ fn main() {
                                     );
                                 },
                             );
-                                     if dot.2 && dot.0.is_none() {
-                                         handles.as_ref().map(
-                                             |registered: &[bevy::asset::Handle<
-                                                 bevy::image::Image,
-                                             >; 9]| {
-                                                 dot.0 = Some(
-                                                     commands
-                                                         .spawn((
-                                                             bevy::sprite::Sprite {
-                                                                 color: bevy::color::Color::srgb_from_array(
-                                                                     [0.902; 3],
-                                                                 ),
-                                                                 image: registered[8].clone(),
-                                                                 custom_size: Some(
-                                                                     bevy::math::Vec2::splat(6.0),
-                                                                 ),
-                                                                 ..bevy::sprite::Sprite::default()
-                                                             },
-                                                             bevy::transform::components::Transform::from_xyz(
-                                                                 0.0,
-                                                                 0.0,
-                                                                 100.0,
-                                                             ),
-                                                             bevy::camera::visibility::Visibility::Hidden,
-                                                         ))
-                                                         .id(),
-                                                 );
-                                             },
-                                         );
-                                     }
-                                     dot.0.into_iter().for_each(
-                                         |dot_entity: bevy::ecs::entity::Entity| {
-                                             transforms.get_mut(dot_entity).into_iter().for_each(
-                                                 |mut dot_transform: bevy::ecs::change_detection::Mut<
-                                                     bevy::transform::components::Transform,
-                                                 >| {
-                                                     if dot_transform.translation
-                                                         != bevy::math::Vec3::new(
-                                                             dot.1.x - viewport.x / 2.0,
-                                                             viewport.y / 2.0 - dot.1.y,
-                                                             100.0,
-                                                         )
-                                                     {
-                                                         dot_transform.translation =
-                                                             bevy::math::Vec3::new(
-                                                                 dot.1.x - viewport.x / 2.0,
-                                                                 viewport.y / 2.0 - dot.1.y,
-                                                                 100.0,
-                                                             );
-                                                     }
-                                                 },
-                                             );
-                                             sprites
-                                                 .get(dot_entity)
-                                                 .map(
-                                                     |(sprite, visibility): (
-                                                         Option<&bevy::sprite::Sprite>,
-                                                         &bevy::camera::visibility::Visibility,
-                                                     )| {
-                                                         sprite.into_iter().for_each(
-                                                             |sprite: &bevy::sprite::Sprite| {
-                                                                 if sprite.color
-                                                                     != bevy::color::Color::srgb_from_array(
-                                                                         [0.902; 3],
-                                                                     )
-                                                                 {
-                                                                     commands
-                                                                         .entity(dot_entity)
-                                                                         .insert(bevy::sprite::Sprite {
-                                                                             color: bevy::color::Color::srgb_from_array(
-                                                                                 [0.902; 3],
-                                                                             ),
-                                                                             ..sprite.clone()
-                                                                         });
-                                                                 }
-                                                             },
-                                                         );
-                                                         if (*visibility
-                                                             == bevy::camera::visibility::Visibility::Inherited)
-                                                             != window.focused
-                                                         {
-                                                             commands.entity(dot_entity).insert(
-                                                                 if window.focused {
-                                                                     bevy::camera::visibility::Visibility::Inherited
-                                                                 } else {
-                                                                     bevy::camera::visibility::Visibility::Hidden
-                                                                 },
-                                                             );
-                                                         }
-                                                     },
-                                                 )
-                                                 .ok();
-                                         },
-                                     );
                         },
                     );
+
+                    if dot.is_none() {
+                        *dot = Some((
+                            commands
+                                .spawn((
+                                    bevy::sprite::Sprite {
+                                        image: images.add(
+                                            bevy::image::Image::new(
+                                                bevy::render::render_resource::Extent3d {
+                                                    width: 11u32,
+                                                    height: 11u32,
+                                                    depth_or_array_layers: 1u32,
+                                                },
+                                                bevy::render::render_resource::TextureDimension::D2,
+                                                Vec::<u8>::from([
+                                                    0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18, 18, 18, 255, 18, 18, 18, 255,
+18, 18, 18, 255, 18, 18, 18, 255, 18, 18, 18, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+18, 18, 18, 255, 18, 18, 18, 255, 18, 18, 18, 255, 18, 18, 18, 255, 18, 18, 18, 255, 18, 18, 18, 255, 18, 18, 18, 255, 0, 0, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 18, 18, 18, 255, 18, 18, 18, 255, 18, 18, 18, 255, 235, 235, 235, 255, 235, 235, 235, 255, 235, 235, 235, 255,
+18, 18, 18, 255, 18, 18, 18, 255, 18, 18, 18, 255, 0, 0, 0, 0, 0, 0, 0, 0, 18, 18, 18, 255, 18, 18, 18, 255, 235, 235, 235, 255,
+235, 235, 235, 255, 235, 235, 235, 255, 235, 235, 235, 255, 235, 235, 235, 255, 18, 18, 18, 255, 18, 18, 18, 255, 0, 0, 0, 0, 0, 0, 0, 0,
+18, 18, 18, 255, 18, 18, 18, 255, 235, 235, 235, 255, 235, 235, 235, 255, 235, 235, 235, 255, 235, 235, 235, 255, 235, 235, 235, 255, 18, 18, 18, 255,
+18, 18, 18, 255, 0, 0, 0, 0, 0, 0, 0, 0, 18, 18, 18, 255, 18, 18, 18, 255, 235, 235, 235, 255, 235, 235, 235, 255, 235, 235, 235, 255,
+235, 235, 235, 255, 235, 235, 235, 255, 18, 18, 18, 255, 18, 18, 18, 255, 0, 0, 0, 0, 0, 0, 0, 0, 18, 18, 18, 255, 18, 18, 18, 255,
+18, 18, 18, 255, 235, 235, 235, 255, 235, 235, 235, 255, 235, 235, 235, 255, 18, 18, 18, 255, 18, 18, 18, 255, 18, 18, 18, 255, 0, 0, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 18, 18, 18, 255, 18, 18, 18, 255, 18, 18, 18, 255, 18, 18, 18, 255, 18, 18, 18, 255, 18, 18, 18, 255,
+18, 18, 18, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18, 18, 18, 255, 18, 18, 18, 255,
+18, 18, 18, 255, 18, 18, 18, 255, 18, 18, 18, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 0,
+                                                ]),
+                                                bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+                                                bevy::asset::RenderAssetUsages::RENDER_WORLD,
+                                            ),
+                                        ),
+                                        custom_size: Some(bevy::math::Vec2::splat(6.0)),
+                                        ..bevy::sprite::Sprite::default()
+                                    },
+                                    bevy::transform::components::Transform::from_xyz(
+                                        0.0, 0.0, 9.0,
+                                    ),
+                                    if window.focused {
+                                        bevy::camera::visibility::Visibility::Inherited
+                                    } else {
+                                        bevy::camera::visibility::Visibility::Hidden
+                                    },
+                                ))
+                                .id(),
+                            bevy::math::Vec2::new(
+                                viewport.x / 2.0,
+                                viewport.y / 2.0,
+                            ),
+                        ));
+                    }
+
+                    (*dot).into_iter().for_each(
+                        |(dot_entity, dot_position): (
+                            bevy::ecs::entity::Entity,
+                            bevy::math::Vec2,
+                        )| {
+                            sprites
+                                .get(dot_entity)
+                                .map(
+                                    |(_sprite, transform, visibility): (
+                                        Option<&bevy::sprite::Sprite>,
+                                        Option<&bevy::transform::components::Transform>,
+                                        &bevy::camera::visibility::Visibility,
+                                    )| {
+                                        transform.into_iter().for_each(
+                                            |transform: &bevy::transform::components::Transform| {
+                                                if transform.translation.truncate()
+                                                    != bevy::math::Vec2::new(
+                                                        dot_position.x - viewport.x / 2.0,
+                                                        viewport.y / 2.0 - dot_position.y,
+                                                    )
+                                                {
+                                                    commands
+                                                        .entity(dot_entity)
+                                                        .insert(
+                                                            bevy::transform::components::Transform::from_xyz(
+                                                                dot_position.x - viewport.x / 2.0,
+                                                                viewport.y / 2.0 - dot_position.y,
+                                                                9.0,
+                                                            ),
+                                                        );
+                                                }
+                                            },
+                                        );
+                                        if (*visibility
+                                            == bevy::camera::visibility::Visibility::Inherited)
+                                            != window.focused
+                                        {
+                                            commands
+                                                .entity(dot_entity)
+                                                .insert(if window.focused {
+                                                    bevy::camera::visibility::Visibility::Inherited
+                                                } else {
+                                                    bevy::camera::visibility::Visibility::Hidden
+                                                });
+                                        }
+                                    },
+                                )
+                                .ok();
+                        },
+                    );
+
                     if anim.0.iter().flatten().zip(
                         [
                             [
@@ -2346,29 +2388,35 @@ fn main() {
                     })
                         || (anim.1[0] - navigation_state.0 as u8 as f32).abs() > 0.001
                         || (anim.1[1]
-                            - if hud.unwrap_or(false) && navigation_state.0 {
+                            - if navigation_state.0 {
                                 1.0
                             } else {
                                 0.0
                             })
                             .abs()
                             > 0.001
-                        || title_metrics.0 == 0.0
-                        || title_metrics.2 < 1.0
                         || (window.focused
-                            && (keys.pressed(bevy::input::keyboard::KeyCode::ControlLeft)
-                                || keys.pressed(bevy::input::keyboard::KeyCode::ControlRight))
-                            && !(keys.pressed(bevy::input::keyboard::KeyCode::ShiftLeft)
-                                || keys.pressed(bevy::input::keyboard::KeyCode::ShiftRight)
-                                || keys.pressed(bevy::input::keyboard::KeyCode::AltLeft)
-                                || keys.pressed(bevy::input::keyboard::KeyCode::AltRight)
-                                || keys.pressed(bevy::input::keyboard::KeyCode::SuperLeft)
-                                || keys.pressed(bevy::input::keyboard::KeyCode::SuperRight))
-                            && (keys.pressed(bevy::input::keyboard::KeyCode::KeyW)
-                                || keys.pressed(bevy::input::keyboard::KeyCode::KeyA)
-                                || keys.pressed(bevy::input::keyboard::KeyCode::KeyS)
-                                || keys.pressed(bevy::input::keyboard::KeyCode::KeyD)))
-                    {
+                            && (keys.pressed(
+                                bevy::input::keyboard::KeyCode::ControlLeft,
+                            ) || keys.pressed(
+                                bevy::input::keyboard::KeyCode::ControlRight,
+                            ))
+                            && (((keys.pressed(
+                                bevy::input::keyboard::KeyCode::KeyD,
+                            ) as u8 as f32)
+                                - (keys.pressed(
+                                    bevy::input::keyboard::KeyCode::KeyA,
+                                ) as u8 as f32))
+                                != 0.0
+                                || ((keys.pressed(
+                                    bevy::input::keyboard::KeyCode::KeyS,
+                                ) as u8 as f32)
+                                    - (keys.pressed(
+                                        bevy::input::keyboard::KeyCode::KeyW,
+                                    ) as u8 as f32))
+                                    != 0.0))
+                        || title_metrics.0 == 0.0
+                        || title_metrics.2 < 1.0 {
                         if settings.focused_mode
                             != bevy::winit::UpdateMode::reactive_low_power(
                                 std::time::Duration::from_millis(16),
@@ -2380,31 +2428,29 @@ fn main() {
                                 );
                             settings.unfocused_mode = settings.focused_mode;
                         }
-                    } else if navigation_state.2.is_some()
-                        && window.focused
+                    } else if window.focused
                         && keys.pressed(bevy::input::keyboard::KeyCode::Escape)
                     {
-                        if settings.focused_mode
-                            != bevy::winit::UpdateMode::reactive_low_power(
-                                std::time::Duration::from_secs_f64(
-                                    (if navigation_state.1 { 5.0f64 } else { 7.0f64 }
-                                        - (time.elapsed_secs_f64()
-                                            - navigation_state.2.unwrap_or(0.0f64)))
-                                    .max(0.001f64),
-                                ),
-                            )
-                        {
-                            settings.focused_mode =
+                        settings.focused_mode = navigation_state
+                            .2
+                            .map(|started: std::time::Instant| {
                                 bevy::winit::UpdateMode::reactive_low_power(
                                     std::time::Duration::from_secs_f64(
-                                        (if navigation_state.1 { 5.0f64 } else { 7.0f64 }
-                                            - (time.elapsed_secs_f64()
-                                                - navigation_state.2.unwrap_or(0.0f64)))
-                                        .max(0.001f64),
+                                        ((if navigation_state.1 {
+                                            5.0f64
+                                        } else {
+                                            7.0f64
+                                        }) - started.elapsed().as_secs_f64())
+                                            .max(0.016f64),
                                     ),
-                                );
-                            settings.unfocused_mode = settings.focused_mode;
-                        }
+                                )
+                            })
+                            .unwrap_or(
+                                bevy::winit::UpdateMode::reactive_low_power(
+                                    std::time::Duration::MAX,
+                                ),
+                            );
+                        settings.unfocused_mode = settings.focused_mode;
                     } else if settings.focused_mode
                         != bevy::winit::UpdateMode::reactive_low_power(
                             std::time::Duration::MAX,
